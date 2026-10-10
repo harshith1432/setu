@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeriCare | Super Admin Command Portal</title>
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ================= AUTH VIEW ================= -->
+  <div id="authView" class="auth-wrapper">
+    <div class="auth-card">
+      <div class="brand-badge">
+        <i data-lucide="shield-check" class="brand-icon"></i>
+        <span>SERICARE SECURE COMMAND</span>
+      </div>
+      <h2>Super Admin Access</h2>
+      <p class="subtitle">Central management portal for Sericulture farmers, rearing sheds & IoT actuators across Mulbagal.</p>
+      
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="username"><i data-lucide="user"></i> Admin Username</label>
+          <input type="text" id="username" value="admin" placeholder="e.g. admin" required autocomplete="username">
+        </div>
+        
+        <div class="form-group">
+          <label for="password"><i data-lucide="key"></i> Security Key / Password</label>
+          <div class="password-input-wrapper">
+            <input type="password" id="password" value="admin" placeholder="Enter password" required autocomplete="current-password">
+            <button type="button" id="togglePasswordBtn" class="btn-toggle-password" onclick="togglePasswordVisibility()" title="Show/Hide Password" aria-label="Toggle password visibility">
+              <i data-lucide="eye" id="passwordEyeIcon"></i>
+            </button>
+          </div>
+        </div>
+        
+        <div id="loginError" class="alert-box error hidden"></div>
+
+        <button type="submit" id="loginBtn" class="btn btn-primary full-width">
+          <span>Authorize Access</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+      
+      <div class="auth-footer">
+        <p><i data-lucide="lock"></i> End-to-end encrypted admin sessions & JWT authentication.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD VIEW ================= -->
+  <div id="dashboardView" class="dashboard-wrapper hidden">
+    <!-- Top Navigation -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="logo-box">
+          <i data-lucide="leaf"></i>
+        </div>
+        <div>
+          <h1>SeriCare <span class="badge-role">Super Admin</span></h1>
+          <p class="nav-sub">Mulbagal Cluster Management Hub</p>
+        </div>
+      </div>
+
+      <div class="nav-right">
+        <div class="live-pulse">
+          <span class="pulse-dot"></span>
+          <span>SYSTEM LIVE</span>
+        </div>
+        <div class="admin-profile">
+          <div class="avatar"><i data-lucide="user-check"></i></div>
+          <div>
+            <div class="profile-name" id="adminDisplayName">Super Administrator</div>
+            <div class="profile-role">Master Access Level</div>
+          </div>
+        </div>
+        <button class="btn btn-outline" onclick="handleLogout()" title="Log Out">
+          <i data-lucide="log-out"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      
+      <!-- Cluster Status Notice -->
+      <section class="banner-strip">
+        <div class="banner-left">
+          <i data-lucide="map-pin" class="banner-icon"></i>
+          <div>
+            <strong>Region Cluster:</strong> Mulbagal Sericulture Division, Kolar District, Karnataka
+            <span class="separator">•</span>
+            <span id="telemetryStatusText">Telemetry Stream Active</span>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="loadAllDashboardData()">
+          <i data-lucide="refresh-cw"></i> Sync Data
+        </button>
+      </section>
+
+      <!-- KPI Summary Cards -->
+      <section class="kpi-grid">
+        <div class="kpi-card card-green">
+          <div class="kpi-header">
+            <span>Enrolled Farmers</span>
+            <div class="kpi-icon"><i data-lucide="users"></i></div>
+          </div>
+          <div class="kpi-value" id="kpiTotalFarmers">--</div>
+          <div class="kpi-caption">
+            <span class="caption-highlight" id="kpiActiveFarmers">--</span> Active farming batches
+          </div>
+        </div>
+
+        <div class="kpi-card card-purple">
+          <div class="kpi-header">
+            <span>Total DFL Capacity</span>
+            <div class="kpi-icon"><i data-lucide="boxes"></i></div>
+          </div>
+          <div class="kpi-value" id="kpiDflCapacity">--</div>
+          <div class="kpi-caption">Disease Free Layings in rearing</div>
+        </div>
+
+        <div class="kpi-card card-blue">
+          <div class="kpi-header">
+            <span>Monitored Sheds</span>
+            <div class="kpi-icon"><i data-lucide="home"></i></div>
+          </div>
+          <div class="kpi-value" id="kpiMonitoredSheds">--</div>
+          <div class="kpi-caption">
+            <span class="status-indicator-green"></span> 100% online IoT telemetry
+          </div>
+        </div>
+
+        <div class="kpi-card card-amber">
+          <div class="kpi-header">
+            <span>Active Actuators</span>
+            <div class="kpi-icon"><i data-lucide="cpu"></i></div>
+          </div>
+          <div class="kpi-value" id="kpiActiveRelays">--</div>
+          <div class="kpi-caption">Fans, Coolers & Heaters running</div>
+        </div>
+      </section>
+
+      <!-- Live IoT Telemetry & Emergency Controls Row -->
+      <section class="two-column-grid">
+        
+        <!-- Live Shed Environment & Actuator Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <i data-lucide="activity"></i>
+              <h3>Active Shed Telemetry & Relays (Shed 01)</h3>
+            </div>
+            <span class="badge-tag" id="liveStageBadge">Instar IV (Active)</span>
+          </div>
+          <div class="panel-body">
+            <div class="telemetry-gauges">
+              <div class="gauge-box">
+                <div class="gauge-label">Internal Temp</div>
+                <div class="gauge-val" id="shedTemp">--°C</div>
+                <div class="gauge-target">Target: 25.0°C - 26.5°C</div>
+              </div>
+              <div class="gauge-box">
+                <div class="gauge-label">Internal Humidity</div>
+                <div class="gauge-val" id="shedHumidity">--%</div>
+                <div class="gauge-target">Target: 70% - 75%</div>
+              </div>
+              <div class="gauge-box">
+                <div class="gauge-label">Outside Weather</div>
+                <div class="gauge-val" id="outsideTemp">--°C</div>
+                <div class="gauge-target" id="weatherCondition">Sunny</div>
+              </div>
+            </div>
+
+            <div class="actuator-status-list">
+              <h4>Connected Actuators (Relay Pins):</h4>
+              <div class="relay-cards">
+                <div class="relay-card" id="relayCooler">
+                  <div class="relay-info">
+                    <i data-lucide="droplets"></i>
+                    <div>
+                      <div class="relay-name">Cooling Fogger</div>
+                      <div class="relay-pin">GPIO Relay Pin 18</div>
+                    </div>
+                  </div>
+                  <span class="relay-state" id="stateCooler">OFF</span>
+                </div>
+
+                <div class="relay-card" id="relayFan">
+                  <div class="relay-info">
+                    <i data-lucide="wind"></i>
+                    <div>
+                      <div class="relay-name">Exhaust Fan</div>
+                      <div class="relay-pin">GPIO Relay Pin 23</div>
+                    </div>
+                  </div>
+                  <span class="relay-state" id="stateFan">OFF</span>
+                </div>
+
+                <div class="relay-card" id="relayHeater">
+                  <div class="relay-info">
+                    <i data-lucide="flame"></i>
+                    <div>
+                      <div class="relay-name">Halogen Heater</div>
+                      <div class="relay-pin">GPIO Relay Pin 24</div>
+                    </div>
+                  </div>
+                  <span class="relay-state" id="stateHeater">OFF</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Super Admin Emergency Override Controls -->
+        <div class="panel emergency-panel">
+          <div class="panel-header">
+            <div class="panel-title text-danger">
+              <i data-lucide="alert-triangle"></i>
+              <h3>Super Admin Emergency Controls</h3>
+            </div>
+            <span class="badge-danger">Master Override</span>
+          </div>
+          <div class="panel-body">
+            <p class="panel-desc">
+              Trigger high-priority environment overrides directly to rearing sheds during severe heatwaves or emergencies. These override automated AI rules.
+            </p>
+
+            <div class="emergency-actions">
+              <div class="action-card">
+                <div>
+                  <strong>Emergency Exhaust Ventilation</strong>
+                  <p>Instantly engage 100% capacity ventilation fans to exhaust hot air and ammonia buildup.</p>
+                </div>
+                <button class="btn btn-warning" onclick="triggerEmergency('EMERGENCY_VENTILATE')">
+                  <i data-lucide="wind"></i> Force Fans ON
+                </button>
+              </div>
+
+              <div class="action-card">
+                <div>
+                  <strong>Fogger Boost (Rapid Cool)</strong>
+                  <p>Engage high-pressure micro-foggers to lower internal temperatures in heat spikes.</p>
+                </div>
+                <button class="btn btn-primary" onclick="triggerEmergency('FOGGER_BOOST')">
+                  <i data-lucide="droplets"></i> Fogger Boost
+                </button>
+              </div>
+
+              <div class="action-card danger-card">
+                <div>
+                  <strong>Emergency Master Shutdown</strong>
+                  <p>Safely turn off all heaters, coolers, and fans in case of electrical or sensor fault.</p>
+                </div>
+                <button class="btn btn-danger" onclick="triggerEmergency('COOLDOWN_ALL')">
+                  <i data-lucide="power-off"></i> Master Kill All
+                </button>
+              </div>
+            </div>
+            
+            <div id="emergencyFeedback" class="alert-box success hidden"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Farmers Management Table Section -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <i data-lucide="users"></i>
+            <h3>Enrolled Sericulture Farmers Management</h3>
+          </div>
+          <div class="table-actions">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="farmerSearch" placeholder="Search farmer, farm or batch..." oninput="filterFarmers()">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openEnrollFarmerModal()">
+              <i data-lucide="user-plus"></i> Enroll Farmer
+            </button>
+          </div>
+        </div>
+        
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Farmer & Account</th>
+                <th>Farm / Shed Name</th>
+                <th>Region</th>
+                <th>Active Batch</th>
+                <th>Capacity</th>
+                <th>Breed</th>
+                <th>Status</th>
+                <th>Account Controls</th>
+              </tr>
+            </thead>
+            <tbody id="farmersTableBody">
+              <tr>
+                <td colspan="8" class="text-center loading-cell">Loading registered farmers...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Audit Logs Section -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <i data-lucide="file-clock"></i>
+            <h3>Security & Control Audit Logs</h3>
+          </div>
+          <span class="badge-tag">Real-Time Trace</span>
+        </div>
+        <div class="table-container log-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 180px;">Timestamp</th>
+                <th style="width: 150px;">Actor / Admin</th>
+                <th style="width: 160px;">Action</th>
+                <th>Details & Payload</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr>
+                <td colspan="4" class="text-center">Loading audit log stream...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="admin-footer">
+      <div>SeriCare Smart Sericulture System • Department of Sericulture Support</div>
+      <div>Designed for Kolar & Mulbagal Silkworm Rearing Clusters</div>
+    </footer>
+  </div>
+
+  <!-- ================= ENROLL FARMER MODAL ================= -->
+  <div id="enrollModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i data-lucide="user-plus"></i> Enroll New Sericulture Farmer</h3>
+        <button class="btn-close" onclick="closeEnrollModal()"><i data-lucide="x"></i></button>
+      </div>
+      
+      <form id="enrollFarmerForm" onsubmit="handleEnrollFarmer(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="enrollUsername">Username *</label>
+            <input type="text" id="enrollUsername" required placeholder="e.g. anand_mulbagal">
+          </div>
+          <div class="form-group">
+            <label for="enrollFullName">Full Name *</label>
+            <input type="text" id="enrollFullName" required placeholder="e.g. Anand Gowda">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="enrollPassword">Initial Password *</label>
+            <input type="password" id="enrollPassword" required placeholder="Min 6 characters">
+          </div>
+          <div class="form-group">
+            <label for="enrollPhone">Phone Number</label>
+            <input type="text" id="enrollPhone" placeholder="e.g. +91 98450 12345">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="enrollFarmName">Shed / Farm Name *</label>
+            <input type="text" id="enrollFarmName" required placeholder="e.g. Gowda Silks Shed 1">
+          </div>
+          <div class="form-group">
+            <label for="enrollRegion">Region</label>
+            <input type="text" id="enrollRegion" value="Mulbagal, Kolar, Karnataka">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="enrollBatchId">Initial Batch ID</label>
+            <input type="text" id="enrollBatchId" value="BATCH-2026-004">
+          </div>
+          <div class="form-group">
+            <label for="enrollDfl">DFL Capacity</label>
+            <input type="text" id="enrollDfl" value="250 DFL">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="enrollBreed">Silkworm Breed</label>
+          <select id="enrollBreed">
+            <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
+            <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
+            <option value="Pure Mysore">Pure Mysore</option>
+          </select>
+        </div>
+
+        <div id="enrollError" class="alert-box error hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeEnrollModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check"></i> Enroll & Activate Farmer
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

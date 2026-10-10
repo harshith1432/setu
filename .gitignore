@@ -1,0 +1,120 @@
+# ==========================================
+# SeriCare Master Git Ignore
+# ==========================================
+
+# Environment variables & secrets
+.env
+.env.*
+*.env
+!.env.example
+!*.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.egg-info/
+dist/
+eggs/
+.eggs/
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# Flutter & Dart
+.dart_tool/
+**/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+**/build/
+*.dill
+*.track.dill
+.widget_preview/
+
+# Android build artifacts & local machine paths
+.gradle/
+**/.gradle/
+.kotlin/
+**/.kotlin/
+local.properties
+**/local.properties
+**/android/app/build/
+**/android/build/
+**/android/.cxx/
+**/android/captures/
+*.apk
+*.aab
+*.ap_
+key.properties
+**/*.keystore
+**/*.jks
+
+# iOS & macOS (Flutter)
+**/ios/.generated/
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+**/*.xcuserstate
+xcuserdata/
+
+# Windows desktop build (Flutter)
+**/windows/flutter/ephemeral/
+**/windows/build/
+
+# Web build (Flutter)
+**/mobile/build/web/
+
+# IDE & Editor settings
+.idea/
+**/.idea/
+*.iml
+**/*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+*~
+*.bak
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Logs & Databases
+*.log
+*.sqlite3
+*.db
+tmp/
+temp/
