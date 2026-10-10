@@ -145,10 +145,37 @@ class ApiService {
     return null;
   }
 
-  Future<ShedData> getShedStatus(String shedId) async {
+  Future<Map<String, dynamic>?> updateProfile(Map<String, dynamic> profileData) async {
     for (final base in candidateUrls) {
       try {
-        final res = await http.get(Uri.parse('$base/sheds/$shedId'), headers: _headers)
+        final res = await http.put(
+          Uri.parse('$base/auth/profile'),
+          headers: _headers,
+          body: jsonEncode(profileData),
+        ).timeout(const Duration(seconds: 4));
+        if (res.statusCode == 200) {
+          return jsonDecode(res.body);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<ShedData> getShedStatus(
+    String shedId, {
+    double? lat,
+    double? lon,
+    String? region,
+  }) async {
+    for (final base in candidateUrls) {
+      try {
+        final queryParams = <String, String>{};
+        if (lat != null) queryParams['lat'] = lat.toString();
+        if (lon != null) queryParams['lon'] = lon.toString();
+        if (region != null && region.isNotEmpty) queryParams['region'] = region;
+
+        final uri = Uri.parse('$base/sheds/$shedId').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+        final res = await http.get(uri, headers: _headers)
             .timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) {
           return ShedData.fromJson(jsonDecode(res.body));
@@ -160,7 +187,7 @@ class ApiService {
     return ShedData(
       shedId: shedId,
       farmName: 'Green Valley Farm',
-      region: 'Mulbagal, Karnataka',
+      region: region ?? 'My Sericulture Shed',
       overallStatus: 'IDEAL',
       statusHeadline: 'Ideal for Silkworms',
       statusSubline: 'Everything is comfortable inside the shed. No action required.',
@@ -168,8 +195,8 @@ class ApiService {
       stageName: '3rd Instar',
       indoorTemp: 26.2,
       indoorHumidity: 74.0,
-      outsideTemp: 34.2,
-      outsideHumidity: 58.0,
+      outsideTemp: 28.5,
+      outsideHumidity: 55.0,
       actuators: ActuatorStates(cooler: true, fan: false, heater: false),
       isAutoMode: true,
       tempTarget: 26.0,
