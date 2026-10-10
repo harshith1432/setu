@@ -4,7 +4,7 @@ import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class AdvancedModeModal extends StatelessWidget {
-  const AdvancedModeModal({Key? key}) : super(key: key);
+  const AdvancedModeModal({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -129,7 +129,7 @@ class AdvancedModeModal extends StatelessWidget {
                   _buildStepBtn('-', () => provider.adjustTempSetPoint(-0.5)),
                   const SizedBox(width: 8),
                   Text(
-                    '${provider.tempSetPoint.toStringAsFixed(1)}',
+                    provider.tempSetPoint.toStringAsFixed(1),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(width: 8),

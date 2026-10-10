@@ -10,11 +10,11 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenManual;
 
   const HomeScreen({
-    Key? key,
+    super.key,
     required this.onOpenDetails,
     required this.onOpenAi,
     required this.onOpenManual,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

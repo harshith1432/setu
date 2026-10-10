@@ -6,7 +6,7 @@ import '../l10n/app_localizations.dart';
 class OnboardingScreen extends StatelessWidget {
   final VoidCallback onProceed;
 
-  const OnboardingScreen({Key? key, required this.onProceed}) : super(key: key);
+  const OnboardingScreen({super.key, required this.onProceed});
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +37,7 @@ class OnboardingScreen extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF4CAF50).withOpacity(0.3),
+                          color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
                           blurRadius: 18,
                           offset: const Offset(0, 8),
                         ),
@@ -100,7 +100,7 @@ class OnboardingScreen extends StatelessWidget {
                   border: Border.all(color: const Color(0xFFE0E7DC)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

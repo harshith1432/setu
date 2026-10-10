@@ -7,7 +7,7 @@ import '../widgets/user_profile_modal.dart';
 class StartingPageScreen extends StatelessWidget {
   final VoidCallback onStart;
 
-  const StartingPageScreen({Key? key, required this.onStart}) : super(key: key);
+  const StartingPageScreen({super.key, required this.onStart});
 
   void _openProfileModal(BuildContext context) {
     showModalBottomSheet(

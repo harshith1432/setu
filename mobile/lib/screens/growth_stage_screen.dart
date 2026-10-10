@@ -4,7 +4,7 @@ import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class GrowthStageScreen extends StatelessWidget {
-  const GrowthStageScreen({Key? key}) : super(key: key);
+  const GrowthStageScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -73,7 +73,7 @@ class GrowthStageScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${stageNum}${_getSuffix(stageNum)}',
+                      '$stageNum${_getSuffix(stageNum)}',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,

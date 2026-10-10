@@ -7,7 +7,7 @@ import '../widgets/visual_comfort_chart.dart';
 class EnvironmentScreen extends StatefulWidget {
   final VoidCallback onOpenManual;
 
-  const EnvironmentScreen({Key? key, required this.onOpenManual}) : super(key: key);
+  const EnvironmentScreen({super.key, required this.onOpenManual});
 
   @override
   State<EnvironmentScreen> createState() => _EnvironmentScreenState();

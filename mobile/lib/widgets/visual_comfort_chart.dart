@@ -11,7 +11,7 @@ class VisualComfortChart extends StatelessWidget {
   final List<double> normalizedPoints; // 0.0 to 1.0 (0.0 is top/hot, 1.0 is bottom/cool)
 
   const VisualComfortChart({
-    Key? key,
+    super.key,
     required this.title,
     required this.currentVal,
     required this.idealZoneText,
@@ -20,7 +20,7 @@ class VisualComfortChart extends StatelessWidget {
     required this.bottomLabel,
     required this.lineColor,
     required this.normalizedPoints,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/setu_provider.dart';
 
 class SystemSettingsModal extends StatefulWidget {
-  const SystemSettingsModal({Key? key}) : super(key: key);
+  const SystemSettingsModal({super.key});
 
   @override
   State<SystemSettingsModal> createState() => _SystemSettingsModalState();

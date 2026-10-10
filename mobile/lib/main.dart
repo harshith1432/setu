@@ -28,7 +28,7 @@ void main() {
 }
 
 class SetuApp extends StatelessWidget {
-  const SetuApp({Key? key}) : super(key: key);
+  const SetuApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +77,7 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
 }
 
 class AppRootFlow extends StatefulWidget {
-  const AppRootFlow({Key? key}) : super(key: key);
+  const AppRootFlow({super.key});
 
   @override
   State<AppRootFlow> createState() => _AppRootFlowState();
@@ -133,7 +133,7 @@ class _AppRootFlowState extends State<AppRootFlow> {
 }
 
 class MainNavigationShell extends StatefulWidget {
-  const MainNavigationShell({Key? key}) : super(key: key);
+  const MainNavigationShell({super.key});
 
   @override
   State<MainNavigationShell> createState() => _MainNavigationShellState();

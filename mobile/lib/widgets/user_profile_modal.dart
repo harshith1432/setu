@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/setu_provider.dart';
 
 class UserProfileModal extends StatefulWidget {
-  const UserProfileModal({Key? key}) : super(key: key);
+  const UserProfileModal({super.key});
 
   @override
   State<UserProfileModal> createState() => _UserProfileModalState();

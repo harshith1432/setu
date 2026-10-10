@@ -4,7 +4,7 @@ import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class AiGuidanceScreen extends StatefulWidget {
-  const AiGuidanceScreen({Key? key}) : super(key: key);
+  const AiGuidanceScreen({super.key});
 
   @override
   State<AiGuidanceScreen> createState() => _AiGuidanceScreenState();

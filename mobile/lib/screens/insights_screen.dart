@@ -4,7 +4,7 @@ import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class InsightsScreen extends StatefulWidget {
-  const InsightsScreen({Key? key}) : super(key: key);
+  const InsightsScreen({super.key});
 
   @override
   State<InsightsScreen> createState() => _InsightsScreenState();

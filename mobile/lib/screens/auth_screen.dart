@@ -5,7 +5,7 @@ import '../providers/setu_provider.dart';
 class AuthScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
 
-  const AuthScreen({Key? key, required this.onLoginSuccess}) : super(key: key);
+  const AuthScreen({super.key, required this.onLoginSuccess});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();

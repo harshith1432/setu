@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/setu_provider.dart';
 
 class DetailedMetricsModal extends StatelessWidget {
-  const DetailedMetricsModal({Key? key}) : super(key: key);
+  const DetailedMetricsModal({super.key});
 
   @override
   Widget build(BuildContext context) {

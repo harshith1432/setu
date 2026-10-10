@@ -545,7 +545,7 @@ class SetuProvider with ChangeNotifier {
       await _saveSessionToPreferences(token: _authToken!, userMap: user);
       await _cacheRegisteredAccount(user, cleanPwd);
       notifyListeners();
-      return (success: true, message: 'Welcome ${_userName}! Farm registered successfully.');
+      return (success: true, message: 'Welcome $_userName! Farm registered successfully.');
     }
 
     // Specific error from server (e.g. "Username already registered")
@@ -585,7 +585,7 @@ class SetuProvider with ChangeNotifier {
     await _saveSessionToPreferences(token: _authToken!, userMap: localUser);
     await _cacheRegisteredAccount(localUser, cleanPwd);
     notifyListeners();
-    return (success: true, message: 'Welcome ${_userName}! Registered successfully on this device.');
+    return (success: true, message: 'Welcome $_userName! Registered successfully on this device.');
   }
 
   Future<void> logout() async {
