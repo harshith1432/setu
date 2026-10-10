@@ -42,7 +42,8 @@ def health_check():
     return {
         "service": settings.PROJECT_NAME,
         "status": "healthy",
-        "cluster": settings.DEFAULT_REGION,
+        "network": settings.DEFAULT_REGION,
+        "mode": "Dynamic / Worldwide Location & Real-Time Weather",
         "api_docs": "/docs",
         "super_admin_portal": "/admin"
     }

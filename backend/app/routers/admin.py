@@ -52,7 +52,7 @@ def get_admin_dashboard_stats(admin_user: dict = Depends(require_superadmin)):
         "active_sheds_monitored": len(telemetry_service.sheds),
         "system_health": "100% Operational",
         "active_relays_count": (1 if shed_overview.actuators.cooler else 0) + (1 if shed_overview.actuators.fan else 0) + (1 if shed_overview.actuators.heater else 0),
-        "cluster_region": "Mulbagal Sericulture Cluster, Karnataka"
+        "cluster_region": "Global Sericulture Network"
     }
 
 @router.get("/farmers")

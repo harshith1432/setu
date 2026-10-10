@@ -29,7 +29,7 @@
         <span>SERICARE SECURE COMMAND</span>
       </div>
       <h2>Super Admin Console</h2>
-      <p class="auth-subtitle">Central supervisory portal for Mulbagal Sericulture cluster, silkworm rearing sheds & IoT microclimate automation.</p>
+      <p class="auth-subtitle">Central supervisory portal for Sericulture rearing sheds & IoT microclimate automation.</p>
       
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
@@ -77,8 +77,8 @@
           </div>
         </div>
         <div class="cluster-tag">
-          <i data-lucide="map-pin"></i>
-          <span>Mulbagal Cluster, Kolar</span>
+          <i data-lucide="globe"></i>
+          <span>Global Sericulture Network</span>
         </div>
       </div>
 
@@ -177,7 +177,7 @@
           <!-- Live Weather Pill -->
           <div class="weather-chip" id="topWeatherChip">
             <i data-lucide="sun"></i>
-            <span id="weatherChipText">Mulbagal: --°C</span>
+            <span id="weatherChipText">Outside: --°C</span>
           </div>
 
           <!-- Manual Sync Button -->
@@ -251,7 +251,7 @@
                 <div class="kpi-icon"><i data-lucide="cloud-sun"></i></div>
               </div>
               <div class="kpi-value" id="kpiOutsideTemp">--°C</div>
-              <div class="kpi-caption" id="kpiOutsideHum">Mulbagal Humidity: --%</div>
+              <div class="kpi-caption" id="kpiOutsideHum">Outside Humidity: --%</div>
             </div>
           </div>
 
@@ -676,7 +676,7 @@
                 <div class="card-icon-badge"><i data-lucide="users"></i></div>
                 <div>
                   <h3>Enrolled Sericulture Farmers & Rearing Sheds</h3>
-                  <p>Database of registered rearers across Mulbagal and Kolar clusters</p>
+                  <p>Database of registered rearers and rearing shed locations</p>
                 </div>
               </div>
 
@@ -856,8 +856,8 @@
               <input type="text" id="enrollFarmName" required placeholder="e.g. Gowda Silk Farm Shed 2">
             </div>
             <div class="form-group">
-              <label for="enrollRegion">Region Cluster</label>
-              <input type="text" id="enrollRegion" value="Mulbagal, Kolar, Karnataka">
+              <label for="enrollRegion">Region / Location</label>
+              <input type="text" id="enrollRegion" placeholder="e.g. Mysuru, Karnataka or Tokyo">
             </div>
           </div>
 

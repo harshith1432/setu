@@ -32,10 +32,10 @@ class Settings(BaseModel):
         "postgresql://postgres:postgres@127.0.0.1:5432/setu"
     )
 
-    # Regional defaults (Mulbagal Cluster, Karnataka)
-    DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "Mulbagal, Kolar, Karnataka")
-    DEFAULT_LATITUDE: float = float(os.getenv("DEFAULT_LATITUDE", "13.1633"))
-    DEFAULT_LONGITUDE: float = float(os.getenv("DEFAULT_LONGITUDE", "78.3944"))
+    # Regional defaults (Global Worldwide Dynamic Geocoding)
+    DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "Global Sericulture Network")
+    DEFAULT_LATITUDE: float = float(os.getenv("DEFAULT_LATITUDE", "0.0"))
+    DEFAULT_LONGITUDE: float = float(os.getenv("DEFAULT_LONGITUDE", "0.0"))
 
 settings = Settings()
 

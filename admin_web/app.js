@@ -91,7 +91,7 @@ function switchNavTab(tabName) {
     stages: { title: 'Rearing Stage Climate Levels', breadcrumb: 'Super Admin Auto-Mode Controls' },
     telemetry: { title: 'Shed IoT Sensors & Relays', breadcrumb: 'Active Hardware State' },
     analytics: { title: 'Microclimate Analytics (24h)', breadcrumb: 'Telemetry Curves vs Safe Zones' },
-    farmers: { title: 'Enrolled Farmers Directory', breadcrumb: 'Mulbagal & Kolar Clusters' },
+    farmers: { title: 'Enrolled Farmers Directory', breadcrumb: 'Global Sericulture Network' },
     emergency: { title: 'Emergency Actuator Overrides', breadcrumb: 'Manual Safety Interlocks' },
     audit: { title: 'Security & Action Audit Logs', breadcrumb: 'Traceable Administrative Log' }
   };
@@ -270,9 +270,9 @@ async function fetchLiveTelemetry() {
 
     // KPI Badges & Outside Weather
     document.getElementById('kpiOutsideTemp').textContent = `${ov.outside_temp.toFixed(1)}°C`;
-    document.getElementById('kpiOutsideHum').textContent = `Mulbagal Humidity: ${ov.outside_humidity.toFixed(0)}%`;
+    document.getElementById('kpiOutsideHum').textContent = `Outside Humidity: ${ov.outside_humidity.toFixed(0)}%`;
     document.getElementById('kpiCompliance').textContent = `${data.compliance_index}%`;
-    document.getElementById('weatherChipText').textContent = `Mulbagal: ${ov.outside_temp.toFixed(1)}°C • ${ov.outside_humidity.toFixed(0)}% RH`;
+    document.getElementById('weatherChipText').textContent = `${ov.region || 'Outside'}: ${ov.outside_temp.toFixed(1)}°C • ${ov.outside_humidity.toFixed(0)}% RH`;
 
     // Overview Microclimate Gauges
     document.getElementById('overviewShedLabel').textContent = `${ov.shed_id.toUpperCase()} • ${ov.farm_name}`;
@@ -890,7 +890,7 @@ function renderFarmersTable(farmers) {
           <div class="farmer-sub-cell">@${escapeHtml(f.username)} • ${escapeHtml(f.phone || 'N/A')}</div>
         </td>
         <td><strong>${escapeHtml(f.farm_name || 'Main Shed')}</strong></td>
-        <td>${escapeHtml(f.region || 'Mulbagal, Kolar')}</td>
+        <td>${escapeHtml(f.region || 'Local / Global')}</td>
         <td><code>${escapeHtml(f.batch_id || 'BATCH-2026')}</code></td>
         <td><strong>${escapeHtml(f.dfl_capacity || 'N/A')}</strong></td>
         <td><small>${escapeHtml(f.breed || 'Bivoltine')}</small></td>

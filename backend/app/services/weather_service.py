@@ -32,7 +32,7 @@ WMO_WEATHER_MAP = {
 }
 
 class WeatherService:
-    def __init__(self, default_region: str = "Mulbagal, Kolar, Karnataka"):
+    def __init__(self, default_region: str = "Global Sericulture Network"):
         self.default_region = default_region
 
     def geocode_region(self, region_name: str) -> Optional[Dict[str, Any]]:

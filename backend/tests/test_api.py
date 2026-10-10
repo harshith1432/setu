@@ -18,7 +18,7 @@ async def test_health_check(async_client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert "Mulbagal" in data["cluster"]
+    assert "Dynamic" in data.get("mode", "") or "Global" in data.get("network", "")
 
 @pytest.mark.anyio
 async def test_login_success_and_jwt(async_client):
@@ -118,7 +118,7 @@ async def test_super_admin_stats_and_farmer_management(async_client):
     assert stats_res.status_code == 200
     stats_data = stats_res.json()
     assert stats_data["total_farmers"] >= 3
-    assert "Mulbagal" in stats_data["cluster_region"]
+    assert "Global" in stats_data["cluster_region"]
 
     # Fetch farmers list
     farmers_res = await async_client.get("/api/v1/admin/farmers", headers=admin_headers)
