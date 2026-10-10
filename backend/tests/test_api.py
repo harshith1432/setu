@@ -180,3 +180,14 @@ async def test_farmer_registration_persistence_and_subsequent_login(async_client
     assert me_res.status_code == 200
     assert me_res.json()["farm_name"] == "Kolar Silk Valley Farm"
 
+@pytest.mark.anyio
+async def test_live_weather_endpoint(async_client):
+    response = await async_client.get("/api/v1/weather/current?lat=13.1652&lon=78.3965")
+    assert response.status_code == 200
+    data = response.json()
+    assert "outside_temperature" in data
+    assert "outside_humidity" in data
+    assert "condition" in data
+    assert data["latitude"] == 13.1652
+    assert data["longitude"] == 78.3965
+

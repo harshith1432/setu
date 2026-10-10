@@ -104,10 +104,31 @@ class TelemetryService:
 
         return self.get_shed_overview(payload.shed_id)
 
-    def get_shed_overview(self, shed_id: str) -> ShedOverview:
+    def get_shed_overview(
+        self,
+        shed_id: str,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        region_override: Optional[str] = None
+    ) -> ShedOverview:
         shed = self.sheds.get(shed_id)
         if not shed:
             shed = self.sheds["shed_01"]
+
+        # Fetch real-time weather dynamically from Open-Meteo
+        lookup_region = region_override or shed.get("region")
+        try:
+            live_weather = weather_service.get_current_weather(
+                lat=lat,
+                lon=lon,
+                region=lookup_region
+            )
+            shed["outside_temp"] = live_weather["outside_temperature"]
+            shed["outside_hum"] = live_weather["outside_humidity"]
+            if lookup_region:
+                shed["region"] = lookup_region
+        except Exception:
+            pass
 
         status, headline, subline, _ = rules_engine.evaluate(
             current_temp=shed["current_temp"],
