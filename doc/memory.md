@@ -21,7 +21,7 @@ Control System
 
 **Target:** Silkworm rearing environment management
 
-**Initial Region:** Mulbagal, Karnataka, India
+**Region Scope:** Worldwide (Dynamic GPS & Geocoded Locations)
 
 **Initial Languages:**
 

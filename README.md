@@ -12,9 +12,9 @@
 
 ## 📌 Overview
 
-**Setu** is an end-to-end, IoT-enabled environmental management and automation system purpose-built for silkworm rearing sheds in the **Mulbagal sericulture cluster (Kolar, Karnataka, India)**.
+**Setu** is an end-to-end, IoT-enabled environmental management and automation system purpose-built for silkworm rearing sheds worldwide.
 
-Silkworms (*Bombyx mori*) are highly sensitive to microclimate variations. Even minor deviations in temperature and relative humidity across growth instars (Instars 1 through 5) can cause crop failure, disease outbreak (Flacherie, Grasserie), or inferior cocoon quality. Setu solves this by combining IoT sensing, deterministic automation rules, hardware safety interlocks, and multilingual explainable AI recommendations in **English, Kannada (ಕನ್ನಡ), and Telugu (తెలుగు)**.
+Silkworms (*Bombyx mori*) are highly sensitive to microclimate variations. Even minor deviations in temperature and relative humidity across growth instars (Instars 1 through 5) can cause crop failure, disease outbreak (Flacherie, Grasserie), or inferior cocoon quality. Setu solves this by combining IoT sensing, real-time worldwide weather tracking, deterministic automation rules, hardware safety interlocks, and multilingual explainable AI recommendations in **English, Kannada (ಕನ್ನಡ), and Telugu (తెలుగు)**.
 
 ---
 
@@ -34,7 +34,7 @@ flowchart TD
         Ingest["Telemetry Ingestion & REST API"]
         Rules["Deterministic Rules Engine<br/>Hysteresis & Safety Interlocks"]
         AI["Explainable AI Engine<br/>(EN, KN, TE Explanations)"]
-        Weather["Weather Trend Service<br/>(Mulbagal Microclimate)"]
+        Weather["Live Weather Service<br/>(Worldwide Open-Meteo & Geocoding)"]
         Auth["JWT & Role-Based Security"]
         DB[(PostgreSQL Database)]
         
@@ -168,9 +168,9 @@ setu/
    API_V1_STR="/api/v1"
    SETU_SECRET_KEY="your-secret-key-change-this-in-production"
    DATABASE_URL="postgresql://postgres:password@localhost:5432/setu"
-   DEFAULT_REGION="Mulbagal, Kolar, Karnataka"
-   DEFAULT_LATITUDE=13.1633
-   DEFAULT_LONGITUDE=78.3944
+   DEFAULT_REGION="Global Sericulture Network"
+   DEFAULT_LATITUDE=0.0
+   DEFAULT_LONGITUDE=0.0
    ```
 
 5. **Start the API Server**:
@@ -196,8 +196,9 @@ http://localhost:8000/admin
 ```
 
 Default credentials (pre-seeded):
-- **Username**: `superadmin`
-- **Password**: `adminsecure2026`
+- **Username**: `admin`
+- **Password**: `admin`
+*(Includes eye button toggle to show/hide password)*
 
 Alternatively, you can run it as a standalone static site:
 ```bash

@@ -2,7 +2,7 @@
 
 **Project:** Setu -- Smart IoT Sericulture Environment Management &
 Automated Control System\
-**Initial Region:** Mulbagal, Karnataka, India\
+**Region Scope:** Worldwide (Dynamic GPS & Geocoded Locations)\
 **Initial Languages:** English, Kannada, Telugu\
 **Primary Users:** Silkworm farmers / rearing-house operators\
 **Document Status:** Product definition for MVP and future expansion

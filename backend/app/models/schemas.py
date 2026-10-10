@@ -14,7 +14,7 @@ class UserCreate(BaseModel):
     phone: str
     preferred_language: str = "kn"  # "en", "kn", "te"
     farm_name: Optional[str] = "Green Valley Sericulture Farm"
-    region: Optional[str] = "Mulbagal, Kolar, KA"
+    region: Optional[str] = "Local Rearing Shed"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     batch_id: Optional[str] = "SERI-2026-M04"
@@ -41,7 +41,7 @@ class UserOut(BaseModel):
     preferred_language: str
     role: str
     farm_name: Optional[str] = "Green Valley Sericulture Farm"
-    region: Optional[str] = "Mulbagal, Kolar, KA"
+    region: Optional[str] = "Local Rearing Shed"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     batch_id: Optional[str] = "SERI-2026-M04"

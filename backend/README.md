@@ -1,9 +1,10 @@
 # Setu Backend (FastAPI)
 
-A secure, high-performance Python FastAPI backend for IoT environmental monitoring, automated relay control, and explainable AI for sericulture sheds in Mulbagal.
+A secure, high-performance Python FastAPI backend for IoT environmental monitoring, automated relay control, real-time worldwide weather geocoding, and explainable AI for sericulture sheds worldwide.
 
 ## Core Features:
-- **JWT & Role-Based Access Control (`app/core/security.py`, `app/routers/auth.py`):** Protects all shed telemetry and actuator endpoints.
+- **JWT & Role-Based Access Control (`app/core/security.py`, `app/routers/auth.py`):** Protects all shed telemetry and actuator endpoints with user role separation (Super Admin & Farmers).
+- **Worldwide Weather & Reverse Geocoding (`app/services/weather_service.py`):** Live weather forecast integration via Open-Meteo and reverse geocoding for any location worldwide based on GPS coordinates or manual search.
 - **Deterministic Rules & Hysteresis Engine (`app/services/rules_engine.py`):** Multi-variable control evaluating indoor temp/humidity, outside weather, growth stage parameters, and hysteresis to prevent rapid equipment switching.
 - **Safety Interlocks:** Strictly prevents simultaneous operation of heaters and coolers.
 - **Explainable AI (`app/services/ai_explainer.py`, `app/routers/ai.py`):** Generates contextual natural-language explanations in English, Kannada, and Telugu.

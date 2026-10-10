@@ -1,6 +1,6 @@
 # Setu Super Admin Command Portal
 
-The Super Admin Command Portal provides centralized monitoring, control, and management of silkworm rearing sheds, registered farmers, IoT sensors, and environmental actuators across the Mulbagal sericulture cluster.
+The Super Admin Command Portal provides centralized monitoring, control, and management of silkworm rearing sheds, registered farmers, IoT sensors, and environmental actuators across global sericulture sheds.
 
 ---
 
@@ -9,17 +9,18 @@ The Super Admin Command Portal provides centralized monitoring, control, and man
 1. **Secure Admin Authentication**:
    - JWT token-based authentication via the FastAPI backend (`/api/v1/auth/login`).
    - Role-based authorization (`superadmin` access).
+   - Password visibility toggle (eye button) for secure and accessible login.
 
 2. **Cluster Health & Real-time Metrics**:
    - Total registered farmers, active rearing sheds, healthy vs warning shed counters.
    - Connected ESP32 nodes and operational status.
 
 3. **Live Shed Environment Monitoring**:
-   - Live temperature, relative humidity, outside ambient conditions, and growth stage indicators.
+   - Live temperature, relative humidity, outside ambient conditions (via Open-Meteo worldwide), and growth stage indicators.
    - Automatic evaluation against stage-specific thresholds (Instars 1–5).
 
 4. **Farmer & Batch Management**:
-   - Register and manage farmers, shed locations, batch identifiers, and silkworm breed types.
+   - Register and manage farmers, shed locations worldwide, batch identifiers, and silkworm breed types.
    - Multilingual preferences (English, Kannada, Telugu).
 
 5. **Manual Actuator Overrides & Interlocks**:
@@ -37,8 +38,8 @@ The Super Admin Command Portal provides centralized monitoring, control, and man
 - **Frontend Tech**: Vanilla HTML5, Modern CSS3 (CSS Variables, Flexbox/Grid), JavaScript (ES6+), and Lucide Icons.
 - **Backend Host**: Mounted directly by the FastAPI backend at `/admin` (via `FastAPI.mount()`), or can be hosted on any static HTTP web server (e.g., Nginx, Caddy, Vercel).
 - **Default Credentials** (Initial Seed):
-  - **Username**: `superadmin`
-  - **Password**: `adminsecure2026`
+  - **Username**: `admin`
+  - **Password**: `admin`
 
 ---
 

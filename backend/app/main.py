@@ -8,7 +8,7 @@ from app.routers import auth, sheds, telemetry, control, ai, admin, weather
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Setu: Smart Sericulture Environment Management & Automated Control API for Mulbagal farmers.",
+    description="Setu: Smart Sericulture Environment Management & Automated Control API for global sericulture farmers.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"

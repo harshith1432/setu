@@ -146,7 +146,7 @@ async def test_farmer_registration_persistence_and_subsequent_login(async_client
         "full_name": "Siddappa Gowda",
         "phone": "+91 98801 23456",
         "farm_name": "Kolar Silk Valley Farm",
-        "region": "Mulbagal, Kolar, KA",
+        "region": "Karnataka, India",
         "batch_id": "SERI-2026-N01",
         "dfl_capacity": "300 DFL",
         "breed": "Double Hybrid (FC1 x FC2)",
@@ -217,7 +217,7 @@ async def test_admin_stage_thresholds_and_software_level_controls(async_client):
         "hysteresis_temp": 0.4,
         "hysteresis_hum": 2.5,
         "fan_trigger_offset": 1.2,
-        "description": "Updated optimal Chawki thresholds for Mulbagal summer batch."
+        "description": "Updated optimal Chawki thresholds for summer batch."
     }
     put_res = await async_client.put("/api/v1/admin/stages/1", json=update_payload, headers=admin_headers)
     assert put_res.status_code == 200
