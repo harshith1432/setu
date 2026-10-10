@@ -3,25 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Setu | Super Admin Command Portal</title>
-  <!-- Google Fonts & Lucide Icons -->
+  <title>Setu | Super Admin Command Portal (SeriCare)</title>
+  
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js 4.4 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Bespoke Sericulture Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- ================= AUTH VIEW ================= -->
+  <!-- ================= AUTHENTICATION VIEW ================= -->
   <div id="authView" class="auth-wrapper">
     <div class="auth-card">
-      <div class="brand-badge">
-        <i data-lucide="shield-check" class="brand-icon"></i>
-        <span>SETU SECURE COMMAND</span>
+      <div class="auth-brand-badge">
+        <i data-lucide="shield-check"></i>
+        <span>SERICARE SECURE COMMAND</span>
       </div>
-      <h2>Super Admin Access</h2>
-      <p class="subtitle">Central management portal for Sericulture farmers, rearing sheds & IoT actuators across Mulbagal.</p>
+      <h2>Super Admin Console</h2>
+      <p class="auth-subtitle">Central supervisory portal for Mulbagal Sericulture cluster, silkworm rearing sheds & IoT microclimate automation.</p>
       
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
@@ -41,379 +49,843 @@
         
         <div id="loginError" class="alert-box error hidden"></div>
 
-        <button type="submit" id="loginBtn" class="btn btn-primary full-width">
+        <button type="submit" id="loginBtn" class="btn btn-primary btn-full">
           <span>Authorize Access</span>
           <i data-lucide="arrow-right"></i>
         </button>
       </form>
       
       <div class="auth-footer">
-        <p><i data-lucide="lock"></i> End-to-end encrypted admin sessions & JWT authentication.</p>
+        <p><i data-lucide="lock"></i> End-to-end encrypted session & Role-Based Access Control.</p>
       </div>
     </div>
   </div>
 
-  <!-- ================= DASHBOARD VIEW ================= -->
-  <div id="dashboardView" class="dashboard-wrapper hidden">
-    <!-- Top Navigation -->
-    <header class="top-nav">
-      <div class="nav-brand">
-        <div class="logo-box">
-          <i data-lucide="leaf"></i>
+  <!-- ================= MAIN DASHBOARD APPLICATION ================= -->
+  <div id="dashboardView" class="app-layout hidden">
+    
+    <!-- LEFT SIDEBAR -->
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        <div class="brand-crest">
+          <div class="brand-logo-icon">
+            <i data-lucide="leaf"></i>
+          </div>
+          <div class="brand-title-wrap">
+            <h1>SeriCare</h1>
+            <span class="brand-role-chip">Super Admin Hub</span>
+          </div>
         </div>
-        <div>
-          <h1>Setu <span class="badge-role">Super Admin</span></h1>
-          <p class="nav-sub">Mulbagal Cluster Management Hub</p>
+        <div class="cluster-tag">
+          <i data-lucide="map-pin"></i>
+          <span>Mulbagal Cluster, Kolar</span>
         </div>
       </div>
 
-      <div class="nav-right">
-        <div class="live-pulse">
-          <span class="pulse-dot"></span>
-          <span>SYSTEM LIVE</span>
-        </div>
-        <div class="admin-profile">
-          <div class="avatar"><i data-lucide="user-check"></i></div>
-          <div>
-            <div class="profile-name" id="adminDisplayName">Super Administrator</div>
-            <div class="profile-role">Master Access Level</div>
-          </div>
-        </div>
-        <button class="btn btn-outline" onclick="handleLogout()" title="Log Out">
-          <i data-lucide="log-out"></i>
-          <span>Logout</span>
-        </button>
-      </div>
-    </header>
-
-    <!-- Main Container -->
-    <main class="main-content">
-      
-      <!-- Cluster Status Notice -->
-      <section class="banner-strip">
-        <div class="banner-left">
-          <i data-lucide="map-pin" class="banner-icon"></i>
-          <div>
-            <strong>Region Cluster:</strong> Mulbagal Sericulture Division, Kolar District, Karnataka
-            <span class="separator">•</span>
-            <span id="telemetryStatusText">Telemetry Stream Active</span>
-          </div>
-        </div>
-        <button class="btn btn-sm btn-ghost" onclick="loadAllDashboardData()">
-          <i data-lucide="refresh-cw"></i> Sync Data
-        </button>
-      </section>
-
-      <!-- KPI Summary Cards -->
-      <section class="kpi-grid">
-        <div class="kpi-card card-green">
-          <div class="kpi-header">
-            <span>Enrolled Farmers</span>
-            <div class="kpi-icon"><i data-lucide="users"></i></div>
-          </div>
-          <div class="kpi-value" id="kpiTotalFarmers">--</div>
-          <div class="kpi-caption">
-            <span class="caption-highlight" id="kpiActiveFarmers">--</span> Active farming batches
-          </div>
-        </div>
-
-        <div class="kpi-card card-purple">
-          <div class="kpi-header">
-            <span>Total DFL Capacity</span>
-            <div class="kpi-icon"><i data-lucide="boxes"></i></div>
-          </div>
-          <div class="kpi-value" id="kpiDflCapacity">--</div>
-          <div class="kpi-caption">Disease Free Layings in rearing</div>
-        </div>
-
-        <div class="kpi-card card-blue">
-          <div class="kpi-header">
-            <span>Monitored Sheds</span>
-            <div class="kpi-icon"><i data-lucide="home"></i></div>
-          </div>
-          <div class="kpi-value" id="kpiMonitoredSheds">--</div>
-          <div class="kpi-caption">
-            <span class="status-indicator-green"></span> 100% online IoT telemetry
-          </div>
-        </div>
-
-        <div class="kpi-card card-amber">
-          <div class="kpi-header">
-            <span>Active Actuators</span>
-            <div class="kpi-icon"><i data-lucide="cpu"></i></div>
-          </div>
-          <div class="kpi-value" id="kpiActiveRelays">--</div>
-          <div class="kpi-caption">Fans, Coolers & Heaters running</div>
-        </div>
-      </section>
-
-      <!-- Live IoT Telemetry & Emergency Controls Row -->
-      <section class="two-column-grid">
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Operations</div>
         
-        <!-- Live Shed Environment & Actuator Panel -->
-        <div class="panel">
-          <div class="panel-header">
-            <div class="panel-title">
-              <i data-lucide="activity"></i>
-              <h3>Active Shed Telemetry & Relays (Shed 01)</h3>
-            </div>
-            <span class="badge-tag" id="liveStageBadge">Instar IV (Active)</span>
+        <a class="nav-item active" onclick="switchNavTab('overview')">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Overview & KPIs</span>
+        </a>
+
+        <a class="nav-item" onclick="switchNavTab('stages')">
+          <i data-lucide="sliders"></i>
+          <span>Stage Climate Levels</span>
+          <span class="nav-pill">Auto-Mode</span>
+        </a>
+
+        <a class="nav-item" onclick="switchNavTab('telemetry')">
+          <i data-lucide="activity"></i>
+          <span>Live Sensors & Relays</span>
+        </a>
+
+        <a class="nav-item" onclick="switchNavTab('analytics')">
+          <i data-lucide="line-chart"></i>
+          <span>Sensor Graphs (24h)</span>
+        </a>
+
+        <div class="nav-section-title">Management</div>
+
+        <a class="nav-item" onclick="switchNavTab('farmers')">
+          <i data-lucide="users"></i>
+          <span>Farmers & Sheds</span>
+          <span class="nav-pill" id="navFarmerCount">--</span>
+        </a>
+
+        <a class="nav-item" onclick="switchNavTab('emergency')">
+          <i data-lucide="alert-octagon"></i>
+          <span>Emergency Controls</span>
+        </a>
+
+        <a class="nav-item" onclick="switchNavTab('audit')">
+          <i data-lucide="clipboard-list"></i>
+          <span>Audit Logs</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="admin-brief">
+          <div class="admin-avatar">
+            <i data-lucide="user-check"></i>
           </div>
-          <div class="panel-body">
-            <div class="telemetry-gauges">
-              <div class="gauge-box">
-                <div class="gauge-label">Internal Temp</div>
-                <div class="gauge-val" id="shedTemp">--°C</div>
-                <div class="gauge-target">Target: 25.0°C - 26.5°C</div>
-              </div>
-              <div class="gauge-box">
-                <div class="gauge-label">Internal Humidity</div>
-                <div class="gauge-val" id="shedHumidity">--%</div>
-                <div class="gauge-target">Target: 70% - 75%</div>
-              </div>
-              <div class="gauge-box">
-                <div class="gauge-label">Outside Weather</div>
-                <div class="gauge-val" id="outsideTemp">--°C</div>
-                <div class="gauge-target" id="weatherCondition">Sunny</div>
-              </div>
-            </div>
+          <div class="admin-brief-info">
+            <div class="admin-name" id="sidebarAdminName">Super Admin</div>
+            <div class="admin-role-text">Master Access</div>
+          </div>
+        </div>
+        <button class="btn-sidebar-logout" onclick="handleLogout()" title="Log Out">
+          <i data-lucide="log-out"></i>
+        </button>
+      </div>
+    </aside>
 
-            <div class="actuator-status-list">
-              <h4>Connected Actuators (Relay Pins):</h4>
-              <div class="relay-cards">
-                <div class="relay-card" id="relayCooler">
-                  <div class="relay-info">
-                    <i data-lucide="droplets"></i>
-                    <div>
-                      <div class="relay-name">Cooling Fogger</div>
-                      <div class="relay-pin">GPIO Relay Pin 18</div>
-                    </div>
-                  </div>
-                  <span class="relay-state" id="stateCooler">OFF</span>
-                </div>
-
-                <div class="relay-card" id="relayFan">
-                  <div class="relay-info">
-                    <i data-lucide="wind"></i>
-                    <div>
-                      <div class="relay-name">Exhaust Fan</div>
-                      <div class="relay-pin">GPIO Relay Pin 23</div>
-                    </div>
-                  </div>
-                  <span class="relay-state" id="stateFan">OFF</span>
-                </div>
-
-                <div class="relay-card" id="relayHeater">
-                  <div class="relay-info">
-                    <i data-lucide="flame"></i>
-                    <div>
-                      <div class="relay-name">Halogen Heater</div>
-                      <div class="relay-pin">GPIO Relay Pin 24</div>
-                    </div>
-                  </div>
-                  <span class="relay-state" id="stateHeater">OFF</span>
-                </div>
-              </div>
+    <!-- MAIN APP CANVAS -->
+    <main class="app-main">
+      
+      <!-- TOP NAVIGATION BAR -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <div class="page-title-wrap">
+            <h2 id="topBarTitle">Cluster Operations Hub</h2>
+            <div class="page-breadcrumb">
+              <span>SeriCare</span>
+              <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+              <span id="topBarBreadcrumb">Live Real-Time Telemetry</span>
             </div>
           </div>
         </div>
 
-        <!-- Super Admin Emergency Override Controls -->
-        <div class="panel emergency-panel">
-          <div class="panel-header">
-            <div class="panel-title text-danger">
-              <i data-lucide="alert-triangle"></i>
-              <h3>Super Admin Emergency Controls</h3>
-            </div>
-            <span class="badge-danger">Master Override</span>
+        <div class="top-bar-right">
+          <!-- Real-Time Stream Status -->
+          <div class="stream-status-pill">
+            <span class="pulse-dot"></span>
+            <span id="streamStatusText">LIVE TELEMETRY STREAM</span>
           </div>
-          <div class="panel-body">
-            <p class="panel-desc">
-              Trigger high-priority environment overrides directly to rearing sheds during severe heatwaves or emergencies. These override automated AI rules.
-            </p>
 
-            <div class="emergency-actions">
-              <div class="action-card">
+          <!-- Active Shed Selector -->
+          <div class="shed-select-wrap">
+            <select id="shedSelect" onchange="handleShedChange(this.value)">
+              <option value="shed_01">Shed 01 — Green Valley Farm</option>
+            </select>
+            <i data-lucide="chevron-down"></i>
+          </div>
+
+          <!-- Live Weather Pill -->
+          <div class="weather-chip" id="topWeatherChip">
+            <i data-lucide="sun"></i>
+            <span id="weatherChipText">Mulbagal: --°C</span>
+          </div>
+
+          <!-- Manual Sync Button -->
+          <button class="btn btn-skin btn-sm" id="syncBtn" onclick="syncAllRealtimeData()" title="Force Sync Real-Time Data">
+            <i data-lucide="refresh-cw" id="syncIcon"></i>
+            <span>Sync</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTENT BODY -->
+      <div class="content-body">
+        
+        <!-- ================= SECTION 1: OVERVIEW & KPIS ================= -->
+        <section id="section-overview" class="view-section">
+          
+          <!-- Executive KPI Grid (Real Data Only) -->
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Enrolled Farmers</span>
+                <div class="kpi-icon"><i data-lucide="users"></i></div>
+              </div>
+              <div class="kpi-value" id="kpiFarmers">--</div>
+              <div class="kpi-caption">
+                <strong id="kpiActiveFarmers">--</strong> active rearing batches
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-gold">
+              <div class="kpi-top">
+                <span class="kpi-label">Rearing Capacity</span>
+                <div class="kpi-icon"><i data-lucide="package"></i></div>
+              </div>
+              <div class="kpi-value" id="kpiDfl">--</div>
+              <div class="kpi-caption">Total DFL layings in cluster</div>
+            </div>
+
+            <div class="kpi-card kpi-blue">
+              <div class="kpi-top">
+                <span class="kpi-label">Monitored Sheds</span>
+                <div class="kpi-icon"><i data-lucide="warehouse"></i></div>
+              </div>
+              <div class="kpi-value" id="kpiSheds">--</div>
+              <div class="kpi-caption">
+                <span class="badge badge-green" style="padding:1px 6px;">100% ONLINE</span>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-amber">
+              <div class="kpi-top">
+                <span class="kpi-label">Active Relays</span>
+                <div class="kpi-icon"><i data-lucide="cpu"></i></div>
+              </div>
+              <div class="kpi-value" id="kpiActuators">--</div>
+              <div class="kpi-caption">Coolers, Heaters & Fans running</div>
+            </div>
+
+            <div class="kpi-card">
+              <div class="kpi-top">
+                <span class="kpi-label">Compliance Index</span>
+                <div class="kpi-icon"><i data-lucide="check-circle-2"></i></div>
+              </div>
+              <div class="kpi-value" id="kpiCompliance">--%</div>
+              <div class="kpi-caption">Within stage target envelope</div>
+            </div>
+
+            <div class="kpi-card kpi-gold">
+              <div class="kpi-top">
+                <span class="kpi-label">Ambient Weather</span>
+                <div class="kpi-icon"><i data-lucide="cloud-sun"></i></div>
+              </div>
+              <div class="kpi-value" id="kpiOutsideTemp">--°C</div>
+              <div class="kpi-caption" id="kpiOutsideHum">Mulbagal Humidity: --%</div>
+            </div>
+          </div>
+
+          <!-- Microclimate Status & Stage Overview Row -->
+          <div class="two-col-layout">
+            
+            <!-- Real-Time Microclimate Telemetry Gauges -->
+            <div class="card-panel">
+              <div class="card-panel-header">
+                <div class="card-title-group">
+                  <div class="card-icon-badge"><i data-lucide="thermometer"></i></div>
+                  <div>
+                    <h3>Active Shed Microclimate</h3>
+                    <p id="overviewShedLabel">Shed 01 • Green Valley Farm</p>
+                  </div>
+                </div>
+                <span class="badge badge-green" id="overviewHealthBadge">OPTIMAL</span>
+              </div>
+
+              <div class="telemetry-dials-grid">
+                <div class="dial-card">
+                  <div class="dial-title">Indoor Temp</div>
+                  <div class="dial-reading" id="dialIndoorTemp">--°C</div>
+                  <div class="dial-target" id="dialTempTarget">Target: --</div>
+                </div>
+
+                <div class="dial-card">
+                  <div class="dial-title">Indoor Humidity</div>
+                  <div class="dial-reading" id="dialIndoorHum">--%</div>
+                  <div class="dial-target" id="dialHumTarget">Target: --</div>
+                </div>
+
+                <div class="dial-card">
+                  <div class="dial-title">Outside Ambient</div>
+                  <div class="dial-reading" id="dialOutdoorTemp">--°C</div>
+                  <div class="dial-target" id="dialOutdoorHum">Humidity: --%</div>
+                </div>
+              </div>
+
+              <!-- Status Headline & Subline -->
+              <div class="stage-info-banner" style="margin-bottom:0;">
+                <i data-lucide="info"></i>
+                <div class="stage-info-banner-content">
+                  <h4 id="overviewHeadline">Telemetry Stream Active</h4>
+                  <p id="overviewSubline">Monitoring live sensor feed from shed ESP32 controller and evaluating biological safety rules.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Active Stage & Hardware Automation Card -->
+            <div class="card-panel">
+              <div class="card-panel-header">
+                <div class="card-title-group">
+                  <div class="card-icon-badge"><i data-lucide="sliders"></i></div>
+                  <div>
+                    <h3>Silkworm Life Stage & Automation</h3>
+                    <p>Current biological phase controlling auto-mode rules</p>
+                  </div>
+                </div>
+                <div class="badge badge-skin" id="overviewStageBadge">Instar --</div>
+              </div>
+
+              <div style="padding: 12px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                  <strong style="font-size: 0.92rem; color:var(--green-deep);" id="overviewStageName">--</strong>
+                  <span class="badge badge-green" id="overviewAutoModeBadge">AUTO-MODE ACTIVE</span>
+                </div>
+                <p style="font-size:0.82rem; color:var(--text-secondary); line-height: 1.5; margin-bottom: 18px;" id="overviewStageDesc">
+                  Loading stage profile...
+                </p>
+
+                <!-- Relay mini status -->
+                <div class="actuator-matrix">
+                  <div class="actuator-card" id="miniRelayCooler">
+                    <div class="actuator-name">Cooling Fogger</div>
+                    <span class="relay-status-tag" id="miniStateCooler">OFF</span>
+                  </div>
+                  <div class="actuator-card" id="miniRelayFan">
+                    <div class="actuator-name">Exhaust Fan</div>
+                    <span class="relay-status-tag" id="miniStateFan">OFF</span>
+                  </div>
+                  <div class="actuator-card" id="miniRelayHeater">
+                    <div class="actuator-name">Halogen Heater</div>
+                    <span class="relay-status-tag" id="miniStateHeater">OFF</span>
+                  </div>
+                </div>
+
+                <div style="margin-top: 20px; display:flex; gap:10px;">
+                  <button class="btn btn-primary btn-sm" onclick="switchNavTab('stages')">
+                    <i data-lucide="sliders"></i> Configure Climate Levels
+                  </button>
+                  <button class="btn btn-skin btn-sm" onclick="switchNavTab('telemetry')">
+                    <i data-lucide="cpu"></i> Actuator Control
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ================= SECTION 2: STAGE CLIMATE LEVELS (SUPER ADMIN CONTROLS) ================= -->
+        <section id="section-stages" class="view-section hidden">
+          
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="sliders"></i></div>
                 <div>
-                  <strong>Emergency Exhaust Ventilation</strong>
-                  <p>Instantly engage 100% capacity ventilation fans to exhaust hot air and ammonia buildup.</p>
+                  <h3>Sericulture Life Stage Climate Setpoints & Auto-Mode Control</h3>
+                  <p>Configure software levels for silkworm growth stages (Instars 1–5). These thresholds govern auto-mode microclimate regulation across all sheds.</p>
+                </div>
+              </div>
+              <button class="btn btn-skin btn-sm" onclick="resetStagesToStandards()">
+                <i data-lucide="rotate-ccw"></i> Reset to CSB Standards
+              </button>
+            </div>
+
+            <!-- Stage Level Selector Tabs -->
+            <div class="stage-tabs-header" id="stageTabsContainer">
+              <!-- Dynamically populated 5 stage tabs -->
+            </div>
+
+            <!-- Stage Level Editor -->
+            <div class="stage-editor-box">
+              <div class="stage-info-banner">
+                <i data-lucide="sparkles"></i>
+                <div class="stage-info-banner-content">
+                  <h4 id="editStageHeaderTitle">1st Instar (Chawki) — Days 1–3</h4>
+                  <p id="editStageHeaderDesc">Delicate newly-hatched larvae require high humidity and constant warm temperatures to prevent desiccation.</p>
+                </div>
+              </div>
+
+              <!-- Envelopes Control Grid -->
+              <div class="thresholds-control-grid">
+                
+                <!-- Temperature Setpoint Envelope -->
+                <div class="envelope-card">
+                  <div class="envelope-header">
+                    <div class="envelope-title">
+                      <i data-lucide="thermometer"></i>
+                      <span>Temperature Envelope (°C)</span>
+                    </div>
+                    <div class="envelope-target-badge" id="tempRangeBadge">27.0°C – 28.0°C</div>
+                  </div>
+
+                  <div class="range-inputs-row">
+                    <div class="form-group">
+                      <label for="inputTempMin">Target Min Temp (°C)</label>
+                      <input type="number" id="inputTempMin" step="0.1" min="15" max="38" value="27.0" oninput="handleStageInputChange()">
+                    </div>
+                    <div class="form-group">
+                      <label for="inputTempMax">Target Max Temp (°C)</label>
+                      <input type="number" id="inputTempMax" step="0.1" min="15" max="38" value="28.0" oninput="handleStageInputChange()">
+                    </div>
+                  </div>
+
+                  <div class="visual-range-bar-container">
+                    <div class="range-bar-track">
+                      <div class="range-bar-fill" id="tempRangeFill" style="left: 40%; width: 25%;"></div>
+                    </div>
+                    <div class="range-bar-labels">
+                      <span>15°C (Min Safe)</span>
+                      <span id="tempRangeLabel">Optimal: 27.0°C - 28.0°C</span>
+                      <span>38°C (Max Safe)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Humidity Setpoint Envelope -->
+                <div class="envelope-card">
+                  <div class="envelope-header">
+                    <div class="envelope-title">
+                      <i data-lucide="droplets"></i>
+                      <span>Relative Humidity Envelope (%)</span>
+                    </div>
+                    <div class="envelope-target-badge" id="humRangeBadge">80% – 85%</div>
+                  </div>
+
+                  <div class="range-inputs-row">
+                    <div class="form-group">
+                      <label for="inputHumMin">Target Min Humidity (%)</label>
+                      <input type="number" id="inputHumMin" step="1" min="30" max="95" value="80" oninput="handleStageInputChange()">
+                    </div>
+                    <div class="form-group">
+                      <label for="inputHumMax">Target Max Humidity (%)</label>
+                      <input type="number" id="inputHumMax" step="1" min="30" max="95" value="85" oninput="handleStageInputChange()">
+                    </div>
+                  </div>
+
+                  <div class="visual-range-bar-container">
+                    <div class="range-bar-track">
+                      <div class="range-bar-fill" id="humRangeFill" style="left: 60%; width: 20%; background: linear-gradient(90deg, #4E9571, #235B85);"></div>
+                    </div>
+                    <div class="range-bar-labels">
+                      <span>30% (Dry)</span>
+                      <span id="humRangeLabel">Optimal: 80% - 85%</span>
+                      <span>95% (Max)</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Advanced Automation Tolerances & Hysteresis -->
+              <div class="advanced-tolerances-row">
+                <div class="tolerance-group">
+                  <label for="inputHysteresisTemp">Temperature Deadband (°C)</label>
+                  <input type="number" id="inputHysteresisTemp" step="0.1" min="0.1" max="3.0" value="0.5">
+                  <small style="font-size:0.7rem; color:var(--text-muted);">Prevents relay oscillation</small>
+                </div>
+
+                <div class="tolerance-group">
+                  <label for="inputHysteresisHum">Humidity Deadband (%)</label>
+                  <input type="number" id="inputHysteresisHum" step="0.5" min="0.5" max="10.0" value="3.0">
+                  <small style="font-size:0.7rem; color:var(--text-muted);">Prevents fogger chattering</small>
+                </div>
+
+                <div class="tolerance-group">
+                  <label for="inputFanOffset">Exhaust Fan Trigger Offset (°C)</label>
+                  <input type="number" id="inputFanOffset" step="0.1" min="0.5" max="4.0" value="1.5">
+                  <small style="font-size:0.7rem; color:var(--text-muted);">Triggers above target max</small>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="inputStageDesc">Sericultural Guidance & Notes</label>
+                <textarea id="inputStageDesc" rows="2" placeholder="Notes for farmers on this stage..."></textarea>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="stage-action-buttons">
+                <div>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="applyCurrentStageToShed()">
+                    <i data-lucide="check-check"></i> Apply This Level to Active Shed
+                  </button>
+                </div>
+                <div class="stage-action-buttons-right">
+                  <button type="button" class="btn btn-primary" onclick="saveStageSetpoints()">
+                    <i data-lucide="save"></i> Save Setpoints to Backend
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Comparison Table for All 5 Stages -->
+            <div style="margin-top: 30px;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; color:var(--green-deep); margin-bottom: 12px;">
+                Central Silk Board Standard Levels Comparison Matrix
+              </h4>
+              <div class="table-responsive">
+                <table class="matrix-table">
+                  <thead>
+                    <tr>
+                      <th>Level #</th>
+                      <th>Stage Name</th>
+                      <th>Duration</th>
+                      <th>Optimal Temperature</th>
+                      <th>Optimal Humidity</th>
+                      <th>Deadband</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="stageMatrixTableBody">
+                    <!-- Dynamic Rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION 3: LIVE SENSORS & RELAYS ================= -->
+        <section id="section-telemetry" class="view-section hidden">
+          
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="activity"></i></div>
+                <div>
+                  <h3>Live Shed IoT Telemetry & Actuator Matrix</h3>
+                  <p>Real-time microclimate conditions from the ESP32 sensor array in Shed 01</p>
+                </div>
+              </div>
+              
+              <div style="display:flex; align-items:center; gap:10px;">
+                <label style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="autoModeToggle" onchange="toggleAutoMode(this.checked)" style="width:16px; height:16px;">
+                  Auto-Mode Enabled
+                </label>
+              </div>
+            </div>
+
+            <div class="telemetry-dials-grid">
+              <div class="dial-card">
+                <div class="dial-title">Shed Internal Temp</div>
+                <div class="dial-reading" id="fullDialIndoorTemp">--°C</div>
+                <div class="dial-target" id="fullDialTempTarget">Target: --</div>
+              </div>
+
+              <div class="dial-card">
+                <div class="dial-title">Shed Internal Humidity</div>
+                <div class="dial-reading" id="fullDialIndoorHum">--%</div>
+                <div class="dial-target" id="fullDialHumTarget">Target: --</div>
+              </div>
+
+              <div class="dial-card">
+                <div class="dial-title">Outdoor Ambient Weather</div>
+                <div class="dial-reading" id="fullDialOutdoorTemp">--°C</div>
+                <div class="dial-target" id="fullDialOutdoorHum">Condition: Sunny</div>
+              </div>
+            </div>
+
+            <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--green-deep); margin: 24px 0 12px;">
+              Connected IoT Actuators & Relays (240V Relays)
+            </h4>
+
+            <div class="actuator-matrix">
+              <!-- Cooling Fogger Card -->
+              <div class="actuator-card" id="cardCooler">
+                <div class="actuator-header">
+                  <div class="actuator-icon-box"><i data-lucide="droplets"></i></div>
+                  <span class="relay-status-tag" id="tagCooler">OFF</span>
+                </div>
+                <div>
+                  <div class="actuator-name">Cooling Fogger</div>
+                  <div class="actuator-pin">GPIO Pin 18 • High Pressure Mist</div>
+                </div>
+                <button class="actuator-toggle-btn" id="btnToggleCooler" onclick="manualToggleActuator('cooler')">
+                  Toggle Fogger
+                </button>
+              </div>
+
+              <!-- Exhaust Fan Card -->
+              <div class="actuator-card" id="cardFan">
+                <div class="actuator-header">
+                  <div class="actuator-icon-box"><i data-lucide="wind"></i></div>
+                  <span class="relay-status-tag" id="tagFan">OFF</span>
+                </div>
+                <div>
+                  <div class="actuator-name">Exhaust Ventilation Fan</div>
+                  <div class="actuator-pin">GPIO Pin 23 • Aeration & Heat Evacuation</div>
+                </div>
+                <button class="actuator-toggle-btn" id="btnToggleFan" onclick="manualToggleActuator('fan')">
+                  Toggle Fan
+                </button>
+              </div>
+
+              <!-- Halogen Heater Card -->
+              <div class="actuator-card" id="cardHeater">
+                <div class="actuator-header">
+                  <div class="actuator-icon-box"><i data-lucide="flame"></i></div>
+                  <span class="relay-status-tag" id="tagHeater">OFF</span>
+                </div>
+                <div>
+                  <div class="actuator-name">Halogen Rearing Heater</div>
+                  <div class="actuator-pin">GPIO Pin 24 • Chawki Thermal Maintenance</div>
+                </div>
+                <button class="actuator-toggle-btn" id="btnToggleHeater" onclick="manualToggleActuator('heater')">
+                  Toggle Heater
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION 4: ANALYTICS & SENSOR GRAPHS ================= -->
+        <section id="section-analytics" class="view-section hidden">
+          
+          <!-- Temperature Line Chart -->
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="thermometer"></i></div>
+                <div>
+                  <h3>24-Hour Temperature Telemetry vs Target Safe Zone</h3>
+                  <p>Real IoT readings compared with configured stage min/max limits</p>
+                </div>
+              </div>
+              <div class="chart-header-actions">
+                <button class="btn btn-skin btn-sm" onclick="exportCsvData()">
+                  <i data-lucide="download"></i> Export CSV
+                </button>
+              </div>
+            </div>
+
+            <div class="chart-container-box">
+              <canvas id="temperatureChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Humidity Line Chart -->
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="droplets"></i></div>
+                <div>
+                  <h3>24-Hour Relative Humidity Telemetry vs Target Safe Zone</h3>
+                  <p>Indoor microclimate humidity curve with optimal boundaries</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="chart-container-box">
+              <canvas id="humidityChart"></canvas>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION 5: FARMERS & SHEDS DIRECTORY ================= -->
+        <section id="section-farmers" class="view-section hidden">
+          
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="users"></i></div>
+                <div>
+                  <h3>Enrolled Sericulture Farmers & Rearing Sheds</h3>
+                  <p>Database of registered rearers across Mulbagal and Kolar clusters</p>
+                </div>
+              </div>
+
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div class="search-input-wrap">
+                  <i data-lucide="search"></i>
+                  <input type="text" id="farmerSearchInput" placeholder="Search farmer, farm or batch..." oninput="handleFarmerSearch()">
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openEnrollFarmerModal()">
+                  <i data-lucide="user-plus"></i> Enroll Farmer
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Farmer & Account</th>
+                    <th>Farm / Shed Name</th>
+                    <th>Region Cluster</th>
+                    <th>Active Batch</th>
+                    <th>DFL Capacity</th>
+                    <th>Silkworm Breed</th>
+                    <th>Status</th>
+                    <th>Account Controls</th>
+                  </tr>
+                </thead>
+                <tbody id="farmersTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center; padding:32px;">Loading enrolled farmers from PostgreSQL...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================= SECTION 6: EMERGENCY OVERRIDES ================= -->
+        <section id="section-emergency" class="view-section hidden">
+          
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge" style="background:var(--rose-tint); border-color:var(--rose-border); color:var(--rose);">
+                  <i data-lucide="alert-triangle"></i>
+                </div>
+                <div>
+                  <h3>Super Admin Emergency Actuator Overrides</h3>
+                  <p>High-priority immediate commands that bypass automatic software rules during heatwaves, power anomalies, or equipment faults.</p>
+                </div>
+              </div>
+              <span class="badge badge-rose">Master Command</span>
+            </div>
+
+            <div class="emergency-grid">
+              
+              <!-- Ventilation Force -->
+              <div class="emergency-action-card">
+                <div>
+                  <h4>Emergency Exhaust Ventilation</h4>
+                  <p>Instantly engage high-velocity ventilation fans at 100% duty cycle to evacuate ammonia buildup and trapped heat.</p>
                 </div>
                 <button class="btn btn-warning" onclick="triggerEmergency('EMERGENCY_VENTILATE')">
-                  <i data-lucide="wind"></i> Force Fans ON
+                  <i data-lucide="wind"></i> Force Ventilation Fans ON
                 </button>
               </div>
 
-              <div class="action-card">
+              <!-- Fogger Boost -->
+              <div class="emergency-action-card">
                 <div>
-                  <strong>Fogger Boost (Rapid Cool)</strong>
-                  <p>Engage high-pressure micro-foggers to lower internal temperatures in heat spikes.</p>
+                  <h4>Emergency Fogger Boost (Rapid Cool)</h4>
+                  <p>Force cooling fogger misting pumps to rapidly drive down internal shed temperatures during severe ambient heat spikes.</p>
                 </div>
                 <button class="btn btn-primary" onclick="triggerEmergency('FOGGER_BOOST')">
-                  <i data-lucide="droplets"></i> Fogger Boost
+                  <i data-lucide="droplets"></i> Engage Fogger Boost
                 </button>
               </div>
 
-              <div class="action-card danger-card">
+              <!-- Master Kill All -->
+              <div class="emergency-action-card danger-card">
                 <div>
-                  <strong>Emergency Master Shutdown</strong>
-                  <p>Safely turn off all heaters, coolers, and fans in case of electrical or sensor fault.</p>
+                  <h4>Emergency Master Equipment Shutdown</h4>
+                  <p>Safely turn OFF all heaters, cooling foggers, and fans instantly. Use during sensor faults, electrical shorts, or repairs.</p>
                 </div>
                 <button class="btn btn-danger" onclick="triggerEmergency('COOLDOWN_ALL')">
-                  <i data-lucide="power-off"></i> Master Kill All
+                  <i data-lucide="power-off"></i> Master Kill All Relays
                 </button>
               </div>
+
             </div>
-            
-            <div id="emergencyFeedback" class="alert-box success hidden"></div>
           </div>
-        </div>
 
-      </section>
+        </section>
 
-      <!-- Farmers Management Table Section -->
-      <section class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <i data-lucide="users"></i>
-            <h3>Enrolled Sericulture Farmers Management</h3>
-          </div>
-          <div class="table-actions">
-            <div class="search-box">
-              <i data-lucide="search"></i>
-              <input type="text" id="farmerSearch" placeholder="Search farmer, farm or batch..." oninput="filterFarmers()">
+        <!-- ================= SECTION 7: AUDIT LOGS ================= -->
+        <section id="section-audit" class="view-section hidden">
+          
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="clipboard-list"></i></div>
+                <div>
+                  <h3>Security & System Control Audit Logs</h3>
+                  <p>Immutable traceability stream of administrative setpoint modifications, emergency triggers, and farmer account actions.</p>
+                </div>
+              </div>
+              <button class="btn btn-skin btn-sm" onclick="fetchAuditLogs()">
+                <i data-lucide="refresh-cw"></i> Refresh Trail
+              </button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openEnrollFarmerModal()">
-              <i data-lucide="user-plus"></i> Enroll Farmer
-            </button>
-          </div>
-        </div>
-        
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Farmer & Account</th>
-                <th>Farm / Shed Name</th>
-                <th>Region</th>
-                <th>Active Batch</th>
-                <th>Capacity</th>
-                <th>Breed</th>
-                <th>Status</th>
-                <th>Account Controls</th>
-              </tr>
-            </thead>
-            <tbody id="farmersTableBody">
-              <tr>
-                <td colspan="8" class="text-center loading-cell">Loading registered farmers...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      <!-- Audit Logs Section -->
-      <section class="panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <i data-lucide="file-clock"></i>
-            <h3>Security & Control Audit Logs</h3>
-          </div>
-          <span class="badge-tag">Real-Time Trace</span>
-        </div>
-        <div class="table-container log-table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 180px;">Timestamp</th>
-                <th style="width: 150px;">Actor / Admin</th>
-                <th style="width: 160px;">Action</th>
-                <th>Details & Payload</th>
-              </tr>
-            </thead>
-            <tbody id="auditTableBody">
-              <tr>
-                <td colspan="4" class="text-center">Loading audit log stream...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 190px;">Timestamp (UTC)</th>
+                    <th style="width: 140px;">Actor / Admin</th>
+                    <th style="width: 180px;">Action Code</th>
+                    <th>Details & Execution Payload</th>
+                  </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                  <tr>
+                    <td colspan="4" style="text-align:center; padding:32px;">Loading audit trail...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
+          </div>
+
+        </section>
+
+      </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="admin-footer">
-      <div>Setu Smart Sericulture System • Department of Sericulture Support</div>
-      <div>Designed for Kolar & Mulbagal Silkworm Rearing Clusters</div>
-    </footer>
   </div>
 
   <!-- ================= ENROLL FARMER MODAL ================= -->
   <div id="enrollModal" class="modal-backdrop hidden">
-    <div class="modal-card">
+    <div class="modal-dialog">
       <div class="modal-header">
         <h3><i data-lucide="user-plus"></i> Enroll New Sericulture Farmer</h3>
-        <button class="btn-close" onclick="closeEnrollModal()"><i data-lucide="x"></i></button>
+        <button class="btn-close-modal" onclick="closeEnrollModal()"><i data-lucide="x"></i></button>
       </div>
-      
+
       <form id="enrollFarmerForm" onsubmit="handleEnrollFarmer(event)">
-        <div class="form-row">
-          <div class="form-group">
-            <label for="enrollUsername">Username *</label>
-            <input type="text" id="enrollUsername" required placeholder="e.g. anand_mulbagal">
+        <div class="modal-body">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="enrollUsername">Username *</label>
+              <input type="text" id="enrollUsername" required placeholder="e.g. prakash_gowda">
+            </div>
+            <div class="form-group">
+              <label for="enrollFullName">Full Name *</label>
+              <input type="text" id="enrollFullName" required placeholder="e.g. Prakash Gowda">
+            </div>
           </div>
-          <div class="form-group">
-            <label for="enrollFullName">Full Name *</label>
-            <input type="text" id="enrollFullName" required placeholder="e.g. Anand Gowda">
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="enrollPassword">Initial Password *</label>
+              <input type="password" id="enrollPassword" required placeholder="Min 6 characters">
+            </div>
+            <div class="form-group">
+              <label for="enrollPhone">Phone Number *</label>
+              <input type="text" id="enrollPhone" required placeholder="e.g. +91 98450 77889">
+            </div>
           </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="enrollFarmName">Shed / Farm Name *</label>
+              <input type="text" id="enrollFarmName" required placeholder="e.g. Gowda Silk Farm Shed 2">
+            </div>
+            <div class="form-group">
+              <label for="enrollRegion">Region Cluster</label>
+              <input type="text" id="enrollRegion" value="Mulbagal, Kolar, Karnataka">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="enrollBatchId">Initial Batch ID</label>
+              <input type="text" id="enrollBatchId" value="SERI-2026-M06">
+            </div>
+            <div class="form-group">
+              <label for="enrollDfl">DFL Capacity</label>
+              <input type="text" id="enrollDfl" value="250 DFL">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="enrollBreed">Silkworm Breed</label>
+            <select id="enrollBreed">
+              <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
+              <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
+              <option value="Pure Mysore">Pure Mysore</option>
+            </select>
+          </div>
+
+          <div id="enrollError" class="alert-box error hidden"></div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="enrollPassword">Initial Password *</label>
-            <input type="password" id="enrollPassword" required placeholder="Min 6 characters">
-          </div>
-          <div class="form-group">
-            <label for="enrollPhone">Phone Number</label>
-            <input type="text" id="enrollPhone" placeholder="e.g. +91 98450 12345">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="enrollFarmName">Shed / Farm Name *</label>
-            <input type="text" id="enrollFarmName" required placeholder="e.g. Gowda Silks Shed 1">
-          </div>
-          <div class="form-group">
-            <label for="enrollRegion">Region</label>
-            <input type="text" id="enrollRegion" value="Mulbagal, Kolar, Karnataka">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="enrollBatchId">Initial Batch ID</label>
-            <input type="text" id="enrollBatchId" value="BATCH-2026-004">
-          </div>
-          <div class="form-group">
-            <label for="enrollDfl">DFL Capacity</label>
-            <input type="text" id="enrollDfl" value="250 DFL">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="enrollBreed">Silkworm Breed</label>
-          <select id="enrollBreed">
-            <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
-            <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
-            <option value="Pure Mysore">Pure Mysore</option>
-          </select>
-        </div>
-
-        <div id="enrollError" class="alert-box error hidden"></div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" onclick="closeEnrollModal()">Cancel</button>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-skin" onclick="closeEnrollModal()">Cancel</button>
           <button type="submit" class="btn btn-primary">
             <i data-lucide="check"></i> Enroll & Activate Farmer
           </button>
@@ -422,6 +894,10 @@
     </div>
   </div>
 
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Application Logic -->
   <script src="app.js"></script>
 </body>
 </html>

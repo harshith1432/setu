@@ -61,7 +61,7 @@ class ShedData {
     return ShedData(
       shedId: json['shed_id'] ?? 'shed_01',
       farmName: json['farm_name'] ?? 'Green Valley Farm',
-      region: json['region'] ?? 'Mulbagal, Karnataka',
+      region: json['region'] ?? 'My Rearing Shed',
       overallStatus: json['overall_status'] ?? 'IDEAL',
       statusHeadline: json['status_headline'] ?? 'Ideal for Silkworms',
       statusSubline: json['status_subline'] ?? 'Everything is normal',

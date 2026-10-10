@@ -6,33 +6,73 @@ STAGE_THRESHOLDS: Dict[int, Dict[str, Any]] = {
         "name": "1st Instar (Chawki)",
         "days": "Days 1–3",
         "temp_min": 27.0, "temp_max": 28.0,
-        "hum_min": 80.0, "hum_max": 85.0
+        "hum_min": 80.0, "hum_max": 85.0,
+        "hysteresis_temp": 0.5, "hysteresis_hum": 3.0,
+        "fan_trigger_offset": 1.5,
+        "description": "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation."
     },
     2: {
         "name": "2nd Instar",
         "days": "Days 4–5",
         "temp_min": 26.5, "temp_max": 27.5,
-        "hum_min": 75.0, "hum_max": 80.0
+        "hum_min": 75.0, "hum_max": 80.0,
+        "hysteresis_temp": 0.5, "hysteresis_hum": 3.0,
+        "fan_trigger_offset": 1.5,
+        "description": "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements."
     },
     3: {
         "name": "3rd Instar",
         "days": "Days 6–9",
         "temp_min": 25.0, "temp_max": 26.5,
-        "hum_min": 70.0, "hum_max": 75.0
+        "hum_min": 70.0, "hum_max": 75.0,
+        "hysteresis_temp": 0.5, "hysteresis_hum": 3.0,
+        "fan_trigger_offset": 1.5,
+        "description": "Late chawki / adult transition. Increased voracity requires steady ventilation and balanced thermal envelope."
     },
     4: {
         "name": "4th Instar",
         "days": "Days 10–14",
         "temp_min": 24.0, "temp_max": 25.5,
-        "hum_min": 65.0, "hum_max": 70.0
+        "hum_min": 65.0, "hum_max": 70.0,
+        "hysteresis_temp": 0.5, "hysteresis_hum": 3.0,
+        "fan_trigger_offset": 1.5,
+        "description": "Exponential larval weight gain. High metabolic heat output necessitates active cooling and air exchange."
     },
     5: {
         "name": "5th Instar",
         "days": "Days 15–20",
         "temp_min": 23.0, "temp_max": 24.5,
-        "hum_min": 60.0, "hum_max": 65.0
+        "hum_min": 60.0, "hum_max": 65.0,
+        "hysteresis_temp": 0.5, "hysteresis_hum": 3.0,
+        "fan_trigger_offset": 1.5,
+        "description": "Final feeding instar preceding cocooning/spinning. Requires cooler, drier conditions and continuous fresh airflow."
     }
 }
+
+def sync_thresholds_from_db():
+    try:
+        from app.services.db_service import get_all_stage_thresholds
+        db_stages = get_all_stage_thresholds()
+        if db_stages:
+            for s in db_stages:
+                sid = int(s["stage_id"])
+                STAGE_THRESHOLDS[sid] = {
+                    "name": s["name"],
+                    "days": s["days"],
+                    "temp_min": float(s["temp_min"]),
+                    "temp_max": float(s["temp_max"]),
+                    "hum_min": float(s["hum_min"]),
+                    "hum_max": float(s["hum_max"]),
+                    "hysteresis_temp": float(s.get("hysteresis_temp", 0.5)),
+                    "hysteresis_hum": float(s.get("hysteresis_hum", 3.0)),
+                    "fan_trigger_offset": float(s.get("fan_trigger_offset", 1.5)),
+                    "description": s.get("description", "")
+                }
+    except Exception:
+        pass
+
+# Attempt initial sync on load
+sync_thresholds_from_db()
 
 class RulesEngine:
     def __init__(self, hysteresis_temp: float = 0.5, hysteresis_hum: float = 3.0):

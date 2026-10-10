@@ -12,7 +12,7 @@ class TelemetryService:
         self.sheds: Dict[str, Dict[str, Any]] = {
             "shed_01": {
                 "farm_name": "Green Valley Farm",
-                "region": "Mulbagal, Karnataka",
+                "region": "Sericulture Shed",
                 "current_stage": 3,
                 "is_auto_mode": True,
                 "temp_target": 26.0,
@@ -53,7 +53,7 @@ class TelemetryService:
         if not shed:
             shed = {
                 "farm_name": f"Farm for {payload.shed_id}",
-                "region": "Mulbagal, Karnataka",
+                "region": "Sericulture Shed",
                 "current_stage": 3,
                 "is_auto_mode": True,
                 "temp_target": 26.0,
@@ -116,7 +116,10 @@ class TelemetryService:
             shed = self.sheds["shed_01"]
 
         # Fetch real-time weather dynamically from Open-Meteo
-        lookup_region = region_override or shed.get("region")
+        lookup_region = region_override
+        if not lookup_region and (lat is None or lon is None):
+            lookup_region = shed.get("region")
+
         try:
             live_weather = weather_service.get_current_weather(
                 lat=lat,
@@ -125,8 +128,10 @@ class TelemetryService:
             )
             shed["outside_temp"] = live_weather["outside_temperature"]
             shed["outside_hum"] = live_weather["outside_humidity"]
-            if lookup_region:
-                shed["region"] = lookup_region
+            if region_override:
+                shed["region"] = region_override
+            elif live_weather.get("region"):
+                shed["region"] = live_weather["region"]
         except Exception:
             pass
 

@@ -27,7 +27,7 @@ class LiveWeatherData {
     required this.isGps,
   });
 
-  /// Factory from Open-Meteo Current payload and reverse-geocoded location
+  /// Factory from Open-Meteo Current payload and live resolved location
   factory LiveWeatherData.fromOpenMeteo({
     required Map<String, dynamic> currentJson,
     required double lat,
@@ -35,8 +35,8 @@ class LiveWeatherData {
     required String locationName,
     required bool isGps,
   }) {
-    final temp = (currentJson['temperature_2m'] as num?)?.toDouble() ?? 28.0;
-    final hum = (currentJson['relative_humidity_2m'] as num?)?.toDouble() ?? 55.0;
+    final temp = (currentJson['temperature_2m'] as num?)?.toDouble() ?? 0.0;
+    final hum = (currentJson['relative_humidity_2m'] as num?)?.toDouble() ?? 0.0;
     final appTemp = (currentJson['apparent_temperature'] as num?)?.toDouble();
     final wind = (currentJson['wind_speed_10m'] as num?)?.toDouble();
     final code = (currentJson['weather_code'] as num?)?.toInt() ?? 0;
@@ -53,26 +53,6 @@ class LiveWeatherData {
       longitude: lon,
       lastUpdated: DateTime.now(),
       isGps: isGps,
-    );
-  }
-
-  factory LiveWeatherData.fallback({
-    String locationName = 'Mulbagal, Karnataka',
-    double lat = 13.1652,
-    double lon = 78.3965,
-  }) {
-    return LiveWeatherData(
-      temperature: 34.2,
-      humidity: 58.0,
-      apparentTemperature: 36.0,
-      windSpeed: 14.5,
-      weatherCode: 1,
-      condition: 'Partly Sunny',
-      locationName: locationName,
-      latitude: lat,
-      longitude: lon,
-      lastUpdated: DateTime.now(),
-      isGps: false,
     );
   }
 

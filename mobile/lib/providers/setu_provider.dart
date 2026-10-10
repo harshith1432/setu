@@ -39,13 +39,16 @@ class SetuProvider with ChangeNotifier {
   String _dflCapacity = '200 DFL';
   String _breed = 'Double Hybrid (FC1 x FC2)';
   String _farmName = 'Green Valley Sericulture Farm';
-  String _region = 'Mulbagal, Kolar, KA';
+  String _region = 'My Rearing Shed';
+  double? _latitude;
+  double? _longitude;
+  bool _isDeviceLocation = false;
   final String _experience = '12 Yrs Exp.';
 
   ShedData _shedData = ShedData(
     shedId: 'shed_01',
     farmName: 'Green Valley Sericulture Farm',
-    region: 'Mulbagal, Karnataka',
+    region: 'My Rearing Shed',
     overallStatus: 'IDEAL',
     statusHeadline: 'Ideal for Silkworms',
     statusSubline: 'Everything is comfortable inside the shed. No action required.',
@@ -104,6 +107,9 @@ class SetuProvider with ChangeNotifier {
   String get breed => _breed;
   String get farmName => _farmName;
   String get region => _region;
+  double? get latitude => _latitude;
+  double? get longitude => _longitude;
+  bool get isDeviceLocation => _isDeviceLocation;
   String get experience => _experience;
 
   // Live Location & Weather Getters
@@ -135,6 +141,9 @@ class SetuProvider with ChangeNotifier {
       _userPhone = prefs.getString('phone') ?? _userPhone;
       _farmName = prefs.getString('farm_name') ?? _farmName;
       _region = prefs.getString('region') ?? _region;
+      _latitude = prefs.getDouble('latitude');
+      _longitude = prefs.getDouble('longitude');
+      _isDeviceLocation = prefs.getBool('is_device_location') ?? false;
       _batchId = prefs.getString('batch_id') ?? _batchId;
       _dflCapacity = prefs.getString('dfl_capacity') ?? _dflCapacity;
       _breed = prefs.getString('breed') ?? _breed;
@@ -147,6 +156,8 @@ class SetuProvider with ChangeNotifier {
             _userName = me['full_name'] ?? _userName;
             _farmName = me['farm_name'] ?? _farmName;
             _region = me['region'] ?? _region;
+            if (me['latitude'] != null) _latitude = (me['latitude'] as num).toDouble();
+            if (me['longitude'] != null) _longitude = (me['longitude'] as num).toDouble();
             _batchId = me['batch_id'] ?? _batchId;
             _dflCapacity = me['dfl_capacity'] ?? _dflCapacity;
             _breed = me['breed'] ?? _breed;
@@ -159,22 +170,38 @@ class SetuProvider with ChangeNotifier {
     } finally {
       _isInitialized = true;
       notifyListeners();
-      // Proactively fetch live ambient temperature and humidity for the current user location
+      // Fetch live real-time ambient weather for the saved location
       refreshLiveWeather();
     }
   }
 
-  /// Live Weather & Geolocation Ingestion
-  Future<void> refreshLiveWeather({bool requestGps = true}) async {
+  /// Refreshes live ambient weather from Open-Meteo for the current region/coordinates
+  Future<void> refreshLiveWeather({bool requestGps = false}) async {
     _isLoadingWeather = true;
     _weatherErrorMessage = null;
     notifyListeners();
 
     try {
+      if (requestGps) {
+        final liveLoc = await _weatherService.resolveLiveLocation();
+        if (liveLoc != null) {
+          _latitude = liveLoc['lat'];
+          _longitude = liveLoc['lon'];
+          _region = liveLoc['locationName'];
+          _isDeviceLocation = liveLoc['isGps'] ?? false;
+        }
+      }
+
       final weather = await _weatherService.fetchLiveWeather(
-        fallbackRegionName: _region,
+        latitude: _latitude,
+        longitude: _longitude,
+        customLocationName: (_region.isNotEmpty && _region != 'My Rearing Shed') ? _region : null,
       );
       _liveWeather = weather;
+      _latitude = weather.latitude;
+      _longitude = weather.longitude;
+      _region = weather.locationName;
+      _isDeviceLocation = weather.isGps;
       _shedData = _shedData.copyWith(
         outsideTemp: weather.temperature,
         outsideHumidity: weather.humidity,
@@ -183,6 +210,103 @@ class SetuProvider with ChangeNotifier {
       _updateAdviceForWeather();
     } catch (e) {
       _weatherErrorMessage = e.toString();
+    } finally {
+      _isLoadingWeather = false;
+      notifyListeners();
+    }
+  }
+
+  /// Sets location manually (city, town, district, country) anywhere worldwide
+  Future<({bool success, String message})> setLocationManual(String locationName) async {
+    final clean = locationName.trim();
+    if (clean.isEmpty) {
+      return (success: false, message: 'Please enter a valid location name.');
+    }
+
+    _isLoadingWeather = true;
+    notifyListeners();
+
+    try {
+      final geo = await _weatherService.geocodeAddress(clean);
+      if (geo != null) {
+        _region = geo['region'] ?? clean;
+        _latitude = geo['lat'];
+        _longitude = geo['lon'];
+        _isDeviceLocation = false;
+      } else {
+        _region = clean;
+        _latitude = null;
+        _longitude = null;
+        _isDeviceLocation = false;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('region', _region);
+      if (_latitude != null) {
+        await prefs.setDouble('latitude', _latitude!);
+      } else {
+        await prefs.remove('latitude');
+      }
+      if (_longitude != null) {
+        await prefs.setDouble('longitude', _longitude!);
+      } else {
+        await prefs.remove('longitude');
+      }
+      await prefs.setBool('is_device_location', false);
+
+      // Sync with backend if logged in
+      _apiService.updateProfile({
+        'region': _region,
+        'latitude': _latitude,
+        'longitude': _longitude,
+      });
+
+      // Update weather immediately
+      await refreshLiveWeather();
+      return (success: true, message: 'Location set to $_region');
+    } catch (e) {
+      return (success: false, message: 'Error setting location: $e');
+    } finally {
+      _isLoadingWeather = false;
+      notifyListeners();
+    }
+  }
+
+  /// Requests phone GPS permission and updates location from device GPS
+  Future<({bool success, String message})> detectAndSetDeviceLocation() async {
+    _isLoadingWeather = true;
+    notifyListeners();
+
+    try {
+      final res = await _weatherService.acquireDeviceLocation();
+      if (!res['success']) {
+        final String errMsg = res['error']?.toString() ?? 'Could not detect device location.';
+        return (success: false, message: errMsg);
+      }
+
+      _latitude = res['lat'] as double;
+      _longitude = res['lon'] as double;
+      _region = res['region'] as String;
+      _isDeviceLocation = true;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('region', _region);
+      await prefs.setDouble('latitude', _latitude!);
+      await prefs.setDouble('longitude', _longitude!);
+      await prefs.setBool('is_device_location', true);
+
+      // Sync with backend
+      _apiService.updateProfile({
+        'region': _region,
+        'latitude': _latitude,
+        'longitude': _longitude,
+      });
+
+      // Fetch weather for acquired coordinates
+      await refreshLiveWeather();
+      return (success: true, message: 'Device location updated: $_region');
+    } catch (e) {
+      return (success: false, message: 'Failed to obtain GPS: $e');
     } finally {
       _isLoadingWeather = false;
       notifyListeners();
@@ -438,7 +562,7 @@ class SetuProvider with ChangeNotifier {
       'full_name': fullName.trim().isNotEmpty ? fullName.trim() : 'Farmer $cleanUname',
       'phone': phone.trim().isNotEmpty ? phone.trim() : '+91 98450 00000',
       'farm_name': (farmName != null && farmName.trim().isNotEmpty) ? farmName.trim() : 'Green Valley Sericulture Farm',
-      'region': (region != null && region.trim().isNotEmpty) ? region.trim() : 'Mulbagal, Kolar, KA',
+      'region': (region != null && region.trim().isNotEmpty) ? region.trim() : (_region.isNotEmpty ? _region : 'Local Rearing Shed'),
       'batch_id': (batchId != null && batchId.trim().isNotEmpty) ? batchId.trim() : 'SERI-2026-M04',
       'dfl_capacity': (dflCapacity != null && dflCapacity.trim().isNotEmpty) ? dflCapacity.trim() : '200 DFL',
       'breed': (breed != null && breed.trim().isNotEmpty) ? breed.trim() : 'Double Hybrid (FC1 x FC2)',
@@ -479,24 +603,43 @@ class SetuProvider with ChangeNotifier {
     required String phone,
     required String batch,
     required String capacity,
-  }) => updateFarmerProfile(name: name, phone: phone, batch: batch, capacity: capacity);
+    String? farmName,
+    String? region,
+  }) => updateFarmerProfile(name: name, phone: phone, batch: batch, capacity: capacity, farmName: farmName, region: region);
 
   void updateFarmerProfile({
     required String name,
     required String phone,
     required String batch,
     required String capacity,
+    String? farmName,
+    String? region,
   }) {
     _userName = name;
     _userPhone = phone;
     _batchId = batch;
     _dflCapacity = capacity;
+    if (farmName != null && farmName.trim().isNotEmpty) _farmName = farmName.trim();
+    if (region != null && region.trim().isNotEmpty) _region = region.trim();
+
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString('full_name', name);
       prefs.setString('phone', phone);
       prefs.setString('batch_id', batch);
       prefs.setString('dfl_capacity', capacity);
+      if (farmName != null && farmName.trim().isNotEmpty) prefs.setString('farm_name', _farmName);
+      if (region != null && region.trim().isNotEmpty) prefs.setString('region', _region);
     });
+
+    _apiService.updateProfile({
+      'full_name': name,
+      'phone': phone,
+      'batch_id': batch,
+      'dfl_capacity': capacity,
+      if (farmName != null && farmName.trim().isNotEmpty) 'farm_name': _farmName,
+      if (region != null && region.trim().isNotEmpty) 'region': _region,
+    });
+
     notifyListeners();
   }
 

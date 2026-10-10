@@ -191,3 +191,66 @@ async def test_live_weather_endpoint(async_client):
     assert data["latitude"] == 13.1652
     assert data["longitude"] == 78.3965
 
+@pytest.mark.anyio
+async def test_admin_stage_thresholds_and_software_level_controls(async_client):
+    admin_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin"}
+    )
+    admin_token = admin_login.json()["access_token"]
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # 1. Fetch all growth stage levels
+    stages_res = await async_client.get("/api/v1/admin/stages", headers=admin_headers)
+    assert stages_res.status_code == 200
+    stages = stages_res.json()
+    assert len(stages) == 5
+    assert stages[0]["stage_id"] == 1
+    assert "1st Instar" in stages[0]["name"]
+
+    # 2. Update Stage 1 thresholds (e.g. adjust Chawki temp & hum)
+    update_payload = {
+        "temp_min": 27.2,
+        "temp_max": 28.5,
+        "hum_min": 82.0,
+        "hum_max": 88.0,
+        "hysteresis_temp": 0.4,
+        "hysteresis_hum": 2.5,
+        "fan_trigger_offset": 1.2,
+        "description": "Updated optimal Chawki thresholds for Mulbagal summer batch."
+    }
+    put_res = await async_client.put("/api/v1/admin/stages/1", json=update_payload, headers=admin_headers)
+    assert put_res.status_code == 200
+    stage1 = put_res.json()["stage"]
+    assert stage1["temp_min"] == 27.2
+    assert stage1["hum_max"] == 88.0
+
+    # 3. Verify in rules_engine that updated threshold is active
+    from app.services.rules_engine import STAGE_THRESHOLDS
+    assert STAGE_THRESHOLDS[1]["temp_min"] == 27.2
+    assert STAGE_THRESHOLDS[1]["hum_max"] == 88.0
+
+    # 4. Switch shed stage and verify overview
+    stage_res = await async_client.post(
+        "/api/v1/admin/sheds/shed_01/stage",
+        json={"stage": 1},
+        headers=admin_headers
+    )
+    assert stage_res.status_code == 200
+    overview = stage_res.json()
+    assert overview["current_stage"] == 1
+
+    # 5. Fetch telemetry-live
+    live_res = await async_client.get("/api/v1/admin/telemetry-live?shed_id=shed_01", headers=admin_headers)
+    assert live_res.status_code == 200
+    live_data = live_res.json()
+    assert "compliance_index" in live_data
+    assert "history" in live_data
+    assert live_data["overview"]["shed_id"] == "shed_01"
+
+    # 6. Reset stages back to CSB standard defaults
+    reset_res = await async_client.post("/api/v1/admin/stages/reset", headers=admin_headers)
+    assert reset_res.status_code == 200
+    assert STAGE_THRESHOLDS[1]["temp_min"] == 27.0
+
+

@@ -126,10 +126,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.location_on, size: 14, color: Colors.white),
+                            Icon(Icons.public, size: 14, color: Colors.white),
                             SizedBox(width: 4),
                             Text(
-                              'Mulbagal Sericulture Cluster',
+                              'Global Sericulture IoT Network',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,

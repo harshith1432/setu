@@ -55,7 +55,7 @@ class _AiGuidanceScreenState extends State<AiGuidanceScreen> {
                     ),
                   ),
                   const Text(
-                    'Real-time explainable actions for Mulbagal farmers',
+                    'Real-time explainable actions for your rearing shed',
                     style: TextStyle(fontSize: 11, color: Color(0xFF5A695C)),
                   ),
                 ],

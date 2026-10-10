@@ -69,6 +69,25 @@ class WeatherService:
             logger.warning(f"Geocoding failed for '{region_name}': {e}")
         return None
 
+    def reverse_geocode(self, lat: float, lon: float) -> Optional[str]:
+        """
+        Reverse geocodes GPS coordinates to city, state, country anywhere in the world.
+        """
+        try:
+            url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
+            req = urllib.request.Request(url, headers={"User-Agent": "Setu-Global/1.0"})
+            with urllib.request.urlopen(req, timeout=3) as res:
+                data = json.loads(res.read().decode())
+                city = data.get("city") or data.get("locality") or ""
+                subdiv = data.get("principalSubdivision") or ""
+                country = data.get("countryName") or ""
+                parts = [p for p in [city, subdiv, country] if p]
+                if parts:
+                    return ", ".join(parts)
+        except Exception as e:
+            logger.warning(f"Reverse geocode failed for {lat}, {lon}: {e}")
+        return None
+
     def get_current_weather(
         self,
         lat: Optional[float] = None,
@@ -78,9 +97,13 @@ class WeatherService:
         """
         Fetches live real-time weather from Open-Meteo for any latitude/longitude or region name anywhere in the world.
         """
-        display_region = region.strip() if region and region.strip() else self.default_region
+        display_region = region.strip() if region and region.strip() else None
         latitude = lat
         longitude = lon
+
+        # If coordinates provided but region name is missing, reverse geocode to find exact place name
+        if latitude is not None and longitude is not None and not display_region:
+            display_region = self.reverse_geocode(latitude, longitude) or f"Coordinates ({latitude:.2f}, {longitude:.2f})"
 
         # If lat/lon not provided, resolve via geocoding
         if latitude is None or longitude is None:
@@ -91,11 +114,25 @@ class WeatherService:
                     longitude = geo["longitude"]
                     if not region:
                         display_region = geo["formatted_region"]
+            else:
+                display_region = self.default_region
 
-        # Default fallback coordinates (Mulbagal) only if resolution completely fails
+        # If lat/lon not provided, resolve via live IP geolocation
         if latitude is None or longitude is None:
-            latitude = 13.1633
-            longitude = 78.3944
+            try:
+                ip_req = urllib.request.Request("http://ip-api.com/json", headers={"User-Agent": "Setu-Global/1.0"})
+                with urllib.request.urlopen(ip_req, timeout=3) as res:
+                    ip_data = json.loads(res.read().decode())
+                    if ip_data.get("status") == "success":
+                        latitude = float(ip_data["lat"])
+                        longitude = float(ip_data["lon"])
+                        if not region:
+                            city = ip_data.get("city", "")
+                            reg = ip_data.get("regionName", "")
+                            parts = [p for p in [city, reg] if p]
+                            display_region = ", ".join(parts) if parts else "Live Location"
+            except Exception as e:
+                logger.warning(f"Live IP geolocation failed: {e}")
 
         try:
             weather_url = (

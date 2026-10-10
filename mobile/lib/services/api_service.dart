@@ -104,7 +104,7 @@ class ApiService {
             'phone': phone,
             'preferred_language': preferredLanguage,
             'farm_name': (farmName != null && farmName.isNotEmpty) ? farmName : 'Green Valley Sericulture Farm',
-            'region': (region != null && region.isNotEmpty) ? region : 'Mulbagal, Kolar, KA',
+            'region': (region != null && region.isNotEmpty) ? region : 'Local Rearing Shed',
             'batch_id': (batchId != null && batchId.isNotEmpty) ? batchId : 'SERI-2026-M04',
             'dfl_capacity': (dflCapacity != null && dflCapacity.isNotEmpty) ? dflCapacity : '200 DFL',
             'breed': (breed != null && breed.isNotEmpty) ? breed : 'Double Hybrid (FC1 x FC2)',

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class InsightsScreen extends StatefulWidget {
@@ -185,6 +187,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final provider = Provider.of<SetuProvider>(context);
+    final currentRegion = provider.region.isNotEmpty ? provider.region : 'Local Rearing Shed';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -245,7 +249,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               'Run exhaust vent fans between 12 PM and 3 PM to extract trapped heat.'
             ],
             fullBody:
-                'Mulbagal summer afternoons often exceed 35°C outside. Direct high temperatures cause heat stress, reducing cocoon weight and filament quality. Automated relay systems trigger foggers in hysteresis mode to reduce indoor temperature by up to 6°C without saturating air moisture.',
+                'Hot summer afternoons often exceed 35°C outside. Direct high temperatures cause heat stress, reducing cocoon weight and filament quality. Automated relay systems trigger foggers in hysteresis mode to reduce indoor temperature by up to 6°C without saturating air moisture.',
           ),
           const SizedBox(height: 8),
 
@@ -266,22 +270,22 @@ class _InsightsScreenState extends State<InsightsScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Mulbagal Regional Focus Card
+          // Regional Focus Card
           _buildInsightCard(
             context,
             icon: Icons.location_on_rounded,
             bgColor: const Color(0xFFFFEBEE),
             iconColor: const Color(0xFFC62828),
             title: l10n.translate('regionInsights'),
-            sub: 'Mulbagal & Kolar weather alerts.',
+            sub: '$currentRegion weather & alerts.',
             borderColor: const Color(0xFFE53935),
             takeaways: [
-              'Mulbagal cluster forecast: Dry afternoon wind expected today.',
+              '$currentRegion live conditions: Real-time outdoor microclimate.',
               'Keep automatic cooling setpoints locked at 26.0°C Target.',
               'Check water supply levels for foggers before noon peak.'
             ],
             fullBody:
-                'Mulbagal and Kolar belt experience dry, hot winds during summer months. Setu IoT edge sensors continuously monitor local microclimate variations to ensure automated relay interlocks react instantaneously to preserve ideal rearing conditions.',
+                'Local outdoor climate directly influences indoor rearing conditions. Setu IoT edge sensors continuously monitor local microclimate variations in $currentRegion to ensure automated relay interlocks react instantaneously to preserve ideal rearing conditions.',
           ),
           const SizedBox(height: 16),
 

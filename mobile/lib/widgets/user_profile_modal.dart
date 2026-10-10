@@ -14,7 +14,9 @@ class _UserProfileModalState extends State<UserProfileModal> {
   late TextEditingController _phoneController;
   late TextEditingController _batchController;
   late TextEditingController _capacityController;
+  late TextEditingController _regionController;
   bool _isEditing = false;
+  bool _isLocating = false;
 
   @override
   void initState() {
@@ -24,6 +26,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
     _phoneController = TextEditingController(text: provider.userPhone);
     _batchController = TextEditingController(text: provider.batchId);
     _capacityController = TextEditingController(text: provider.dflCapacity);
+    _regionController = TextEditingController(text: provider.region);
   }
 
   @override
@@ -32,24 +35,50 @@ class _UserProfileModalState extends State<UserProfileModal> {
     _phoneController.dispose();
     _batchController.dispose();
     _capacityController.dispose();
+    _regionController.dispose();
     super.dispose();
   }
 
-  void _saveProfile(SetuProvider provider) {
+  Future<void> _saveProfile(SetuProvider provider) async {
     provider.updateUserProfile(
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
       batch: _batchController.text.trim(),
       capacity: _capacityController.text.trim(),
+      region: _regionController.text.trim(),
     );
+    if (_regionController.text.trim() != provider.region) {
+      await provider.setLocationManual(_regionController.text.trim());
+    }
     setState(() => _isEditing = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('User Profile updated successfully'),
-        backgroundColor: Color(0xFF2E7D32),
-        duration: Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User Profile updated successfully'),
+          backgroundColor: Color(0xFF2E7D32),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _detectLocationInProfile(SetuProvider provider) async {
+    setState(() => _isLocating = true);
+    final res = await provider.detectAndSetDeviceLocation();
+    if (mounted) {
+      setState(() {
+        _isLocating = false;
+        if (res.success) {
+          _regionController.text = provider.region;
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message),
+          backgroundColor: res.success ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+        ),
+      );
+    }
   }
 
   @override
@@ -209,6 +238,37 @@ class _UserProfileModalState extends State<UserProfileModal> {
               _buildTextField('Batch ID', _batchController, Icons.tag),
               const SizedBox(height: 10),
               _buildTextField('Shed Capacity (DFLs)', _capacityController, Icons.grid_view, keyboardType: TextInputType.number),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTextField('Shed Location / City', _regionController, Icons.location_on_outlined),
+                  ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _isLocating ? null : () => _detectLocationInProfile(provider),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFA5D6A7)),
+                      ),
+                      child: Row(
+                        children: [
+                          _isLocating
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2E7D32)))
+                              : const Icon(Icons.my_location, size: 18, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 4),
+                          const Text('GPS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 14),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
@@ -222,7 +282,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
             ] else ...[
               _buildInfoRow('Phone Number', provider.userPhone),
               _buildInfoRow('Registered Shed', '${provider.shedData.shedId.toUpperCase()} (${provider.shedData.farmName})'),
-              _buildInfoRow('Cluster Region', provider.region),
+              _buildInfoRow('Shed Region / Location', provider.region),
               _buildInfoRow('Silkworm Breed', provider.breed),
               _buildInfoRow('Rearing Capacity', provider.dflCapacity.contains('DFL') ? provider.dflCapacity : '${provider.dflCapacity} DFL'),
               _buildInfoRow('Rearing Stage', '${provider.currentGrowthStage}rd Instar (FC1 x FC2)'),

@@ -53,6 +53,40 @@ def init_db():
         details TEXT NOT NULL
     );
     """)
+
+    # Stage Thresholds (Admin software levels for auto-mode)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS stage_thresholds (
+        stage_id INT PRIMARY KEY,
+        name VARCHAR(128) NOT NULL,
+        days VARCHAR(64) NOT NULL,
+        temp_min FLOAT NOT NULL,
+        temp_max FLOAT NOT NULL,
+        hum_min FLOAT NOT NULL,
+        hum_max FLOAT NOT NULL,
+        hysteresis_temp FLOAT NOT NULL DEFAULT 0.5,
+        hysteresis_hum FLOAT NOT NULL DEFAULT 3.0,
+        fan_trigger_offset FLOAT NOT NULL DEFAULT 1.5,
+        description TEXT,
+        updated_at TIMESTAMPTZ NOT NULL
+    );
+    """)
+
+    # Pre-seed Stage Thresholds if empty
+    cursor.execute("SELECT COUNT(*) FROM stage_thresholds")
+    if cursor.fetchone()[0] == 0:
+        now_dt = datetime.now(timezone.utc)
+        for stage in [
+            (1, "1st Instar (Chawki)", "Days 1–3", 27.0, 28.0, 80.0, 85.0, 0.5, 3.0, 1.5, "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation.", now_dt),
+            (2, "2nd Instar", "Days 4–5", 26.5, 27.5, 75.0, 80.0, 0.5, 3.0, 1.5, "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements.", now_dt),
+            (3, "3rd Instar", "Days 6–9", 25.0, 26.5, 70.0, 75.0, 0.5, 3.0, 1.5, "Late chawki / adult transition. Increased voracity requires steady ventilation and balanced thermal envelope.", now_dt),
+            (4, "4th Instar", "Days 10–14", 24.0, 25.5, 65.0, 70.0, 0.5, 3.0, 1.5, "Exponential larval weight gain. High metabolic heat output necessitates active cooling and air exchange.", now_dt),
+            (5, "5th Instar", "Days 15–20", 23.0, 24.5, 60.0, 65.0, 0.5, 3.0, 1.5, "Final feeding instar preceding cocooning/spinning. Requires cooler, drier conditions and continuous fresh airflow.", now_dt)
+        ]:
+            cursor.execute("""
+            INSERT INTO stage_thresholds (stage_id, name, days, temp_min, temp_max, hum_min, hum_max, hysteresis_temp, hysteresis_hum, fan_trigger_offset, description, updated_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, stage)
     
     # Pre-seed Admin and sample farmers if empty
     cursor.execute("SELECT COUNT(*) FROM users")
@@ -351,3 +385,104 @@ def get_audit_logs(limit: int = 50) -> List[Dict[str, Any]]:
             d["timestamp"] = d["timestamp"].isoformat()
         result.append(d)
     return result
+
+def get_all_stage_thresholds() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM stage_thresholds ORDER BY stage_id ASC")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    result = []
+    for r in rows:
+        d = dict(r)
+        if isinstance(d.get("updated_at"), datetime):
+            d["updated_at"] = d["updated_at"].isoformat()
+        result.append(d)
+    return result
+
+def get_stage_threshold(stage_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT * FROM stage_thresholds WHERE stage_id = %s", (stage_id,))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if row:
+        d = dict(row)
+        if isinstance(d.get("updated_at"), datetime):
+            d["updated_at"] = d["updated_at"].isoformat()
+        return d
+    return None
+
+def update_stage_threshold(stage_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    conn.autocommit = True
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    fields = []
+    values = []
+    allowed = ["name", "days", "temp_min", "temp_max", "hum_min", "hum_max", "hysteresis_temp", "hysteresis_hum", "fan_trigger_offset", "description"]
+    for k in allowed:
+        if k in updates and updates[k] is not None:
+            fields.append(f"{k} = %s")
+            values.append(updates[k])
+            
+    if not fields:
+        cursor.close()
+        conn.close()
+        return get_stage_threshold(stage_id)
+
+    fields.append("updated_at = %s")
+    values.append(datetime.now(timezone.utc))
+
+    values.append(stage_id)
+    query = f"UPDATE stage_thresholds SET {', '.join(fields)} WHERE stage_id = %s RETURNING *"
+    cursor.execute(query, tuple(values))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if row:
+        d = dict(row)
+        if isinstance(d.get("updated_at"), datetime):
+            d["updated_at"] = d["updated_at"].isoformat()
+        return d
+    return None
+
+def reset_stage_thresholds() -> List[Dict[str, Any]]:
+    conn = get_connection()
+    conn.autocommit = True
+    cursor = conn.cursor()
+    
+    defaults = [
+        (1, "1st Instar (Chawki)", "Days 1–3", 27.0, 28.0, 80.0, 85.0, 0.5, 3.0, 1.5, "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation."),
+        (2, "2nd Instar", "Days 4–5", 26.5, 27.5, 75.0, 80.0, 0.5, 3.0, 1.5, "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements."),
+        (3, "3rd Instar", "Days 6–9", 25.0, 26.5, 70.0, 75.0, 0.5, 3.0, 1.5, "Late chawki / adult transition. Increased voracity requires steady ventilation and balanced thermal envelope."),
+        (4, "4th Instar", "Days 10–14", 24.0, 25.5, 65.0, 70.0, 0.5, 3.0, 1.5, "Exponential larval weight gain. High metabolic heat output necessitates active cooling and air exchange."),
+        (5, "5th Instar", "Days 15–20", 23.0, 24.5, 60.0, 65.0, 0.5, 3.0, 1.5, "Final feeding instar preceding cocooning/spinning. Requires cooler, drier conditions and continuous fresh airflow.")
+    ]
+    
+    now_dt = datetime.now(timezone.utc)
+    for s in defaults:
+        cursor.execute("""
+        INSERT INTO stage_thresholds (stage_id, name, days, temp_min, temp_max, hum_min, hum_max, hysteresis_temp, hysteresis_hum, fan_trigger_offset, description, updated_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (stage_id) DO UPDATE SET
+            name = EXCLUDED.name,
+            days = EXCLUDED.days,
+            temp_min = EXCLUDED.temp_min,
+            temp_max = EXCLUDED.temp_max,
+            hum_min = EXCLUDED.hum_min,
+            hum_max = EXCLUDED.hum_max,
+            hysteresis_temp = EXCLUDED.hysteresis_temp,
+            hysteresis_hum = EXCLUDED.hysteresis_hum,
+            fan_trigger_offset = EXCLUDED.fan_trigger_offset,
+            description = EXCLUDED.description,
+            updated_at = EXCLUDED.updated_at
+        """, (*s, now_dt))
+        
+    cursor.close()
+    conn.close()
+    return get_all_stage_thresholds()
+
