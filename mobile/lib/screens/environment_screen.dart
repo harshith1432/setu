@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/visual_comfort_chart.dart';
 
@@ -19,7 +19,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final shed = provider.shedData;
     final l10n = AppLocalizations.of(context);
 
@@ -144,9 +144,33 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Exact Sensor Readings',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Exact Sensor Readings',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFA5D6A7)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on, size: 10, color: Color(0xFF2E7D32)),
+                            const SizedBox(width: 3),
+                            Text(
+                              provider.liveWeather?.locationName ?? provider.region,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   GridView.count(
@@ -159,8 +183,8 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
                     children: [
                       _buildMetricCell('Indoor Temp', '${shed.indoorTemp} °C'),
                       _buildMetricCell('Indoor Humidity', '${shed.indoorHumidity.toInt()} %'),
-                      _buildMetricCell('Outside Temp', '${shed.outsideTemp} °C'),
-                      _buildMetricCell('Outside Humidity', '${shed.outsideHumidity.toInt()} %'),
+                      _buildMetricCell('Outside Temp (Live)', '${shed.outsideTemp} °C'),
+                      _buildMetricCell('Outside Humidity (Live)', '${shed.outsideHumidity.toInt()} %'),
                       _buildMetricCell('Device Node', 'ESP32 Online', isGreen: true),
                       _buildMetricCell('Cooling Relay', shed.actuators.cooler ? 'Active (Fogger)' : 'Standby', isGreen: shed.actuators.cooler),
                     ],

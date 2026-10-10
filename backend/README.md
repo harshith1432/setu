@@ -1,4 +1,4 @@
-# SeriCare Backend (FastAPI)
+# Setu Backend (FastAPI)
 
 A secure, high-performance Python FastAPI backend for IoT environmental monitoring, automated relay control, and explainable AI for sericulture sheds in Mulbagal.
 

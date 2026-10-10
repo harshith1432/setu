@@ -1,6 +1,6 @@
-# SeriCare --- Product Requirements Document (PRD)
+# Setu --- Product Requirements Document (PRD)
 
-**Project:** SeriCare -- Smart IoT Sericulture Environment Management &
+**Project:** Setu -- Smart IoT Sericulture Environment Management &
 Automated Control System\
 **Initial Region:** Mulbagal, Karnataka, India\
 **Initial Languages:** English, Kannada, Telugu\
@@ -11,7 +11,7 @@ Automated Control System\
 
 ## 1. Product Overview
 
-SeriCare is an IoT-enabled sericulture management platform designed to
+Setu is an IoT-enabled sericulture management platform designed to
 help silkworm farmers maintain suitable environmental conditions inside
 rearing sheds.
 
@@ -32,7 +32,7 @@ The system combines:
 The central product principle is:
 
 > **The farmer should not have to interpret technical sensor data.
-> SeriCare should interpret the environment and tell the farmer what is
+> Setu should interpret the environment and tell the farmer what is
 > happening, why it matters, and what action is being taken.**
 
 ------------------------------------------------------------------------
@@ -56,7 +56,7 @@ Traditional approaches create several problems:
 8.  Existing IoT dashboards can expose too many technical numbers
     without giving actionable guidance.
 
-SeriCare addresses these problems by combining sensing, rules,
+Setu addresses these problems by combining sensing, rules,
 automation, remote control, notifications and explainable intelligence.
 
 ------------------------------------------------------------------------
@@ -173,7 +173,7 @@ Needs:
 
 ### Onboarding
 
-1.  Install/open SeriCare.
+1.  Install/open Setu.
 2.  Select language.
 3.  Create/login to account.
 4.  Add farm.
@@ -354,7 +354,7 @@ Advanced Mode should expose:
 
 ## 9. IoT Requirements
 
-The IoT system is a core part of SeriCare.
+The IoT system is a core part of Setu.
 
 ### Device Responsibilities
 
@@ -482,7 +482,7 @@ The MVP is complete when a farmer can:
 
 ## 15. Product Principle
 
-SeriCare should always prioritize:
+Setu should always prioritize:
 
 **Simple for the farmer.\
 Safe for the silkworms.\

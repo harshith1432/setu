@@ -12,12 +12,12 @@ class AppLocalizations {
 
   static const _localizedValues = <String, Map<String, String>>{
     'en': {
-      'appName': 'SeriCare',
+      'appName': 'Setu',
       'tagline': 'Healthy Silkworms · Happier Farmers',
       'region': 'Mulbagal Sericulture Cluster',
       'chooseLang': 'Choose Your Language',
       'chooseLangSub': 'Select language to proceed with voice & visual alerts',
-      'enterApp': 'Enter SeriCare Dashboard',
+      'enterApp': 'Enter Setu Dashboard',
       'advMode': 'Advanced',
       'simpleMode': 'Simple',
       'home': 'Home',

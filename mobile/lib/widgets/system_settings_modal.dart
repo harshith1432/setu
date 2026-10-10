@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 
 class SystemSettingsModal extends StatefulWidget {
   const SystemSettingsModal({Key? key}) : super(key: key);
@@ -14,7 +14,7 @@ class _SystemSettingsModalState extends State<SystemSettingsModal> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -164,7 +164,7 @@ class _SystemSettingsModalState extends State<SystemSettingsModal> {
     );
   }
 
-  void _showLanguageSelector(BuildContext context, SeriCareProvider provider) {
+  void _showLanguageSelector(BuildContext context, SetuProvider provider) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(

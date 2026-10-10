@@ -281,7 +281,7 @@ class _InsightsScreenState extends State<InsightsScreen> {
               'Check water supply levels for foggers before noon peak.'
             ],
             fullBody:
-                'Mulbagal and Kolar belt experience dry, hot winds during summer months. SeriCare IoT edge sensors continuously monitor local microclimate variations to ensure automated relay interlocks react instantaneously to preserve ideal rearing conditions.',
+                'Mulbagal and Kolar belt experience dry, hot winds during summer months. Setu IoT edge sensors continuously monitor local microclimate variations to ensure automated relay interlocks react instantaneously to preserve ideal rearing conditions.',
           ),
           const SizedBox(height: 16),
 

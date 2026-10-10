@@ -78,4 +78,44 @@ class ShedData {
       lastUpdated: DateTime.tryParse(json['last_updated'] ?? '') ?? DateTime.now(),
     );
   }
+
+  ShedData copyWith({
+    String? shedId,
+    String? farmName,
+    String? region,
+    String? overallStatus,
+    String? statusHeadline,
+    String? statusSubline,
+    int? currentStage,
+    String? stageName,
+    double? indoorTemp,
+    double? indoorHumidity,
+    double? outsideTemp,
+    double? outsideHumidity,
+    ActuatorStates? actuators,
+    bool? isAutoMode,
+    double? tempTarget,
+    double? humidityTarget,
+    DateTime? lastUpdated,
+  }) {
+    return ShedData(
+      shedId: shedId ?? this.shedId,
+      farmName: farmName ?? this.farmName,
+      region: region ?? this.region,
+      overallStatus: overallStatus ?? this.overallStatus,
+      statusHeadline: statusHeadline ?? this.statusHeadline,
+      statusSubline: statusSubline ?? this.statusSubline,
+      currentStage: currentStage ?? this.currentStage,
+      stageName: stageName ?? this.stageName,
+      indoorTemp: indoorTemp ?? this.indoorTemp,
+      indoorHumidity: indoorHumidity ?? this.indoorHumidity,
+      outsideTemp: outsideTemp ?? this.outsideTemp,
+      outsideHumidity: outsideHumidity ?? this.outsideHumidity,
+      actuators: actuators ?? this.actuators,
+      isAutoMode: isAutoMode ?? this.isAutoMode,
+      tempTarget: tempTarget ?? this.tempTarget,
+      humidityTarget: humidityTarget ?? this.humidityTarget,
+      lastUpdated: lastUpdated ?? this.lastUpdated,
+    );
+  }
 }

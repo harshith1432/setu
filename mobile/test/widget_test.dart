@@ -1,16 +1,16 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:sericare/main.dart';
-import 'package:sericare/providers/sericare_provider.dart';
+import 'package:setu/main.dart';
+import 'package:setu/providers/setu_provider.dart';
 
 void main() {
-  testWidgets('SeriCareApp smoke test', (WidgetTester tester) async {
+  testWidgets('SetuApp smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => SeriCareProvider(),
-        child: const SeriCareApp(),
+        create: (_) => SetuProvider(),
+        child: const SetuApp(),
       ),
     );
-    expect(find.byType(SeriCareApp), findsOneWidget);
+    expect(find.byType(SetuApp), findsOneWidget);
   });
 }

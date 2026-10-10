@@ -4,11 +4,11 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import auth, sheds, telemetry, control, ai, admin
+from app.routers import auth, sheds, telemetry, control, ai, admin, weather
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="SeriCare: Smart Sericulture Environment Management & Automated Control API for Mulbagal farmers.",
+    description="Setu: Smart Sericulture Environment Management & Automated Control API for Mulbagal farmers.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -30,6 +30,7 @@ app.include_router(telemetry.router, prefix=settings.API_V1_STR)
 app.include_router(control.router, prefix=settings.API_V1_STR)
 app.include_router(ai.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
+app.include_router(weather.router, prefix=settings.API_V1_STR)
 
 # Mount Super Admin Web Application
 admin_web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "admin_web"))

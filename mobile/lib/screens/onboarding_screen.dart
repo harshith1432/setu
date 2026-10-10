@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class OnboardingScreen extends StatelessWidget {
@@ -10,7 +10,7 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
@@ -49,7 +49,7 @@ class OnboardingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'SeriCare',
+                    'Setu',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,

@@ -1,8 +1,8 @@
-# SeriCare --- System Architecture
+# Setu --- System Architecture
 
 ## 1. Architecture Overview
 
-SeriCare is a distributed IoT platform consisting of:
+Setu is a distributed IoT platform consisting of:
 
 1.  Farmer application
 2.  Backend API
@@ -172,12 +172,12 @@ MQTT should provide lightweight bidirectional messaging.
 Example topic hierarchy:
 
 ``` text
-sericare/{farm_id}/{shed_id}/{device_id}/telemetry
-sericare/{farm_id}/{shed_id}/{device_id}/state
-sericare/{farm_id}/{shed_id}/{device_id}/command
-sericare/{farm_id}/{shed_id}/{device_id}/ack
-sericare/{farm_id}/{shed_id}/{device_id}/event
-sericare/{farm_id}/{shed_id}/{device_id}/health
+setu/{farm_id}/{shed_id}/{device_id}/telemetry
+setu/{farm_id}/{shed_id}/{device_id}/state
+setu/{farm_id}/{shed_id}/{device_id}/command
+setu/{farm_id}/{shed_id}/{device_id}/ack
+setu/{farm_id}/{shed_id}/{device_id}/event
+setu/{farm_id}/{shed_id}/{device_id}/health
 ```
 
 Example telemetry:

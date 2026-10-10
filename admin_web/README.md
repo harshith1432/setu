@@ -1,4 +1,4 @@
-# SeriCare Super Admin Command Portal
+# Setu Super Admin Command Portal
 
 The Super Admin Command Portal provides centralized monitoring, control, and management of silkworm rearing sheds, registered farmers, IoT sensors, and environmental actuators across the Mulbagal sericulture cluster.
 

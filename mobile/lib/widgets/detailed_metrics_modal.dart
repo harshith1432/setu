@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 
 class DetailedMetricsModal extends StatelessWidget {
   const DetailedMetricsModal({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final shed = provider.shedData;
 
     return Container(
@@ -46,10 +46,12 @@ class DetailedMetricsModal extends StatelessWidget {
           ),
           const SizedBox(height: 14),
 
-          _buildMetricRow('Current Temperature', '${shed.indoorTemp} °C'),
-          _buildMetricRow('Current Humidity', '${shed.indoorHumidity.toInt()} %'),
-          _buildMetricRow('Outside Temperature', '${shed.outsideTemp} °C'),
-          _buildMetricRow('Outside Humidity', '${shed.outsideHumidity.toInt()} %'),
+          _buildMetricRow('Current Shed Temperature', '${shed.indoorTemp} °C'),
+          _buildMetricRow('Current Shed Humidity', '${shed.indoorHumidity.toInt()} %'),
+          _buildMetricRow('Live Outside Temperature', '${shed.outsideTemp} °C'),
+          _buildMetricRow('Live Outside Humidity', '${shed.outsideHumidity.toInt()} %'),
+          _buildMetricRow('Current User Location', provider.liveWeather?.locationName ?? provider.region),
+          _buildMetricRow('Weather Data Source', (provider.liveWeather?.isGps ?? false) ? '● Device GPS Live' : '● Internet Live Feed', isGreen: true),
           _buildMetricRow('System Status', shed.actuators.cooler ? '● Cooling ON' : '● Normal Standby', isGreen: true),
           _buildMetricRow('ESP32 Node IP & Ping', '192.168.1.104 (22 ms)'),
           const SizedBox(height: 14),

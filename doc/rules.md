@@ -1,8 +1,8 @@
-# SeriCare --- Rules, Automation & Control Specification
+# Setu --- Rules, Automation & Control Specification
 
 ## 1. Purpose
 
-This document defines how SeriCare decides environmental status,
+This document defines how Setu decides environmental status,
 generates recommendations and controls connected equipment.
 
 The most important architectural rule is:

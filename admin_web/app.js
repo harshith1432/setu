@@ -1,9 +1,9 @@
-// SeriCare Super Admin Command Portal Logic
+// Setu Super Admin Command Portal Logic
 const API_BASE_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
   ? `${window.location.origin}/api/v1`
   : 'http://localhost:8000/api/v1';
 
-let adminToken = localStorage.getItem('sericare_admin_token') || null;
+let adminToken = localStorage.getItem('setu_admin_token') || null;
 let enrolledFarmers = [];
 
 // Initialize on page load
@@ -66,8 +66,8 @@ async function handleLogin(event) {
     }
 
     adminToken = data.access_token;
-    localStorage.setItem('sericare_admin_token', adminToken);
-    localStorage.setItem('sericare_admin_user', JSON.stringify(data.user || data));
+    localStorage.setItem('setu_admin_token', adminToken);
+    localStorage.setItem('setu_admin_user', JSON.stringify(data.user || data));
     
     const displayName = (data.user && (data.user.full_name || data.user.username)) || data.full_name || data.username || 'Super Admin';
     document.getElementById('adminDisplayName').textContent = displayName;
@@ -118,8 +118,8 @@ async function checkAdminSession() {
 
 function handleLogout() {
   adminToken = null;
-  localStorage.removeItem('sericare_admin_token');
-  localStorage.removeItem('sericare_admin_user');
+  localStorage.removeItem('setu_admin_token');
+  localStorage.removeItem('setu_admin_user');
   showAuthView();
 }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -18,7 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   // Controllers
   final _usernameController = TextEditingController(text: 'ramesh_farmer');
-  final _passwordController = TextEditingController(text: 'sericare2026');
+  final _passwordController = TextEditingController(text: 'setu2026');
   final _fullNameController = TextEditingController(text: 'Ramesh Gowda');
   final _phoneController = TextEditingController(text: '+91 98450 12345');
   final _farmNameController = TextEditingController(text: 'Green Valley Sericulture Farm');
@@ -38,7 +38,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    final provider = Provider.of<SeriCareProvider>(context, listen: false);
+    final provider = Provider.of<SetuProvider>(context, listen: false);
     final uname = _usernameController.text.trim();
     final pwd = _passwordController.text.trim();
 
@@ -100,7 +100,7 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  void _showLanguageSelector(BuildContext context, SeriCareProvider provider) {
+  void _showLanguageSelector(BuildContext context, SetuProvider provider) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -172,7 +172,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F2),
@@ -240,7 +240,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'SeriCare',
+                  'Setu',
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
@@ -416,7 +416,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 if (_isSignUp) {
                                   // Clear demo defaults when entering Sign Up mode
                                   if (_usernameController.text == 'ramesh_farmer') _usernameController.clear();
-                                  if (_passwordController.text == 'sericare2026') _passwordController.clear();
+                                  if (_passwordController.text == 'setu2026') _passwordController.clear();
                                   if (_fullNameController.text == 'Ramesh Gowda') _fullNameController.clear();
                                   if (_phoneController.text == '+91 98450 12345') _phoneController.clear();
                                 }

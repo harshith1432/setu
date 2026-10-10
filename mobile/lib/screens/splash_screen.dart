@@ -97,7 +97,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 24),
                       const Text(
-                        'SeriCare',
+                        'Setu',
                         style: TextStyle(
                           fontSize: 38,
                           fontWeight: FontWeight.w900,

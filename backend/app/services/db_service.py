@@ -68,7 +68,7 @@ def init_db():
             "usr_admin",
             "superadmin",
             get_password_hash("adminsecure2026"),
-            "SeriCare Super Admin",
+            "Setu Super Admin",
             "+91 98450 99999",
             "en",
             "superadmin",
@@ -88,7 +88,7 @@ def init_db():
         """, (
             "usr_001",
             "ramesh_farmer",
-            get_password_hash("sericare2026"),
+            get_password_hash("setu2026"),
             "Ramesh Gowda",
             "+91 98450 12345",
             "kn",
@@ -109,7 +109,7 @@ def init_db():
         """, (
             "usr_002",
             "venkatamma_farmer",
-            get_password_hash("sericare2026"),
+            get_password_hash("setu2026"),
             "Venkatamma Reddy",
             "+91 94480 54321",
             "te",
@@ -130,7 +130,7 @@ def init_db():
         """, (
             "usr_003",
             "manjunath_kolar",
-            get_password_hash("sericare2026"),
+            get_password_hash("setu2026"),
             "Manjunath K.",
             "+91 99001 88776",
             "kn",
@@ -141,6 +141,7 @@ def init_db():
             "300 DFL",
             "Bivoltine White (FC1 x FC2)",
             True,
+            now_dt
         ))
 
     # Always ensure default Super Admin 'admin' with password 'admin' exists
@@ -154,7 +155,7 @@ def init_db():
             "usr_admin_default",
             "admin",
             get_password_hash("admin"),
-            "SeriCare Super Admin",
+            "Setu Super Admin",
             "+91 98450 99999",
             "en",
             "superadmin",
@@ -249,8 +250,8 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         created_at_dt = datetime.now(timezone.utc)
 
     cursor.execute("""
-    INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, batch_id, dfl_capacity, breed, is_active, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, latitude, longitude, batch_id, dfl_capacity, breed, is_active, created_at)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         user_data["id"],
         user_data["username"],
@@ -261,6 +262,8 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         user_data.get("role", "farmer"),
         user_data.get("farm_name", "Green Valley Farm"),
         user_data.get("region", "Mulbagal, Kolar, KA"),
+        user_data.get("latitude"),
+        user_data.get("longitude"),
         user_data.get("batch_id", "SERI-2026-M04"),
         user_data.get("dfl_capacity", "200 DFL"),
         user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
@@ -270,6 +273,38 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     cursor.close()
     conn.close()
     return user_data
+
+def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    conn = get_connection()
+    conn.autocommit = True
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    fields = []
+    values = []
+    allowed = ["full_name", "phone", "preferred_language", "farm_name", "region", "latitude", "longitude", "batch_id", "dfl_capacity", "breed"]
+    for k in allowed:
+        if k in updates and updates[k] is not None:
+            fields.append(f"{k} = %s")
+            values.append(updates[k])
+            
+    if not fields:
+        cursor.close()
+        conn.close()
+        return get_user_by_id(user_id) or get_user_by_username(user_id)
+        
+    values.append(user_id)
+    values.append(user_id)
+    query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s RETURNING *"
+    cursor.execute(query, tuple(values))
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if row:
+        d = dict(row)
+        if isinstance(d.get("created_at"), datetime):
+            d["created_at"] = d["created_at"].isoformat()
+        return d
+    return None
 
 def update_user_status(user_id: str, is_active: bool) -> bool:
     conn = get_connection()

@@ -1,5 +1,5 @@
-name: sericare
-description: "SeriCare - Smart Sericulture Environment Management & Automated Control Mobile App"
+name: setu
+description: "Setu - Smart Sericulture Environment Management & Automated Control Mobile App"
 publish_to: "none"
 version: 1.0.0+1
 
@@ -15,6 +15,7 @@ dependencies:
   http: ^1.2.0
   provider: ^6.1.1
   shared_preferences: ^2.2.2
+  geolocator: ^14.1.1
 
 dev_dependencies:
   flutter_test:

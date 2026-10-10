@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/live_weather_card.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenDetails;
@@ -17,7 +18,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final shed = provider.shedData;
     final l10n = AppLocalizations.of(context);
 
@@ -43,64 +44,8 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Weather Strip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFFF9C4), Color(0xFFFFF59D)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFFFEE58)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.wb_sunny_rounded, color: Color(0xFFE65100), size: 22),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'OUTSIDE MULBAGAL',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF795548),
-                          ),
-                        ),
-                        Text(
-                          '${shed.outsideTemp}°C · ${shed.outsideHumidity.toInt()}% RH',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF3E2723),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE65100).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    'Afternoon Heat',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFFBF360C),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Live Location & Weather Feed
+          const LiveWeatherCard(),
           const SizedBox(height: 12),
 
           // Big Friendly Status Card

@@ -1,4 +1,4 @@
-# SeriCare — Smart IoT Sericulture Environment Management & Control System
+# Setu — Smart IoT Sericulture Environment Management & Control System
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
@@ -6,15 +6,15 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-336791.svg)](https://www.postgresql.org/)
 
-> **"The farmer should not have to interpret technical sensor data. SeriCare interprets the environment and tells the farmer what is happening, why it matters, and what action is being taken."**
+> **"The farmer should not have to interpret technical sensor data. Setu interprets the environment and tells the farmer what is happening, why it matters, and what action is being taken."**
 
 ---
 
 ## 📌 Overview
 
-**SeriCare** is an end-to-end, IoT-enabled environmental management and automation system purpose-built for silkworm rearing sheds in the **Mulbagal sericulture cluster (Kolar, Karnataka, India)**.
+**Setu** is an end-to-end, IoT-enabled environmental management and automation system purpose-built for silkworm rearing sheds in the **Mulbagal sericulture cluster (Kolar, Karnataka, India)**.
 
-Silkworms (*Bombyx mori*) are highly sensitive to microclimate variations. Even minor deviations in temperature and relative humidity across growth instars (Instars 1 through 5) can cause crop failure, disease outbreak (Flacherie, Grasserie), or inferior cocoon quality. SeriCare solves this by combining IoT sensing, deterministic automation rules, hardware safety interlocks, and multilingual explainable AI recommendations in **English, Kannada (ಕನ್ನಡ), and Telugu (తెలుగు)**.
+Silkworms (*Bombyx mori*) are highly sensitive to microclimate variations. Even minor deviations in temperature and relative humidity across growth instars (Instars 1 through 5) can cause crop failure, disease outbreak (Flacherie, Grasserie), or inferior cocoon quality. Setu solves this by combining IoT sensing, deterministic automation rules, hardware safety interlocks, and multilingual explainable AI recommendations in **English, Kannada (ಕನ್ನಡ), and Telugu (తెలుగు)**.
 
 ---
 
@@ -77,7 +77,7 @@ flowchart TD
 ## 📁 Repository Structure
 
 ```
-sericare/
+setu/
 ├── admin_web/                  # Super Admin Command Web Application
 │   ├── index.html              # Modern, responsive single-page dashboard
 │   ├── app.js                  # Frontend state, API integration, and telemetry charts
@@ -164,10 +164,10 @@ sericare/
    ```
    Example `.env` configuration:
    ```env
-   PROJECT_NAME="SeriCare IoT Backend"
+   PROJECT_NAME="Setu IoT Backend"
    API_V1_STR="/api/v1"
-   SERICARE_SECRET_KEY="your-secret-key-change-this-in-production"
-   DATABASE_URL="postgresql://postgres:password@localhost:5432/sericare"
+   SETU_SECRET_KEY="your-secret-key-change-this-in-production"
+   DATABASE_URL="postgresql://postgres:password@localhost:5432/setu"
    DEFAULT_REGION="Mulbagal, Kolar, Karnataka"
    DEFAULT_LATITUDE=13.1633
    DEFAULT_LONGITUDE=78.3944

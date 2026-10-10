@@ -1,8 +1,8 @@
-# SeriCare --- Development Task Plan
+# Setu --- Development Task Plan
 
 ## 1. Development Strategy
 
-Build SeriCare in vertical slices instead of developing the entire
+Build Setu in vertical slices instead of developing the entire
 frontend, backend and IoT layers independently.
 
 A vertical slice should work end-to-end:

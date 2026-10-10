@@ -1,4 +1,4 @@
-package com.example.sericare
+package com.example.setu
 
 import io.flutter.embedding.android.FlutterActivity
 

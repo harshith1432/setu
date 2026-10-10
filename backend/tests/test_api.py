@@ -24,7 +24,7 @@ async def test_health_check(async_client):
 async def test_login_success_and_jwt(async_client):
     response = await async_client.post(
         "/api/v1/auth/login",
-        json={"username": "ramesh_farmer", "password": "sericare2026"}
+        json={"username": "ramesh_farmer", "password": "setu2026"}
     )
     assert response.status_code == 200
     data = response.json()
@@ -58,7 +58,7 @@ async def test_telemetry_ingestion(async_client):
 async def test_authenticated_shed_status(async_client):
     login_res = await async_client.post(
         "/api/v1/auth/login",
-        json={"username": "ramesh_farmer", "password": "sericare2026"}
+        json={"username": "ramesh_farmer", "password": "setu2026"}
     )
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -73,7 +73,7 @@ async def test_authenticated_shed_status(async_client):
 async def test_ai_explanation_multilingual(async_client):
     login_res = await async_client.post(
         "/api/v1/auth/login",
-        json={"username": "ramesh_farmer", "password": "sericare2026"}
+        json={"username": "ramesh_farmer", "password": "setu2026"}
     )
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -90,7 +90,7 @@ async def test_ai_explanation_multilingual(async_client):
 async def test_csv_export(async_client):
     login_res = await async_client.post(
         "/api/v1/auth/login",
-        json={"username": "ramesh_farmer", "password": "sericare2026"}
+        json={"username": "ramesh_farmer", "password": "setu2026"}
     )
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -129,7 +129,7 @@ async def test_super_admin_stats_and_farmer_management(async_client):
     # Test Web Portal Static route
     portal_res = await async_client.get("/admin/")
     assert portal_res.status_code == 200
-    assert "SeriCare | Super Admin" in portal_res.text
+    assert "Setu | Super Admin" in portal_res.text
 
 @pytest.mark.anyio
 async def test_farmer_registration_persistence_and_subsequent_login(async_client):

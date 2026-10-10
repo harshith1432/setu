@@ -15,9 +15,23 @@ class UserCreate(BaseModel):
     preferred_language: str = "kn"  # "en", "kn", "te"
     farm_name: Optional[str] = "Green Valley Sericulture Farm"
     region: Optional[str] = "Mulbagal, Kolar, KA"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     batch_id: Optional[str] = "SERI-2026-M04"
     dfl_capacity: Optional[str] = "200 DFL"
     breed: Optional[str] = "Double Hybrid (FC1 x FC2)"
+
+class UserProfileUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    farm_name: Optional[str] = None
+    region: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    batch_id: Optional[str] = None
+    dfl_capacity: Optional[str] = None
+    breed: Optional[str] = None
+    preferred_language: Optional[str] = None
 
 class UserOut(BaseModel):
     id: str
@@ -28,6 +42,8 @@ class UserOut(BaseModel):
     role: str
     farm_name: Optional[str] = "Green Valley Sericulture Farm"
     region: Optional[str] = "Mulbagal, Kolar, KA"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     batch_id: Optional[str] = "SERI-2026-M04"
     dfl_capacity: Optional[str] = "200 DFL"
     breed: Optional[str] = "Double Hybrid (FC1 x FC2)"

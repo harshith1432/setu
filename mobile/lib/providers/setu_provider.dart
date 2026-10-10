@@ -4,10 +4,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shed_data.dart';
 import '../models/growth_stage.dart';
 import '../models/ai_advice.dart';
+import '../models/live_weather_data.dart';
 import '../services/api_service.dart';
+import '../services/location_weather_service.dart';
 
-class SeriCareProvider with ChangeNotifier {
+class SetuProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final LocationWeatherService _weatherService = LocationWeatherService();
+
+  LiveWeatherData? _liveWeather;
+  bool _isLoadingWeather = false;
+  String? _weatherErrorMessage;
 
   Locale _locale = const Locale('en');
   int _currentBottomNavIndex = 0;
@@ -67,7 +74,7 @@ class SeriCareProvider with ChangeNotifier {
     language: 'en',
   );
 
-  SeriCareProvider() {
+  SetuProvider() {
     _loadSessionFromPreferences();
   }
 
@@ -98,6 +105,11 @@ class SeriCareProvider with ChangeNotifier {
   String get farmName => _farmName;
   String get region => _region;
   String get experience => _experience;
+
+  // Live Location & Weather Getters
+  LiveWeatherData? get liveWeather => _liveWeather;
+  bool get isLoadingWeather => _isLoadingWeather;
+  String? get weatherErrorMessage => _weatherErrorMessage;
 
   // --- Persistent Session Management ---
   Future<void> _loadSessionFromPreferences() async {
@@ -147,6 +159,55 @@ class SeriCareProvider with ChangeNotifier {
     } finally {
       _isInitialized = true;
       notifyListeners();
+      // Proactively fetch live ambient temperature and humidity for the current user location
+      refreshLiveWeather();
+    }
+  }
+
+  /// Live Weather & Geolocation Ingestion
+  Future<void> refreshLiveWeather({bool requestGps = true}) async {
+    _isLoadingWeather = true;
+    _weatherErrorMessage = null;
+    notifyListeners();
+
+    try {
+      final weather = await _weatherService.fetchLiveWeather(
+        fallbackRegionName: _region,
+      );
+      _liveWeather = weather;
+      _shedData = _shedData.copyWith(
+        outsideTemp: weather.temperature,
+        outsideHumidity: weather.humidity,
+        region: weather.locationName,
+      );
+      _updateAdviceForWeather();
+    } catch (e) {
+      _weatherErrorMessage = e.toString();
+    } finally {
+      _isLoadingWeather = false;
+      notifyListeners();
+    }
+  }
+
+  void _updateAdviceForWeather() {
+    if (_liveWeather != null) {
+      final t = _liveWeather!.temperature;
+      final h = _liveWeather!.humidity.toInt();
+      final loc = _liveWeather!.locationName;
+      final isCoolerOn = _shedData.actuators.cooler;
+      final isHeaterOn = _shedData.actuators.heater;
+
+      _aiAdvice = AIAdvice(
+        whyText: 'Live outside weather at $loc is $t°C, $h% RH (${_liveWeather!.condition}). ${_liveWeather!.silkwormAdvisory}',
+        currentAction: isCoolerOn ? 'Cooling is ON' : (isHeaterOn ? 'Heating is ON' : 'Microclimate Balanced'),
+        targetDescription: 'Maintaining optimal conditions for ${currentStageInfo.name} silkworms.',
+        bulletPoints: [
+          'Outside temperature is currently $t°C with $h% relative humidity.',
+          _liveWeather!.silkwormAdvisory,
+          'Setu dynamically accounts for outside microclimate to protect rearing trays.',
+        ],
+        language: _locale.languageCode,
+      );
     }
   }
 
@@ -248,9 +309,9 @@ class SeriCareProvider with ChangeNotifier {
 
     // Offline / Demo Login Fallback
     final validDemoAccounts = {
-      'ramesh_farmer': 'sericare2026',
-      'venkatamma_farmer': 'sericare2026',
-      'manjunath_kolar': 'sericare2026',
+      'ramesh_farmer': 'setu2026',
+      'venkatamma_farmer': 'setu2026',
+      'manjunath_kolar': 'setu2026',
       'admin': 'admin',
       'superadmin': 'adminsecure2026',
     };
@@ -262,7 +323,7 @@ class SeriCareProvider with ChangeNotifier {
           ? 'Ramesh Gowda'
           : (cleanUname == 'venkatamma_farmer'
               ? 'Venkatamma Reddy'
-              : (cleanUname == 'admin' ? 'SeriCare Admin' : 'Farmer $uname'));
+              : (cleanUname == 'admin' ? 'Setu Admin' : 'Farmer $uname'));
       _userPhone = '+91 98450 12345';
       _authToken = 'offline_session_token_${DateTime.now().millisecondsSinceEpoch}';
       _apiService.setToken(_authToken);

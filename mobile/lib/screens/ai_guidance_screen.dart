@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class AiGuidanceScreen extends StatefulWidget {
@@ -21,7 +21,7 @@ class _AiGuidanceScreenState extends State<AiGuidanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final advice = provider.aiAdvice;
     final l10n = AppLocalizations.of(context);
 
@@ -200,7 +200,7 @@ class _AiGuidanceScreenState extends State<AiGuidanceScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Ask SeriCare Assistant',
+                  'Ask Setu Assistant',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,

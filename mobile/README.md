@@ -1,4 +1,4 @@
-# SeriCare Mobile Application (Flutter)
+# Setu Mobile Application (Flutter)
 
 A cross-platform native mobile application built with Flutter for silkworm farmers in the Mulbagal sericulture cluster.
 

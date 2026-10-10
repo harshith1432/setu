@@ -1,8 +1,8 @@
-# SeriCare --- Project Memory / AI Context
+# Setu --- Project Memory / AI Context
 
 ## 1. Purpose
 
-This file is the persistent project context for SeriCare.
+This file is the persistent project context for Setu.
 
 Any developer, AI coding assistant or future contributor should read
 this document before making architectural or product changes.
@@ -14,7 +14,7 @@ implementation decisions.
 
 # 2. Project Identity
 
-**Product Name:** SeriCare
+**Product Name:** Setu
 
 **Concept:** Smart IoT Sericulture Environment Management and Automated
 Control System
@@ -33,7 +33,7 @@ Control System
 
 # 3. Core Product Idea
 
-SeriCare is not simply a sensor dashboard.
+Setu is not simply a sensor dashboard.
 
 It is an integrated:
 
@@ -631,7 +631,7 @@ Before changing code, the AI/developer should:
 
 # 27. Project North Star
 
-The project succeeds when a farmer can open SeriCare and immediately
+The project succeeds when a farmer can open Setu and immediately
 understand:
 
 > **"Is my silkworm environment safe, what is the system doing, and do I
@@ -643,6 +643,6 @@ The technology should stay behind the scenes as much as possible.
 
 # 28. One-Line Product Definition
 
-> **SeriCare is a farmer-first IoT platform that senses, understands and
+> **Setu is a farmer-first IoT platform that senses, understands and
 > automatically manages silkworm rearing environments while keeping the
 > farmer informed and in control.**

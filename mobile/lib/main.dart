@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'providers/sericare_provider.dart';
+import 'providers/setu_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth_screen.dart';
@@ -20,22 +20,22 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SeriCareProvider()),
+        ChangeNotifierProvider(create: (_) => SetuProvider()),
       ],
-      child: const SeriCareApp(),
+      child: const SetuApp(),
     ),
   );
 }
 
-class SeriCareApp extends StatelessWidget {
-  const SeriCareApp({Key? key}) : super(key: key);
+class SetuApp extends StatelessWidget {
+  const SetuApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
 
     return MaterialApp(
-      title: 'SeriCare',
+      title: 'Setu',
       debugShowCheckedModeBanner: false,
       locale: provider.locale,
       supportedLocales: const [
@@ -89,9 +89,9 @@ class _AppRootFlowState extends State<AppRootFlow> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
 
-    // Show custom branded SeriCare splash screen on startup
+    // Show custom branded Setu splash screen on startup
     if (_showSplash) {
       return SplashScreen(
         onFinish: () {
@@ -169,7 +169,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final l10n = AppLocalizations.of(context);
 
     final screens = [

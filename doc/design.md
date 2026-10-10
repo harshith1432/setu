@@ -1,8 +1,8 @@
-# SeriCare --- UI/UX and Product Design Specification
+# Setu --- UI/UX and Product Design Specification
 
 ## 1. Design Philosophy
 
-SeriCare is designed for farmers first, not engineers.
+Setu is designed for farmers first, not engineers.
 
 The interface should answer three questions immediately:
 
@@ -96,7 +96,7 @@ Purpose:
 Layout:
 
 ``` text
-        SeriCare
+        Setu
  Healthy Silkworms
   Happier Farmers
 
@@ -123,7 +123,7 @@ Recommended layout:
 
 ``` text
 ┌─────────────────────────────┐
-│ SeriCare              🔔    │
+│ Setu              🔔    │
 │                             │
 │ 🟢 Ideal for Silkworms      │
 │                             │

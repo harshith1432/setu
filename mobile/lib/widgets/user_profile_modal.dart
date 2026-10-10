@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 
 class UserProfileModal extends StatefulWidget {
   const UserProfileModal({Key? key}) : super(key: key);
@@ -19,7 +19,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
   @override
   void initState() {
     super.initState();
-    final provider = Provider.of<SeriCareProvider>(context, listen: false);
+    final provider = Provider.of<SetuProvider>(context, listen: false);
     _nameController = TextEditingController(text: provider.userName);
     _phoneController = TextEditingController(text: provider.userPhone);
     _batchController = TextEditingController(text: provider.batchId);
@@ -35,7 +35,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
     super.dispose();
   }
 
-  void _saveProfile(SeriCareProvider provider) {
+  void _saveProfile(SetuProvider provider) {
     provider.updateUserProfile(
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
@@ -54,7 +54,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
 
     return Container(
       padding: EdgeInsets.only(
@@ -251,7 +251,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
     );
   }
 
-  Widget _buildLanguageRow(BuildContext context, SeriCareProvider provider) {
+  Widget _buildLanguageRow(BuildContext context, SetuProvider provider) {
     String currentLangName;
     if (provider.locale.languageCode == 'kn') {
       currentLangName = 'ಕನ್ನಡ';
@@ -325,7 +325,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
     );
   }
 
-  void _showLanguageSelector(BuildContext context, SeriCareProvider provider) {
+  void _showLanguageSelector(BuildContext context, SetuProvider provider) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(

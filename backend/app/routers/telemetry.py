@@ -31,5 +31,5 @@ def export_csv(shed_id: str, payload: dict = Depends(get_current_user_payload)):
     return Response(
         content=csv_data,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=sericare_{shed_id}_telemetry.csv"}
+        headers={"Content-Disposition": f"attachment; filename=setu_{shed_id}_telemetry.csv"}
     )

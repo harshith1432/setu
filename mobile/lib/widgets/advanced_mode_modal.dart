@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/sericare_provider.dart';
+import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 
 class AdvancedModeModal extends StatelessWidget {
@@ -8,7 +8,7 @@ class AdvancedModeModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<SeriCareProvider>(context);
+    final provider = Provider.of<SetuProvider>(context);
     final l10n = AppLocalizations.of(context);
     final isAuto = provider.isAutoMode;
     final actuators = provider.shedData.actuators;
