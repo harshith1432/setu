@@ -23,19 +23,19 @@ Silkworms (*Bombyx mori*) are highly sensitive to microclimate variations. Even 
 ```mermaid
 flowchart TD
     subgraph IoT["IoT Shed Hardware (ESP32)"]
-        Sensors["DHT22 / SHT3x Sensors<br/>(Temperature & Humidity)"]
-        Actuators["Relay Modules<br/>(Fan, Cooler, Heater, Humidifier)"]
-        ESP32["ESP32 Microcontroller<br/>Local Fail-Safe Logic"]
+        Sensors["Sensors<br/>• DHT22/SHT3x (Temp & Humidity)<br/>• MQ-135 (Air Quality / CO₂)<br/>• BH1750 / LDR (Light Lux)"]
+        Actuators["Actuators & Relays<br/>• Exhaust / Vent Fan<br/>• Evaporative Cooler<br/>• Heating Element<br/>• PWM Dimmable Bulb"]
+        ESP32["ESP32 Microcontroller<br/>Local Fail-Safe & PWM Logic"]
         Sensors --> ESP32
         ESP32 --> Actuators
     end
 
-    subgraph Backend["FastAPI Backend Services"]
+    subgraph Backend["FastAPI Cloud Backend (Render)"]
         Ingest["Telemetry Ingestion & REST API"]
-        Rules["Deterministic Rules Engine<br/>Hysteresis & Safety Interlocks"]
+        Rules["Deterministic Rules Engine<br/>Hysteresis, Photoperiod & Safety Interlocks"]
         AI["Explainable AI Engine<br/>(EN, KN, TE Explanations)"]
-        Weather["Live Weather Service<br/>(Worldwide Open-Meteo & Geocoding)"]
-        Auth["JWT & Role-Based Security"]
+        Weather["Live Weather Service<br/>(Worldwide Open-Meteo & GPS Geocoding)"]
+        Auth["JWT, Google Auth & Role Security"]
         DB[(PostgreSQL Database)]
         
         Ingest --> Rules
@@ -46,8 +46,8 @@ flowchart TD
     end
 
     subgraph Clients["User & Operator Interfaces"]
-        MobileApp["Farmer Mobile App (Flutter)<br/>• Trilingual (EN, KN, TE)<br/>• Real-time Shed Monitoring<br/>• Growth Stage Guidance<br/>• Manual Override Stepper"]
-        AdminWeb["Super Admin Portal (Web)<br/>• Cluster Health & Analytics<br/>• Farmer & Batch Registry<br/>• Actuator Manual Controls<br/>• CSV Telemetry Export"]
+        MobileApp["Farmer Mobile App (Flutter)<br/>• 4-Metric Grid (Temp, Hum, AQ, Lux)<br/>• Trilingual (EN, KN, TE)<br/>• PWM Dimmer Slider & Quick Presets<br/>• Google Sign-In & Offline Fail-Safe"]
+        AdminWeb["Super Admin Portal (Vercel)<br/>• Live Gauges for AQ, Lux & Temp<br/>• Actuator Controls & PWM Dimmer<br/>• Farmer & Batch Management<br/>• CSV Telemetry Export"]
     end
 
     ESP32 <-->|HTTP / MQTT| Ingest
@@ -57,20 +57,38 @@ flowchart TD
 
 ---
 
+## 🌐 Live Deployments
+
+- **Cloud Backend API (Render)**: [https://setu-8vh9.onrender.com/api/v1](https://setu-8vh9.onrender.com/api/v1)
+- **Interactive Swagger Documentation**: [https://setu-8vh9.onrender.com/docs](https://setu-8vh9.onrender.com/docs)
+- **Super Admin Command Portal (Vercel)**: [https://setu-adminweb.vercel.app](https://setu-adminweb.vercel.app)
+
+---
+
 ## 🚀 Key Features
 
-- **Growth-Stage Aware Control**: Automatically adjusts target temperature and humidity bands based on silkworm development stage:
+- **Growth-Stage Aware Microclimate Control**: Automatically adjusts target temperature and humidity bands based on silkworm development stage:
   - **Instar 1 (Chawki)**: 27–28°C, 85–90% RH
   - **Instar 2 (Chawki)**: 26–27°C, 80–85% RH
   - **Instar 3**: 25–26°C, 75–80% RH
   - **Instar 4**: 24–25°C, 70–75% RH
   - **Instar 5**: 23–24°C, 65–70% RH
+- **IoT Air Quality & CO₂ Ventilation Automation**:
+  - Continuous monitoring of indoor air freshness / CO₂ concentration (`air_quality`).
+  - Automatically triggers the ventilation exhaust fan when air quality drops below safe levels (`< 80%` fresh air / `CO₂ > 1000 ppm`), preventing larval asphyxiation and metabolic stress.
+  - Enforces a `+4%` hysteresis recovery band (`>= 84%`) before shutting off the fan.
+- **Photoperiod Lighting & PWM Bulb Dimming**:
+  - Implements research-backed circadian photoperiods:
+    - **Daytime Activity (06:00–22:00)**: Maintains optimal uniform dim light of **15–30 Lux** via PWM bulb modulation (25–40%).
+    - **Night Rest (22:00–06:00)**: Ensures resting darkness (**< 5 Lux**, 0% PWM / OFF).
+    - **5th Instar Spinning Stage**: Provides semi-darkness (**~10 Lux**, 15% PWM) to prevent larvae from wandering off cocooning mountages.
+  - Manual brightness slider (0–100%) and quick presets (Dark 0%, Dim 25%, Active 40%, Full 100%).
 - **Deterministic Rules & Hysteresis Engine**: Prevents rapid equipment toggling and relay wear by enforcing deadbands and minimum cycling intervals.
 - **Hardware Safety Interlocks**: Strict mutual exclusion preventing simultaneous operation of heaters and coolers under any condition.
-- **Explainable AI (XAI)**: Generates clear, plain-language reasoning for farmers in **English, Kannada, and Telugu**, explaining *why* a particular actuator is running.
-- **Farmer Mobile Application (Flutter)**: Clean, intuitive mobile interface offering instant status cards, environmental graphs, stage selector, and manual override dialogs.
-- **Super Admin Command Portal (Web)**: Real-time dashboard for sericulture officers and cluster managers to oversee multiple rearing sheds, manage farmer batches, and export telemetry data.
-- **Audit Logging & Telemetry Export**: Tamper-evident logging of actuator operations and one-click CSV export for research and agricultural extension services.
+- **Google Authentication & Backend Synchronization**: One-tap Google Sign-In with Firebase Auth, backend PostgreSQL account synchronization, and duplicate registration protection.
+- **Explainable AI (XAI)**: Generates clear, plain-language reasoning for farmers in **English, Kannada, and Telugu**, explaining *why* actuators are running.
+- **Farmer Mobile Application (Flutter)**: Clean 4-card metric grid, visual comfort charts with shaded bands, growth stage guidance, and live GPS weather tracking.
+- **Super Admin Command Portal (Web)**: Real-time dials for temperature, humidity, air quality, and light intensity, cluster health monitoring, and one-click CSV export.
 
 ---
 

@@ -4,6 +4,13 @@ The Super Admin Command Portal provides centralized monitoring, control, and man
 
 ---
 
+## Live Deployment
+
+- **Production Portal (Vercel)**: [https://setu-adminweb.vercel.app](https://setu-adminweb.vercel.app)
+- **Connected Cloud Backend (Render)**: [https://setu-8vh9.onrender.com/api/v1](https://setu-8vh9.onrender.com/api/v1)
+
+---
+
 ## Key Features
 
 1. **Secure Admin Authentication**:
@@ -15,21 +22,25 @@ The Super Admin Command Portal provides centralized monitoring, control, and man
    - Total registered farmers, active rearing sheds, healthy vs warning shed counters.
    - Connected ESP32 nodes and operational status.
 
-3. **Live Shed Environment Monitoring**:
+3. **Live Shed Environment Monitoring (4-Metric Gauges)**:
    - Live temperature, relative humidity, outside ambient conditions (via Open-Meteo worldwide), and growth stage indicators.
+   - **Air Quality & CO₂ dial**: Shows fresh air percentage (`>=80%` healthy zone; alerts when exhaust fan is engaged).
+   - **Light Intensity dial**: Shows real-time Lux levels and active photoperiod mode (Day, Night Rest, Spinning).
    - Automatic evaluation against stage-specific thresholds (Instars 1–5).
 
 4. **Farmer & Batch Management**:
    - Register and manage farmers, shed locations worldwide, batch identifiers, and silkworm breed types.
    - Multilingual preferences (English, Kannada, Telugu).
+   - Shows users registered directly or authenticated via Google Auth.
 
 5. **Manual Actuator Overrides & Interlocks**:
-   - Manual override control for cooling, heating, ventilation, and misting systems.
+   - Manual override controls for cooling, heating, ventilation, and misting systems.
+   - **Dimmable Photoperiod Bulb Control**: Live PWM indicator (0–100%) and override toggles.
    - Built-in hardware safety interlocks ensuring mutual exclusion between heating and cooling elements.
 
 6. **Audit Trails & CSV Reporting**:
    - Tamper-evident logging of actuator commands and environmental state changes.
-   - One-click CSV export of historical sensor telemetry.
+   - One-click CSV export of historical sensor telemetry including temperature, humidity, air quality, light lux, and relay states.
 
 ---
 

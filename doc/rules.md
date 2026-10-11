@@ -188,24 +188,63 @@ control logic.
 
 ------------------------------------------------------------------------
 
-## 9. Light / Lighting Logic
+## 8.1 Air Quality & CO₂ Ventilation Automation
 
-Light conditions should be monitored separately from temperature and humidity. Where controllable lighting is installed, the rules engine may recommend or control it according to the current growth/rearing stage, configured operating schedule and validated biological requirements.
-
-Conceptual behavior:
+Silkworms consume high volumes of oxygen and respire carbon dioxide, especially in 4th and 5th instars. In crowded sheds, CO₂ concentration must remain strictly below 1% (< 1,000 ppm) or larval mortality and flacherie outbreaks rise rapidly (SSRG 2020 & IRJMETS 2024 research).
 
 ```text
-IF light is below the configured acceptable condition:
-    recommend or activate lighting if installed
+Threshold:
+- Safe Indoor Air Quality Target: >= 80% fresh air (CO₂ <= 1,000 ppm)
+- Stale Air Threshold: < 80%
 
-IF light is above the configured acceptable condition:
-    recommend reduction/shading if supported
+Control Logic:
+IF indoor_air_quality < air_quality_target (e.g. < 80%):
+    ventilation fan = ON (Active fresh air circulation)
+    status = ATTENTION_REQUIRED ("Low air quality detected")
 
-IF light changes suddenly:
-    evaluate whether farmer attention is required
+Recovery with Hysteresis (+4%):
+IF ventilation fan is ON:
+    Keep fan running until indoor_air_quality >= (air_quality_target + 4.0%) (e.g. >= 84%)
+    Only then shut off fan or return to thermal-only regulation
 ```
 
-The exact light intensity, duration and timing must not be invented in software; they should come from validated sericulture requirements.
+------------------------------------------------------------------------
+
+## 9. Research-Backed Photoperiod Lighting & Dimming Logic
+
+Silkworms are sensitive to light variations and require regulated photoperiods for optimal feeding activity and cocoon spinning (SSRG 2020, GAU 2023, IARJSET 2022).
+
+### 9.1 Circadian Photoperiod Regimes
+1. **Daytime Feeding Phase (06:00 – 22:00)**:
+   - Target Lux: **15 – 30 Lux** (optimal 20–25 Lux).
+   - Dimming Bulb PWM: Modulates at **25% – 40%** duty cycle to maintain uniform illumination across all rearing trays without generating radiant heat.
+2. **Nighttime Resting Phase (22:00 – 06:00)**:
+   - Target Lux: **< 5 Lux** (Physiological darkness).
+   - Dimming Bulb PWM: **0% (OFF)**.
+3. **Late 5th Instar Spinning Stage (Cocooning on Mountages)**:
+   - Target Lux: **~10 Lux** (Semi-darkness).
+   - Dimming Bulb PWM: **15%**.
+   - Bright light during spinning causes larvae to crowd together and spin unmarketable double/flimsy cocoons.
+
+```text
+Photoperiod Evaluation Algorithm:
+IF current_hour in [06..21]:
+    mode = "DAY"
+    target_lux = 25.0
+    IF ambient_lux < 15.0:
+        light = ON, light_brightness = 35% (PWM)
+    ELSE IF ambient_lux > 35.0:
+        light = OFF, light_brightness = 0%
+ELSE:
+    mode = "NIGHT"
+    target_lux = 0.0
+    light = OFF, light_brightness = 0% (PWM)
+
+IF stage == 5 AND days_in_stage >= 6 (Spinning):
+    mode = "SPINNING"
+    target_lux = 10.0
+    light = ON, light_brightness = 15% (PWM)
+```
 
 ## 10. Heating and Cooling Interlock
 
