@@ -38,14 +38,17 @@ def update_setpoints(
     user_payload: dict = Depends(verify_shed_control_access)
 ):
     """
-    Update target setpoints (temperature setpoint, humidity setpoint, and auto/manual toggle).
+    Update target setpoints (temperature, humidity, air quality, light lux, bulb brightness, and auto/manual toggle).
     Enforces object-level authorization (SEC-06).
     """
     return telemetry_service.update_setpoints(
         shed_id=shed_id,
         is_auto=payload.is_auto_mode,
         temp_target=payload.temp_target,
-        hum_target=payload.humidity_target
+        hum_target=payload.humidity_target,
+        air_quality_target=payload.air_quality_target,
+        light_lux_target=payload.light_lux_target,
+        light_brightness=payload.light_brightness
     )
 
 @router.post("/{shed_id}/override", response_model=ShedOverview)
@@ -55,14 +58,20 @@ def manual_actuator_override(
     user_payload: dict = Depends(verify_shed_control_access)
 ):
     """
-    Manually toggle cooler, fan, or heater. Automatically enforces safety interlocks
+    Manually toggle cooler, fan, heater, light, or adjust bulb brightness. Automatically enforces safety interlocks
     and object-level authorization (SEC-06).
     """
-    if payload.actuator not in ["cooler", "fan", "heater"]:
-        raise HTTPException(status_code=400, detail="Invalid actuator. Must be cooler, fan, or heater")
+    valid_actuators = ["cooler", "fan", "heater", "light", "light_brightness"]
+    if payload.actuator not in valid_actuators:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid actuator '{payload.actuator}'. Must be one of {valid_actuators}"
+        )
     
     return telemetry_service.manual_override_actuator(
         shed_id=shed_id,
         actuator=payload.actuator,
-        state=payload.state
+        state=payload.state,
+        value=payload.value
     )
+

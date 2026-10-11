@@ -73,11 +73,15 @@ class ActuatorStates(BaseModel):
     cooler: bool = False
     fan: bool = False
     heater: bool = False
+    light: bool = False
+    light_brightness: int = 0  # 0 to 100% PWM dimming
 
 class TelemetryPayload(BaseModel):
     shed_id: str
     temperature: float = Field(..., ge=0.0, le=60.0)
     humidity: float = Field(..., ge=0.0, le=100.0)
+    air_quality: Optional[float] = Field(88.0, ge=0.0, le=100.0)  # 0-100% index (safe > 80%, CO2 < 1%)
+    light_lux: Optional[float] = Field(22.0, ge=0.0, le=500.0)    # Research target 15-30 Lux
     outside_temperature: Optional[float] = 34.0
     outside_humidity: Optional[float] = 55.0
     timestamp: Optional[datetime] = None
@@ -86,10 +90,14 @@ class SetpointsUpdate(BaseModel):
     is_auto_mode: bool = True
     temp_target: float = Field(26.0, ge=18.0, le=35.0)
     humidity_target: float = Field(75.0, ge=40.0, le=95.0)
+    air_quality_target: Optional[float] = Field(80.0, ge=50.0, le=100.0)
+    light_lux_target: Optional[float] = Field(25.0, ge=5.0, le=100.0)
+    light_brightness: Optional[int] = Field(None, ge=0, le=100)
 
 class ManualActuatorOverride(BaseModel):
-    actuator: str  # "cooler", "fan", "heater"
-    state: bool
+    actuator: str  # "cooler", "fan", "heater", "light", "light_brightness"
+    state: bool = False
+    value: Optional[int] = None  # for light_brightness PWM 0-100
 
 class GrowthStageInfo(BaseModel):
     stage_number: int  # 1 to 5
@@ -119,10 +127,16 @@ class ShedOverview(BaseModel):
     stage_name: str
     indoor_temp: float
     indoor_humidity: float
+    indoor_air_quality: float = 88.0
+    indoor_light_lux: float = 22.0
     outside_temp: float
     outside_humidity: float
     actuators: ActuatorStates
     is_auto_mode: bool
     temp_target: float
     humidity_target: float
+    air_quality_target: float = 80.0
+    light_lux_target: float = 25.0
+    photoperiod_mode: str = "DAY"  # "DAY", "NIGHT", "SPINNING"
     last_updated: datetime
+

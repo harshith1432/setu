@@ -84,6 +84,13 @@ class AppLocalizations {
       'stage_7': 'Spinning',
       'stage_8': 'Cocoon Preservation',
       'shedNo': 'Shed 01',
+      'airQuality': 'Air Quality (CO₂)',
+      'lightIntensity': 'Light Intensity',
+      'dimmableLight': 'Dimmable Bulb',
+      'airTarget': 'Target: >= 80% Fresh',
+      'lightTarget': 'Target: 15–30 Lux',
+      'airQualitySetPoint': 'Air Quality Threshold (%)',
+      'lightBrightnessSetPoint': 'Light Bulb Brightness (PWM %)',
     },
     'kn': {
       'appName': 'Setu',
@@ -158,6 +165,13 @@ class AppLocalizations {
       'stage_7': 'ಗೂಡು ಕಟ್ಟುವಿಕೆ',
       'stage_8': 'ಗೂಡು ಸಂರಕ್ಷಣೆ',
       'shedNo': 'ಶೆಡ್ ೦೧',
+      'airQuality': 'ಗಾಳಿಯ ಗುಣಮಟ್ಟ (CO₂)',
+      'lightIntensity': 'ಬೆಳಕಿನ ತೀವ್ರತೆ',
+      'dimmableLight': 'ಬಲ್ಬ್ ಪ್ರಕಾಶತೆ',
+      'airTarget': 'ಗುರಿ: >= ೮೦% ಶುದ್ಧ',
+      'lightTarget': 'ಗುರಿ: ೧೫–೩೦ ಲಕ್ಸ್',
+      'airQualitySetPoint': 'ಗಾಳಿಯ ಗುಣಮಟ್ಟದ ಮಿತಿ (%)',
+      'lightBrightnessSetPoint': 'ಬಲ್ಬ್ ಪ್ರಕಾಶತೆ (PWM %)',
     },
     'te': {
       'appName': 'Setu',
@@ -232,8 +246,16 @@ class AppLocalizations {
       'stage_7': 'గూడు కట్టడం',
       'stage_8': 'గూడు నిల్వ',
       'shedNo': 'షెడ్ ౦౧',
+      'airQuality': 'గాలి నాణ్యత (CO₂)',
+      'lightIntensity': 'కాంతి తీవ్రత',
+      'dimmableLight': 'బల్బ్ ప్రకాశం',
+      'airTarget': 'లక్ష్యం: >= 80% స్వచ్ఛమైనది',
+      'lightTarget': 'లక్ష్యం: 15–30 లక్స్',
+      'airQualitySetPoint': 'గాలి నాణ్యత పరిమితి (%)',
+      'lightBrightnessSetPoint': 'బల్బ్ ప్రకాశం (PWM %)',
     }
   };
+
 
   String translate(String key) {
     return _localizedValues[locale.languageCode]?[key] ??

@@ -139,8 +139,9 @@ class AdvancedModeModal extends StatelessWidget {
                     children: [
                       _buildPresetBadge('Temp', '${provider.tempSetPoint.toStringAsFixed(1)} C'),
                       _buildPresetBadge('Humidity', '${provider.humSetPoint.toInt()}%'),
-                      _buildPresetBadge('Air', '${provider.airflowSetPoint}%'),
-                      _buildPresetBadge('Light', '${provider.lightSetPoint}%'),
+                      _buildPresetBadge('Air Quality', '>= ${provider.airQualitySetPoint.toInt()}%'),
+                      _buildPresetBadge('Light Target', '${provider.lightLuxSetPoint.toInt()} Lux'),
+                      _buildPresetBadge('Bulb PWM', '${provider.lightBrightness}%'),
                     ],
                   ),
                 ],
@@ -177,7 +178,7 @@ class AdvancedModeModal extends StatelessWidget {
               ),
             ],
           ),
-          const Divider(height: 24),
+          const Divider(height: 20),
 
           // Humidity Set Point Stepper
           Row(
@@ -207,8 +208,9 @@ class AdvancedModeModal extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const Divider(height: 20),
 
+          // Air Quality Threshold Stepper (CO2 protection)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -216,28 +218,29 @@ class AdvancedModeModal extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Air Quantity (%)',
+                    'Air Quality Threshold (%)',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
-                  Text('Ventilation and fresh air flow target', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
+                  Text('Triggers ventilation fan if below target', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
                 ],
               ),
               Row(
                 children: [
-                  _buildStepBtn('-', () => provider.adjustAirflowSetPoint(-5)),
+                  _buildStepBtn('-', () => provider.adjustAirQualitySetPoint(-5.0)),
                   const SizedBox(width: 8),
                   Text(
-                    '${provider.airflowSetPoint}',
+                    '${provider.airQualitySetPoint.toInt()}%',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(width: 8),
-                  _buildStepBtn('+', () => provider.adjustAirflowSetPoint(5)),
+                  _buildStepBtn('+', () => provider.adjustAirQualitySetPoint(5.0)),
                 ],
               ),
             ],
           ),
-          const Divider(height: 24),
+          const Divider(height: 20),
 
+          // Light Target Stepper (Research 15-30 Lux)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -245,22 +248,70 @@ class AdvancedModeModal extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Light Level (%)',
+                    'Light Intensity Target (Lux)',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   ),
-                  Text('Shed lighting intensity target', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
+                  Text('Research photoperiod (15–30 Lux)', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
                 ],
               ),
               Row(
                 children: [
-                  _buildStepBtn('-', () => provider.adjustLightSetPoint(-5)),
+                  _buildStepBtn('-', () => provider.adjustLightLuxSetPoint(-5.0)),
                   const SizedBox(width: 8),
                   Text(
-                    '${provider.lightSetPoint}',
+                    '${provider.lightLuxSetPoint.toInt()}',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(width: 8),
-                  _buildStepBtn('+', () => provider.adjustLightSetPoint(5)),
+                  _buildStepBtn('+', () => provider.adjustLightLuxSetPoint(5.0)),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+
+          // Dimmable Light Bulb PWM Brightness Slider
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Bulb Brightness (PWM Dimmer)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFFB74D)),
+                    ),
+                    child: Text(
+                      '${provider.lightBrightness}% PWM',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFFE65100)),
+                    ),
+                  ),
+                ],
+              ),
+              Slider(
+                value: provider.lightBrightness.toDouble(),
+                min: 0,
+                max: 100,
+                divisions: 20,
+                activeColor: const Color(0xFFF57F17),
+                inactiveColor: const Color(0xFFFFE082),
+                label: '${provider.lightBrightness}%',
+                onChanged: (val) => provider.setLightBrightness(val.round()),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildPresetSliderBtn('Dark (0%)', 0, provider),
+                  _buildPresetSliderBtn('Dim (25%)', 25, provider),
+                  _buildPresetSliderBtn('Active (40%)', 40, provider),
+                  _buildPresetSliderBtn('Full (100%)', 100, provider),
                 ],
               ),
             ],
@@ -284,16 +335,19 @@ class AdvancedModeModal extends StatelessWidget {
                     style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _buildRelayBtn('❄️ Cooler', actuators.cooler, () => provider.toggleActuator('cooler')),
-                      const SizedBox(width: 6),
-                      _buildRelayBtn('🌀 Fan', actuators.fan, () => provider.toggleActuator('fan')),
-                      const SizedBox(width: 6),
-                      _buildRelayBtn('🔥 Heater', actuators.heater, () => provider.toggleActuator('heater')),
-                      const SizedBox(width: 6),
-                      _buildRelayBtn('💡 Light', actuators.light, () => provider.toggleActuator('light')),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildRelayBtn('❄️ Cooler', actuators.cooler, () => provider.toggleActuator('cooler')),
+                        const SizedBox(width: 6),
+                        _buildRelayBtn('🌀 Fan', actuators.fan, () => provider.toggleActuator('fan')),
+                        const SizedBox(width: 6),
+                        _buildRelayBtn('🔥 Heater', actuators.heater, () => provider.toggleActuator('heater')),
+                        const SizedBox(width: 6),
+                        _buildRelayBtn('💡 Bulb (${actuators.lightBrightness}%)', actuators.light, () => provider.toggleActuator('light')),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
@@ -305,6 +359,7 @@ class AdvancedModeModal extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+
 
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -367,36 +422,60 @@ class AdvancedModeModal extends StatelessWidget {
     );
   }
 
-  Widget _buildRelayBtn(String label, bool isOn, VoidCallback onTap) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isOn ? const Color(0xFFE8F5E9) : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isOn ? const Color(0xFF2E7D32) : const Color(0xFFE0E7DC),
-              width: isOn ? 1.5 : 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-              Text(
-                isOn ? 'ON' : 'OFF',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: isOn ? const Color(0xFF2E7D32) : const Color(0xFF5A695C),
-                ),
-              ),
-            ],
+  Widget _buildPresetSliderBtn(String label, int val, SetuProvider provider) {
+    final isSelected = provider.lightBrightness == val;
+    return InkWell(
+      onTap: () => provider.setLightBrightness(val),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFF57F17) : const Color(0xFFFFF8E1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? const Color(0xFFE65100) : const Color(0xFFFFD54F)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: isSelected ? Colors.white : const Color(0xFF5D4037),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildRelayBtn(String label, bool isOn, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.only(right: 6),
+        decoration: BoxDecoration(
+          color: isOn ? const Color(0xFFE8F5E9) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isOn ? const Color(0xFF2E7D32) : const Color(0xFFE0E7DC),
+            width: isOn ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+            Text(
+              isOn ? 'ON' : 'OFF',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: isOn ? const Color(0xFF2E7D32) : const Color(0xFF5A695C),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

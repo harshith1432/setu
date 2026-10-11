@@ -3,12 +3,14 @@ class ActuatorStates {
   final bool fan;
   final bool heater;
   final bool light;
+  final int lightBrightness;
 
   ActuatorStates({
     this.cooler = false,
     this.fan = false,
     this.heater = false,
     this.light = false,
+    this.lightBrightness = 0,
   });
 
   factory ActuatorStates.fromJson(Map<String, dynamic> json) {
@@ -17,6 +19,7 @@ class ActuatorStates {
       fan: json['fan'] ?? false,
       heater: json['heater'] ?? false,
       light: json['light'] ?? false,
+      lightBrightness: json['light_brightness'] ?? (json['light'] == true ? 35 : 0),
     );
   }
 }
@@ -32,6 +35,8 @@ class ShedData {
   final String stageName;
   final double indoorTemp;
   final double indoorHumidity;
+  final double indoorAirQuality;
+  final double indoorLightLux;
   final double outsideTemp;
   final double outsideHumidity;
   final ActuatorStates actuators;
@@ -40,6 +45,9 @@ class ShedData {
   final double humidityTarget;
   final double airflowTarget;
   final double lightTarget;
+  final double airQualityTarget;
+  final double lightLuxTarget;
+  final String photoperiodMode;
   final DateTime lastUpdated;
 
   ShedData({
@@ -53,6 +61,8 @@ class ShedData {
     required this.stageName,
     required this.indoorTemp,
     required this.indoorHumidity,
+    this.indoorAirQuality = 88.0,
+    this.indoorLightLux = 22.0,
     required this.outsideTemp,
     required this.outsideHumidity,
     required this.actuators,
@@ -61,6 +71,9 @@ class ShedData {
     required this.humidityTarget,
     this.airflowTarget = 50.0,
     this.lightTarget = 30.0,
+    this.airQualityTarget = 80.0,
+    this.lightLuxTarget = 25.0,
+    this.photoperiodMode = 'DAY',
     required this.lastUpdated,
   });
 
@@ -76,6 +89,8 @@ class ShedData {
       stageName: json['stage_name'] ?? 'III Instar',
       indoorTemp: (json['indoor_temp'] as num?)?.toDouble() ?? 26.2,
       indoorHumidity: (json['indoor_humidity'] as num?)?.toDouble() ?? 74.0,
+      indoorAirQuality: (json['indoor_air_quality'] as num?)?.toDouble() ?? 88.0,
+      indoorLightLux: (json['indoor_light_lux'] as num?)?.toDouble() ?? 22.0,
       outsideTemp: (json['outside_temp'] as num?)?.toDouble() ?? 34.2,
       outsideHumidity: (json['outside_humidity'] as num?)?.toDouble() ?? 58.0,
       actuators: ActuatorStates.fromJson(json['actuators'] ?? {}),
@@ -84,6 +99,9 @@ class ShedData {
       humidityTarget: (json['humidity_target'] as num?)?.toDouble() ?? 80.0,
       airflowTarget: (json['airflow_target'] as num?)?.toDouble() ?? 50.0,
       lightTarget: (json['light_target'] as num?)?.toDouble() ?? 35.0,
+      airQualityTarget: (json['air_quality_target'] as num?)?.toDouble() ?? 80.0,
+      lightLuxTarget: (json['light_lux_target'] as num?)?.toDouble() ?? 25.0,
+      photoperiodMode: json['photoperiod_mode'] ?? 'DAY',
       lastUpdated: DateTime.tryParse(json['last_updated'] ?? '') ?? DateTime.now(),
     );
   }
@@ -99,6 +117,8 @@ class ShedData {
     String? stageName,
     double? indoorTemp,
     double? indoorHumidity,
+    double? indoorAirQuality,
+    double? indoorLightLux,
     double? outsideTemp,
     double? outsideHumidity,
     ActuatorStates? actuators,
@@ -107,6 +127,9 @@ class ShedData {
     double? humidityTarget,
     double? airflowTarget,
     double? lightTarget,
+    double? airQualityTarget,
+    double? lightLuxTarget,
+    String? photoperiodMode,
     DateTime? lastUpdated,
   }) {
     return ShedData(
@@ -120,6 +143,8 @@ class ShedData {
       stageName: stageName ?? this.stageName,
       indoorTemp: indoorTemp ?? this.indoorTemp,
       indoorHumidity: indoorHumidity ?? this.indoorHumidity,
+      indoorAirQuality: indoorAirQuality ?? this.indoorAirQuality,
+      indoorLightLux: indoorLightLux ?? this.indoorLightLux,
       outsideTemp: outsideTemp ?? this.outsideTemp,
       outsideHumidity: outsideHumidity ?? this.outsideHumidity,
       actuators: actuators ?? this.actuators,
@@ -128,6 +153,9 @@ class ShedData {
       humidityTarget: humidityTarget ?? this.humidityTarget,
       airflowTarget: airflowTarget ?? this.airflowTarget,
       lightTarget: lightTarget ?? this.lightTarget,
+      airQualityTarget: airQualityTarget ?? this.airQualityTarget,
+      lightLuxTarget: lightLuxTarget ?? this.lightLuxTarget,
+      photoperiodMode: photoperiodMode ?? this.photoperiodMode,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }

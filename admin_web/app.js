@@ -360,15 +360,36 @@ async function fetchLiveTelemetry() {
     document.getElementById('fullDialHumTarget').textContent = `Safe Band: ${targets.hum_min}% – ${targets.hum_max}%`;
     document.getElementById('fullDialOutdoorHum').textContent = `Outside RH: ${ov.outside_humidity.toFixed(0)}%`;
 
+    if (document.getElementById('fullDialAirQuality')) {
+      const aqi = ov.indoor_air_quality !== undefined ? ov.indoor_air_quality : 88;
+      const targetAqi = ov.air_quality_target !== undefined ? ov.air_quality_target : 80;
+      document.getElementById('fullDialAirQuality').textContent = `${aqi.toFixed(0)}%`;
+      document.getElementById('fullDialAirTarget').textContent = aqi < targetAqi ? 'STALE AIR • Fan Engaged' : `Target: ≥ ${targetAqi.toFixed(0)}% (CO₂ < 1%)`;
+      document.getElementById('fullDialAirQuality').style.color = aqi < targetAqi ? '#d97706' : 'inherit';
+    }
+
+    if (document.getElementById('fullDialLightLux')) {
+      const lux = ov.indoor_light_lux !== undefined ? ov.indoor_light_lux : 22;
+      document.getElementById('fullDialLightLux').textContent = `${lux.toFixed(0)} Lux`;
+      document.getElementById('fullDialLightTarget').textContent = `${ov.photoperiod_mode || 'DAY'} • Research: 15–30 Lux`;
+    }
+
     // Full Actuator Cards
     updateRelayUI('cardCooler', 'tagCooler', ov.actuators.cooler);
     updateRelayUI('cardFan', 'tagFan', ov.actuators.fan);
     updateRelayUI('cardHeater', 'tagHeater', ov.actuators.heater);
+    updateRelayUI('cardLight', 'tagLight', ov.actuators.light);
+    if (document.getElementById('lightBrightnessInfo') && ov.actuators.light_brightness !== undefined) {
+      document.getElementById('lightBrightnessInfo').textContent = ov.actuators.light 
+        ? `GPIO Pin 25 • Dimmed at ${ov.actuators.light_brightness}% PWM`
+        : 'GPIO Pin 25 • Standby (0% PWM)';
+    }
 
     // If on analytics tab, update charts
     if (currentTab === 'analytics') {
       initOrUpdateCharts();
     }
+
 
   } catch (err) {
     console.error('Error fetching live telemetry:', err);

@@ -133,6 +133,32 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
           ),
           const SizedBox(height: 14),
 
+          // Visual Air Quality Chart (CO2 Protection)
+          VisualComfortChart(
+            title: 'Air Quality (CO₂ Concentration)',
+            currentVal: '${shed.indoorAirQuality.toInt()}%',
+            idealZoneText: 'Safe Fresh Air (>= 80% / CO₂ < 1%)',
+            topLabel: 'Clean (100%)',
+            midLabel: 'Target (>= 80%)',
+            bottomLabel: 'Stale / Fan ON',
+            lineColor: const Color(0xFF00897B),
+            normalizedPoints: const [0.85, 0.88, 0.82, 0.80, 0.86, 0.88],
+          ),
+          const SizedBox(height: 14),
+
+          // Visual Light Intensity Chart (Research 15-30 Lux)
+          VisualComfortChart(
+            title: 'Light Intensity (Lux)',
+            currentVal: '${shed.indoorLightLux.toInt()} Lux',
+            idealZoneText: 'Research Photoperiod (15–30 Lux)',
+            topLabel: 'Bright (> 40)',
+            midLabel: 'Ideal (15–30)',
+            bottomLabel: 'Dark (< 10)',
+            lineColor: const Color(0xFFF57F17),
+            normalizedPoints: const [0.50, 0.52, 0.48, 0.55, 0.50, 0.53],
+          ),
+          const SizedBox(height: 14),
+
           // Detailed Metrics Section (shown if detailed view is toggled)
           if (_isDetailedView) ...[
             Container(
@@ -184,12 +210,14 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
                     children: [
                       _buildMetricCell('Indoor Temp', '${shed.indoorTemp} °C'),
                       _buildMetricCell('Indoor Humidity', '${shed.indoorHumidity.toInt()} %'),
+                      _buildMetricCell('Air Quality (CO₂)', '${shed.indoorAirQuality.toInt()} %', isGreen: shed.indoorAirQuality >= shed.airQualityTarget),
+                      _buildMetricCell('Light Intensity', '${shed.indoorLightLux.toInt()} Lux'),
+                      _buildMetricCell('Bulb Brightness', '${shed.actuators.lightBrightness} % PWM', isGreen: shed.actuators.light),
+                      _buildMetricCell('Photoperiod Cycle', shed.photoperiodMode),
                       _buildMetricCell('Outside Temp (Live)', '${shed.outsideTemp} °C'),
                       _buildMetricCell('Outside Humidity (Live)', '${shed.outsideHumidity.toInt()} %'),
-                      _buildMetricCell('Air Quantity Target', '${provider.airflowSetPoint} %'),
-                      _buildMetricCell('Light Target', '${provider.lightSetPoint} %'),
                       _buildMetricCell('Device Node', 'ESP32 Online', isGreen: true),
-                      _buildMetricCell('Lighting Relay', shed.actuators.light ? 'ON' : 'OFF', isGreen: shed.actuators.light),
+                      _buildMetricCell('Ventilation Fan', shed.actuators.fan ? 'Active' : 'Standby', isGreen: shed.actuators.fan),
                     ],
                   ),
                 ],

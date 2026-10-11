@@ -562,6 +562,18 @@
               </div>
 
               <div class="dial-card">
+                <div class="dial-title">Air Quality (CO₂)</div>
+                <div class="dial-reading" id="fullDialAirQuality">--%</div>
+                <div class="dial-target" id="fullDialAirTarget">Target: &ge; 80% (CO₂ &lt; 1%)</div>
+              </div>
+
+              <div class="dial-card">
+                <div class="dial-title">Light Intensity (Lux)</div>
+                <div class="dial-reading" id="fullDialLightLux">-- Lux</div>
+                <div class="dial-target" id="fullDialLightTarget">Photoperiod: 15–30 Lux</div>
+              </div>
+
+              <div class="dial-card">
                 <div class="dial-title">Outdoor Ambient Weather</div>
                 <div class="dial-reading" id="fullDialOutdoorTemp">--°C</div>
                 <div class="dial-target" id="fullDialOutdoorHum">Condition: Sunny</div>
@@ -569,7 +581,7 @@
             </div>
 
             <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--green-deep); margin: 24px 0 12px;">
-              Connected IoT Actuators & Relays (240V Relays)
+              Connected IoT Actuators & Relays (240V Relays & PWM Dimmers)
             </h4>
 
             <div class="actuator-matrix">
@@ -596,7 +608,7 @@
                 </div>
                 <div>
                   <div class="actuator-name">Exhaust Ventilation Fan</div>
-                  <div class="actuator-pin">GPIO Pin 23 • Aeration & Heat Evacuation</div>
+                  <div class="actuator-pin">GPIO Pin 23 • Aeration & CO₂ Evacuation</div>
                 </div>
                 <button class="actuator-toggle-btn" id="btnToggleFan" onclick="manualToggleActuator('fan')">
                   Toggle Fan
@@ -617,7 +629,23 @@
                   Toggle Heater
                 </button>
               </div>
+
+              <!-- Dimmable Photoperiod Bulb Card -->
+              <div class="actuator-card" id="cardLight">
+                <div class="actuator-header">
+                  <div class="actuator-icon-box"><i data-lucide="lightbulb"></i></div>
+                  <span class="relay-status-tag" id="tagLight">OFF</span>
+                </div>
+                <div>
+                  <div class="actuator-name">Dimmable Photoperiod Bulb</div>
+                  <div class="actuator-pin" id="lightBrightnessInfo">GPIO Pin 25 • PWM Dimmer (15–30 Lux)</div>
+                </div>
+                <button class="actuator-toggle-btn" id="btnToggleLight" onclick="manualToggleActuator('light')">
+                  Toggle Bulb
+                </button>
+              </div>
             </div>
+
 
           </div>
 

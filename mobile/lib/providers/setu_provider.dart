@@ -31,6 +31,9 @@ class SetuProvider with ChangeNotifier {
   double _humSetPoint = 80.0;
   int _airflowSetPoint = 50;
   int _lightSetPoint = 35;
+  double _airQualitySetPoint = 80.0;
+  double _lightLuxSetPoint = 25.0;
+  int _lightBrightness = 35;
 
   // Session & Auth state
   bool _isLoggedIn = false;
@@ -66,14 +69,19 @@ class SetuProvider with ChangeNotifier {
     stageName: 'III Instar',
     indoorTemp: 26.2,
     indoorHumidity: 80.0,
+    indoorAirQuality: 88.0,
+    indoorLightLux: 22.0,
     outsideTemp: 34.2,
     outsideHumidity: 58.0,
-    actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true),
+    actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true, lightBrightness: 35),
     isAutoMode: true,
     tempTarget: 26.0,
     humidityTarget: 80.0,
     airflowTarget: 50.0,
     lightTarget: 35.0,
+    airQualityTarget: 80.0,
+    lightLuxTarget: 25.0,
+    photoperiodMode: 'DAY',
     lastUpdated: DateTime.now(),
   );
 
@@ -103,9 +111,13 @@ class SetuProvider with ChangeNotifier {
   double get humSetPoint => _humSetPoint;
   int get airflowSetPoint => _airflowSetPoint;
   int get lightSetPoint => _lightSetPoint;
+  double get airQualitySetPoint => _airQualitySetPoint;
+  double get lightLuxSetPoint => _lightLuxSetPoint;
+  int get lightBrightness => _lightBrightness;
   ShedData get shedData => _shedData;
   AIAdvice get aiAdvice => _aiAdvice;
   GrowthStageModel get currentStageInfo => GrowthStageModel.allStages[_currentGrowthStage - 1];
+
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isInitialized => _isInitialized;
@@ -899,6 +911,8 @@ class SetuProvider with ChangeNotifier {
       humidityTarget: _humSetPoint,
       airflowTarget: _airflowSetPoint.toDouble(),
       lightTarget: _lightSetPoint.toDouble(),
+      airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
       lastUpdated: DateTime.now(),
     );
   }
@@ -909,13 +923,18 @@ class SetuProvider with ChangeNotifier {
     _humSetPoint = preset.humidityTarget;
     _airflowSetPoint = preset.airflowPercent;
     _lightSetPoint = preset.lightPercent;
+    _airQualitySetPoint = 80.0;
+    _lightLuxSetPoint = _currentGrowthStage == 5 ? 10.0 : 25.0;
+    _lightBrightness = _currentGrowthStage == 5 ? 15 : 35;
+
     _syncTargetsIntoShedData(
       isAutoMode: true,
       actuators: ActuatorStates(
         cooler: _shedData.actuators.cooler,
         fan: preset.airflowPercent >= 50,
         heater: _shedData.actuators.heater,
-        light: preset.lightPercent >= 20,
+        light: true,
+        lightBrightness: _lightBrightness,
       ),
     );
   }
@@ -927,7 +946,15 @@ class SetuProvider with ChangeNotifier {
     } else {
       _syncTargetsIntoShedData(isAutoMode: false);
     }
-    _apiService.updateSetpoints(_shedData.shedId, auto, _tempSetPoint, _humSetPoint);
+    _apiService.updateSetpoints(
+      _shedData.shedId,
+      auto,
+      _tempSetPoint,
+      _humSetPoint,
+      airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
+    );
     notifyListeners();
   }
 
@@ -958,6 +985,54 @@ class SetuProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void adjustAirQualitySetPoint(double delta) {
+    _airQualitySetPoint = (_airQualitySetPoint + delta).clamp(50.0, 95.0);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    _apiService.updateSetpoints(
+      _shedData.shedId,
+      _isAutoMode,
+      _tempSetPoint,
+      _humSetPoint,
+      airQualityTarget: _airQualitySetPoint,
+    );
+    notifyListeners();
+  }
+
+  void adjustLightLuxSetPoint(double delta) {
+    _lightLuxSetPoint = (_lightLuxSetPoint + delta).clamp(5.0, 80.0);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    _apiService.updateSetpoints(
+      _shedData.shedId,
+      _isAutoMode,
+      _tempSetPoint,
+      _humSetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+    );
+    notifyListeners();
+  }
+
+  void setLightBrightness(int brightness) {
+    _lightBrightness = brightness.clamp(0, 100);
+    final isLit = _lightBrightness > 0;
+    _syncTargetsIntoShedData(
+      isAutoMode: false,
+      actuators: ActuatorStates(
+        cooler: _shedData.actuators.cooler,
+        fan: _shedData.actuators.fan,
+        heater: _shedData.actuators.heater,
+        light: isLit,
+        lightBrightness: _lightBrightness,
+      ),
+    );
+    _apiService.manualActuatorOverride(
+      _shedData.shedId,
+      'light_brightness',
+      isLit,
+      value: _lightBrightness,
+    );
+    notifyListeners();
+  }
+
   void setGrowthStage(int stage) {
     if (stage >= 1 && stage <= GrowthStageModel.allStages.length) {
       _currentGrowthStage = stage;
@@ -977,6 +1052,7 @@ class SetuProvider with ChangeNotifier {
     bool nextFan = _shedData.actuators.fan;
     bool nextHeater = _shedData.actuators.heater;
     bool nextLight = _shedData.actuators.light;
+    int nextBrightness = _shedData.actuators.lightBrightness;
 
     if (actuator == 'cooler') {
       nextCooler = !nextCooler;
@@ -988,11 +1064,19 @@ class SetuProvider with ChangeNotifier {
       nextFan = !nextFan;
     } else if (actuator == 'light') {
       nextLight = !nextLight;
+      nextBrightness = nextLight ? (_lightBrightness > 0 ? _lightBrightness : 35) : 0;
+      _lightBrightness = nextBrightness;
     }
 
     _syncTargetsIntoShedData(
       isAutoMode: false,
-      actuators: ActuatorStates(cooler: nextCooler, fan: nextFan, heater: nextHeater, light: nextLight),
+      actuators: ActuatorStates(
+        cooler: nextCooler,
+        fan: nextFan,
+        heater: nextHeater,
+        light: nextLight,
+        lightBrightness: nextBrightness,
+      ),
     );
 
     final nextState = actuator == 'cooler'
@@ -1019,12 +1103,17 @@ class SetuProvider with ChangeNotifier {
         stageName: currentStageInfo.name,
         indoorTemp: 26.2,
         indoorHumidity: 74.0,
+        indoorAirQuality: 88.0,
+        indoorLightLux: 24.0,
         outsideTemp: 34.2,
         outsideHumidity: 58.0,
-        actuators: ActuatorStates(cooler: true, fan: false, heater: false),
+        actuators: ActuatorStates(cooler: true, fan: false, heater: false, light: true, lightBrightness: 35),
         isAutoMode: true,
         tempTarget: 26.0,
         humidityTarget: 75.0,
+        airQualityTarget: 80.0,
+        lightLuxTarget: 25.0,
+        photoperiodMode: 'DAY',
         lastUpdated: DateTime.now(),
       );
     } else if (scenario == 'hot') {
@@ -1039,12 +1128,17 @@ class SetuProvider with ChangeNotifier {
         stageName: currentStageInfo.name,
         indoorTemp: 28.6,
         indoorHumidity: 68.0,
+        indoorAirQuality: 82.0,
+        indoorLightLux: 28.0,
         outsideTemp: 37.8,
         outsideHumidity: 45.0,
-        actuators: ActuatorStates(cooler: true, fan: true, heater: false),
+        actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true, lightBrightness: 25),
         isAutoMode: true,
         tempTarget: 26.0,
         humidityTarget: 75.0,
+        airQualityTarget: 80.0,
+        lightLuxTarget: 25.0,
+        photoperiodMode: 'DAY',
         lastUpdated: DateTime.now(),
       );
     } else if (scenario == 'cold') {
@@ -1059,15 +1153,73 @@ class SetuProvider with ChangeNotifier {
         stageName: currentStageInfo.name,
         indoorTemp: 20.4,
         indoorHumidity: 82.0,
+        indoorAirQuality: 85.0,
+        indoorLightLux: 2.0,
         outsideTemp: 16.5,
         outsideHumidity: 88.0,
-        actuators: ActuatorStates(cooler: false, fan: false, heater: true),
+        actuators: ActuatorStates(cooler: false, fan: false, heater: true, light: false, lightBrightness: 0),
         isAutoMode: true,
         tempTarget: 26.0,
         humidityTarget: 75.0,
+        airQualityTarget: 80.0,
+        lightLuxTarget: 25.0,
+        photoperiodMode: 'NIGHT',
+        lastUpdated: DateTime.now(),
+      );
+    } else if (scenario == 'stale_air') {
+      // Research scenario: CO2 accumulation exceeds 1% / low air quality (< 80%)
+      _shedData = ShedData(
+        shedId: _shedData.shedId,
+        farmName: _shedData.farmName,
+        region: _shedData.region,
+        overallStatus: 'AIR_LOW',
+        statusHeadline: 'Air Quality Low — Ventilation Active',
+        statusSubline: 'Air quality dropped to 64% (target >= 80%). Exhaust fan activated for fresh aeration.',
+        currentStage: _currentGrowthStage,
+        stageName: currentStageInfo.name,
+        indoorTemp: 26.0,
+        indoorHumidity: 76.0,
+        indoorAirQuality: 64.0,
+        indoorLightLux: 22.0,
+        outsideTemp: 32.0,
+        outsideHumidity: 60.0,
+        actuators: ActuatorStates(cooler: false, fan: true, heater: false, light: true, lightBrightness: 35),
+        isAutoMode: true,
+        tempTarget: 26.0,
+        humidityTarget: 75.0,
+        airQualityTarget: 80.0,
+        lightLuxTarget: 25.0,
+        photoperiodMode: 'DAY',
+        lastUpdated: DateTime.now(),
+      );
+    } else if (scenario == 'night_mode') {
+      // Research scenario: 8h photoperiod night rest (< 5 Lux)
+      _shedData = ShedData(
+        shedId: _shedData.shedId,
+        farmName: _shedData.farmName,
+        region: _shedData.region,
+        overallStatus: 'IDEAL',
+        statusHeadline: 'Night Rest Photoperiod (<5 Lux)',
+        statusSubline: 'Dark resting cycle active (22:00–06:00). Silkworms resting peacefully.',
+        currentStage: _currentGrowthStage,
+        stageName: currentStageInfo.name,
+        indoorTemp: 24.8,
+        indoorHumidity: 75.0,
+        indoorAirQuality: 90.0,
+        indoorLightLux: 2.0,
+        outsideTemp: 22.0,
+        outsideHumidity: 70.0,
+        actuators: ActuatorStates(cooler: false, fan: false, heater: false, light: false, lightBrightness: 0),
+        isAutoMode: true,
+        tempTarget: 26.0,
+        humidityTarget: 75.0,
+        airQualityTarget: 80.0,
+        lightLuxTarget: 25.0,
+        photoperiodMode: 'NIGHT',
         lastUpdated: DateTime.now(),
       );
     }
     notifyListeners();
   }
+
 }

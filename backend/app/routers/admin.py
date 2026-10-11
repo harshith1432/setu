@@ -131,6 +131,7 @@ class ShedAutoModePayload(BaseModel):
 class ShedActuatorOverridePayload(BaseModel):
     actuator: str
     state: bool
+    value: Optional[int] = None
 
 @router.get("/stages")
 def list_growth_stages(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:
@@ -250,15 +251,17 @@ def override_shed_actuator(
     """
     Manually toggle a specific actuator on a shed.
     """
-    if payload.actuator not in ["cooler", "fan", "heater"]:
-        raise HTTPException(status_code=400, detail="Invalid actuator")
-    overview = telemetry_service.manual_override_actuator(shed_id, payload.actuator, payload.state)
+    valid_actuators = ["cooler", "fan", "heater", "light", "light_brightness"]
+    if payload.actuator not in valid_actuators:
+        raise HTTPException(status_code=400, detail=f"Invalid actuator. Must be one of {valid_actuators}")
+    overview = telemetry_service.manual_override_actuator(shed_id, payload.actuator, payload.state, value=payload.value)
     log_audit(
         admin_user.get("sub", "admin"),
         "MANUAL_ACTUATOR_OVERRIDE",
-        f"{shed_id} {payload.actuator} turned {'ON' if payload.state else 'OFF'}"
+        f"{shed_id} {payload.actuator} set to {payload.state if payload.value is None else payload.value}"
     )
     return overview
+
 
 @router.get("/telemetry-live")
 def get_live_cluster_telemetry(shed_id: str = "shed_01", admin_user: dict = Depends(require_superadmin)):

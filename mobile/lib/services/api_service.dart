@@ -312,17 +312,30 @@ class ApiService {
     );
   }
 
-  Future<bool> updateSetpoints(String shedId, bool isAuto, double tempTarget, double humTarget) async {
+  Future<bool> updateSetpoints(
+    String shedId,
+    bool isAuto,
+    double tempTarget,
+    double humTarget, {
+    double? airQualityTarget,
+    double? lightLuxTarget,
+    int? lightBrightness,
+  }) async {
     for (final base in candidateUrls) {
       try {
+        final payload = <String, dynamic>{
+          'is_auto_mode': isAuto,
+          'temp_target': tempTarget,
+          'humidity_target': humTarget,
+        };
+        if (airQualityTarget != null) payload['air_quality_target'] = airQualityTarget;
+        if (lightLuxTarget != null) payload['light_lux_target'] = lightLuxTarget;
+        if (lightBrightness != null) payload['light_brightness'] = lightBrightness;
+
         final res = await http.post(
           Uri.parse('$base/control/$shedId/setpoints'),
           headers: _headers,
-          body: jsonEncode({
-            'is_auto_mode': isAuto,
-            'temp_target': tempTarget,
-            'humidity_target': humTarget,
-          }),
+          body: jsonEncode(payload),
         ).timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) return true;
       } catch (_) {}
@@ -330,16 +343,24 @@ class ApiService {
     return false;
   }
 
-  Future<bool> manualActuatorOverride(String shedId, String actuator, bool state) async {
+  Future<bool> manualActuatorOverride(
+    String shedId,
+    String actuator,
+    bool state, {
+    int? value,
+  }) async {
     for (final base in candidateUrls) {
       try {
+        final payload = <String, dynamic>{
+          'actuator': actuator,
+          'state': state,
+        };
+        if (value != null) payload['value'] = value;
+
         final res = await http.post(
           Uri.parse('$base/control/$shedId/override'),
           headers: _headers,
-          body: jsonEncode({
-            'actuator': actuator,
-            'state': state,
-          }),
+          body: jsonEncode(payload),
         ).timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) return true;
       } catch (_) {}
@@ -347,3 +368,4 @@ class ApiService {
     return false;
   }
 }
+

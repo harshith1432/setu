@@ -139,15 +139,23 @@ def init_db():
             shed_id VARCHAR(64) NOT NULL,
             temperature DOUBLE PRECISION NOT NULL,
             humidity DOUBLE PRECISION NOT NULL,
+            air_quality DOUBLE PRECISION NOT NULL DEFAULT 88.0,
+            light_lux DOUBLE PRECISION NOT NULL DEFAULT 22.0,
             outside_temperature DOUBLE PRECISION,
             outside_humidity DOUBLE PRECISION,
             cooler BOOLEAN NOT NULL DEFAULT FALSE,
             heater BOOLEAN NOT NULL DEFAULT FALSE,
             fan BOOLEAN NOT NULL DEFAULT FALSE,
             humidifier BOOLEAN NOT NULL DEFAULT FALSE,
+            light BOOLEAN NOT NULL DEFAULT FALSE,
+            light_brightness INT NOT NULL DEFAULT 0,
             mode VARCHAR(32) NOT NULL DEFAULT 'AUTO'
         );
         """)
+        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS air_quality DOUBLE PRECISION DEFAULT 88.0;")
+        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS light_lux DOUBLE PRECISION DEFAULT 22.0;")
+        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS light BOOLEAN NOT NULL DEFAULT FALSE;")
+        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS light_brightness INT NOT NULL DEFAULT 0;")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_shed_telemetry_shed_time ON shed_telemetry (shed_id, time DESC);")
 
         # Pre-seed Stage Thresholds if empty
@@ -537,21 +545,25 @@ def save_telemetry_reading(reading: Dict[str, Any]) -> None:
                     t = datetime.now(timezone.utc)
             cursor.execute("""
             INSERT INTO shed_telemetry (
-                time, shed_id, temperature, humidity,
+                time, shed_id, temperature, humidity, air_quality, light_lux,
                 outside_temperature, outside_humidity,
-                cooler, heater, fan, humidifier, mode
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                cooler, heater, fan, humidifier, light, light_brightness, mode
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 t,
                 reading.get("shed_id", "shed_01"),
                 float(reading.get("indoor_temp", 25.0)),
                 float(reading.get("indoor_hum", 75.0)),
+                float(reading.get("air_quality", 88.0)),
+                float(reading.get("light_lux", 22.0)),
                 float(reading.get("outside_temp")) if reading.get("outside_temp") is not None else None,
                 float(reading.get("outside_hum")) if reading.get("outside_hum") is not None else None,
                 bool(reading.get("cooler", False)),
                 bool(reading.get("heater", False)),
                 bool(reading.get("fan", False)),
                 bool(reading.get("humidifier", False)),
+                bool(reading.get("light", False)),
+                int(reading.get("light_brightness", 0)),
                 reading.get("mode", "AUTO")
             ))
     except Exception:
@@ -564,9 +576,15 @@ def get_telemetry_history_from_db(shed_id: str, limit: int = 50) -> List[Dict[st
     try:
         with get_db_cursor(dict_cursor=True) as cursor:
             cursor.execute("""
-            SELECT time as timestamp, shed_id, temperature as indoor_temp, humidity as indoor_hum,
+            SELECT time as timestamp, shed_id,
+                   temperature as indoor_temp, humidity as indoor_hum,
+                   COALESCE(air_quality, 88.0) as air_quality,
+                   COALESCE(light_lux, 22.0) as light_lux,
                    outside_temperature as outside_temp, outside_humidity as outside_hum,
-                   cooler, heater, fan, humidifier, mode
+                   cooler, heater, fan, humidifier,
+                   COALESCE(light, FALSE) as light,
+                   COALESCE(light_brightness, 0) as light_brightness,
+                   mode
             FROM shed_telemetry
             WHERE shed_id = %s
             ORDER BY time DESC
@@ -582,3 +600,4 @@ def get_telemetry_history_from_db(shed_id: str, limit: int = 50) -> List[Dict[st
             return result
     except Exception:
         return []
+

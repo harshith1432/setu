@@ -135,7 +135,7 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Simple Indicators: Temp & Humidity
+          // Sensor Indicators: 4-Metric Grid (Temp, Humidity, Air Quality, Light Lux)
           Row(
             children: [
               Expanded(
@@ -209,6 +209,103 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: shed.indoorAirQuality < shed.airQualityTarget
+                          ? const Color(0xFFFFB74D)
+                          : const Color(0xFFE0E7DC),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Icon(
+                            Icons.air_rounded,
+                            color: shed.indoorAirQuality < shed.airQualityTarget ? const Color(0xFFE65100) : const Color(0xFF00897B),
+                            size: 22,
+                          ),
+                          Text(
+                            '${shed.indoorAirQuality.toInt()}%',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: shed.indoorAirQuality < shed.airQualityTarget ? const Color(0xFFE65100) : const Color(0xFF1B5E20),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.translate('airQuality'),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
+                      ),
+                      Text(
+                        shed.indoorAirQuality < shed.airQualityTarget
+                            ? 'CO₂ High • Fan Active'
+                            : 'Clean • Target: >=${shed.airQualityTarget.toInt()}%',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: shed.indoorAirQuality < shed.airQualityTarget ? const Color(0xFFD84315) : const Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE0E7DC)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Icon(
+                            Icons.lightbulb_rounded,
+                            color: shed.actuators.light ? const Color(0xFFF57F17) : const Color(0xFF9E9E9E),
+                            size: 22,
+                          ),
+                          Text(
+                            '${shed.indoorLightLux.toInt()} Lux',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.translate('lightIntensity'),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
+                      ),
+                      Text(
+                        '${shed.photoperiodMode} • 15–30 Lux',
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
 
           // AI Quick Banner (Concise)
@@ -239,7 +336,9 @@ class HomeScreen extends StatelessWidget {
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF4A148C)),
                         ),
                         Text(
-                          l10n.translate('everythingNormal'),
+                          shed.indoorAirQuality < shed.airQualityTarget
+                              ? 'Low air quality detected. Exhaust fan active for fresh air circulation.'
+                              : l10n.translate('everythingNormal'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 11, color: Color(0xFF512DA8)),
@@ -314,14 +413,24 @@ class HomeScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _buildEquipmentChip(Icons.ac_unit_rounded, 'Cooler', shed.actuators.cooler ? 'Running' : 'Off', shed.actuators.cooler),
-                    const SizedBox(width: 8),
-                    _buildEquipmentChip(Icons.air_rounded, 'Vent Fan', shed.actuators.fan ? 'Running' : 'Standby', shed.actuators.fan),
-                    const SizedBox(width: 8),
-                    _buildEquipmentChip(Icons.local_fire_department_rounded, 'Heater', shed.actuators.heater ? 'Running' : 'Off', shed.actuators.heater),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildEquipmentChip(Icons.ac_unit_rounded, 'Cooler', shed.actuators.cooler ? 'Running' : 'Off', shed.actuators.cooler),
+                      const SizedBox(width: 8),
+                      _buildEquipmentChip(Icons.air_rounded, 'Vent Fan', shed.actuators.fan ? 'Running' : 'Standby', shed.actuators.fan),
+                      const SizedBox(width: 8),
+                      _buildEquipmentChip(Icons.local_fire_department_rounded, 'Heater', shed.actuators.heater ? 'Running' : 'Off', shed.actuators.heater),
+                      const SizedBox(width: 8),
+                      _buildEquipmentChip(
+                        Icons.lightbulb_rounded,
+                        'Bulb (PWM)',
+                        shed.actuators.light ? '${shed.actuators.lightBrightness}%' : 'Off',
+                        shed.actuators.light,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -359,12 +468,17 @@ class HomeScreen extends StatelessWidget {
                       _buildSimBtn('Hot Noon (35°C)', () => provider.applyScenario('hot')),
                       const SizedBox(width: 6),
                       _buildSimBtn('Cold Night (20°C)', () => provider.applyScenario('cold')),
+                      const SizedBox(width: 6),
+                      _buildSimBtn('Stale Air (Fan ON)', () => provider.applyScenario('stale_air')),
+                      const SizedBox(width: 6),
+                      _buildSimBtn('Night Rest (<5 Lux)', () => provider.applyScenario('night_mode')),
                     ],
                   ),
                 ),
               ],
             ),
           ),
+
         ],
       ),
     );
