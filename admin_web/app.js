@@ -4,9 +4,11 @@
 // IoT Actuators & Historical Analytics
 // ==========================================================================
 
-const API_BASE_URL = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
+const API_BASE_URL = (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1'))
   ? `${window.location.origin}/api/v1`
-  : 'http://localhost:8000/api/v1';
+  : (window.location.hostname.includes('onrender.com')
+      ? `${window.location.origin}/api/v1`
+      : 'https://setu-8vh9.onrender.com/api/v1');
 
 // Application State
 let adminToken = localStorage.getItem('setu_admin_token') || null;

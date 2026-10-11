@@ -37,7 +37,7 @@ class SetuProvider with ChangeNotifier {
   bool _isInitialized = false;
   bool _hasCompletedOnboarding = false;
   String? _authToken;
-  String _backendHost = '127.0.0.1:8000';
+  String _backendHost = 'https://setu-8vh9.onrender.com';
   String? _phoneVerificationId;
 
   // User Profile Data
@@ -157,7 +157,7 @@ class SetuProvider with ChangeNotifier {
       if (savedHost != null && savedHost.trim().isNotEmpty) {
         _backendHost = savedHost;
       } else {
-        _backendHost = '127.0.0.1:8000';
+        _backendHost = 'https://setu-8vh9.onrender.com';
       }
       _apiService.setCustomHost(_backendHost);
       
