@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -5,7 +6,7 @@ import 'providers/setu_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth_screen.dart';
-import 'screens/starting_page_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/ai_guidance_screen.dart';
 import 'screens/environment_screen.dart';
@@ -15,8 +16,13 @@ import 'widgets/advanced_mode_modal.dart';
 import 'widgets/system_settings_modal.dart';
 import 'widgets/user_profile_modal.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    // Allow local/offline mode even when Firebase config is not present yet.
+  }
   runApp(
     MultiProvider(
       providers: [
@@ -85,7 +91,6 @@ class AppRootFlow extends StatefulWidget {
 
 class _AppRootFlowState extends State<AppRootFlow> {
   bool _showSplash = true;
-  bool _hasPassedStartingPage = false;
 
   @override
   Widget build(BuildContext context) {
@@ -111,20 +116,16 @@ class _AppRootFlowState extends State<AppRootFlow> {
       );
     }
 
-    // If user is not logged in, prompt Login / Sign Up
-    if (!provider.isLoggedIn) {
-      return AuthScreen(
-        onLoginSuccess: () {
-          setState(() {
-            _hasPassedStartingPage = true;
-          });
-        },
+    if (!provider.hasCompletedOnboarding) {
+      return OnboardingScreen(
+        onProceed: provider.completeOnboarding,
       );
     }
 
-    if (!_hasPassedStartingPage) {
-      return StartingPageScreen(
-        onStart: () => setState(() => _hasPassedStartingPage = true),
+    // If user is not logged in, prompt Login / Sign Up
+    if (!provider.isLoggedIn) {
+      return AuthScreen(
+        onLoginSuccess: () => setState(() {}),
       );
     }
 

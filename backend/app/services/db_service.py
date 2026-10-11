@@ -35,6 +35,8 @@ def init_db():
         role VARCHAR(32) NOT NULL DEFAULT 'farmer',
         farm_name VARCHAR(128) NOT NULL DEFAULT 'Green Valley Farm',
         region VARCHAR(128) NOT NULL DEFAULT 'Local Rearing Shed',
+        latitude DOUBLE PRECISION,
+        longitude DOUBLE PRECISION,
         batch_id VARCHAR(64) NOT NULL DEFAULT 'SERI-2026-M04',
         dfl_capacity VARCHAR(64) NOT NULL DEFAULT '200 DFL',
         breed VARCHAR(128) NOT NULL DEFAULT 'Double Hybrid (FC1 x FC2)',
@@ -42,6 +44,8 @@ def init_db():
         created_at TIMESTAMPTZ NOT NULL
     );
     """)
+    cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
+    cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
     
     # Audit Logs
     cursor.execute("""

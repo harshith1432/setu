@@ -21,6 +21,7 @@ class HomeScreen extends StatelessWidget {
     final provider = Provider.of<SetuProvider>(context);
     final shed = provider.shedData;
     final l10n = AppLocalizations.of(context);
+    final stage = provider.currentStageInfo;
 
     Color heroCardBg = const Color(0xFFE8F5E9);
     Color heroCardBorder = const Color(0xFFA5D6A7);
@@ -159,8 +160,8 @@ class HomeScreen extends StatelessWidget {
                         l10n.translate('temperature'),
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
                       ),
-                      const Text(
-                        'Target: 25-26.5°C',
+                      Text(
+                        'Target: ${stage.tempMin.toStringAsFixed(0)}-${stage.tempMax.toStringAsFixed(0)}C',
                         style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -194,8 +195,8 @@ class HomeScreen extends StatelessWidget {
                         l10n.translate('humidity'),
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
                       ),
-                      const Text(
-                        'Target: 70-75%',
+                      Text(
+                        'Target: ${stage.humMin.toInt()}-${stage.humMax.toInt()}%',
                         style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                       ),
                     ],

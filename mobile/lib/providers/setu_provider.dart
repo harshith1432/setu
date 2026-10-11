@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shed_data.dart';
 import '../models/growth_stage.dart';
@@ -11,6 +15,7 @@ import '../services/location_weather_service.dart';
 class SetuProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LocationWeatherService _weatherService = LocationWeatherService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
 
   LiveWeatherData? _liveWeather;
   bool _isLoadingWeather = false;
@@ -18,17 +23,21 @@ class SetuProvider with ChangeNotifier {
 
   Locale _locale = const Locale('en');
   int _currentBottomNavIndex = 0;
-  int _currentGrowthStage = 3;
+  int _currentGrowthStage = 4;
   bool _isAdvancedMode = false;
   bool _isAutoMode = true;
   double _tempSetPoint = 26.0;
-  double _humSetPoint = 75.0;
+  double _humSetPoint = 80.0;
+  int _airflowSetPoint = 50;
+  int _lightSetPoint = 35;
 
   // Session & Auth state
   bool _isLoggedIn = false;
   bool _isInitialized = false;
+  bool _hasCompletedOnboarding = false;
   String? _authToken;
-  String _backendHost = '10.38.239.10:8000';
+  String _backendHost = '127.0.0.1:8000';
+  String? _phoneVerificationId;
 
   // User Profile Data
   String _userId = 'usr_001';
@@ -52,23 +61,25 @@ class SetuProvider with ChangeNotifier {
     overallStatus: 'IDEAL',
     statusHeadline: 'Ideal for Silkworms',
     statusSubline: 'Everything is comfortable inside the shed. No action required.',
-    currentStage: 3,
-    stageName: '3rd Instar',
+    currentStage: 4,
+    stageName: 'III Instar',
     indoorTemp: 26.2,
-    indoorHumidity: 74.0,
+    indoorHumidity: 80.0,
     outsideTemp: 34.2,
     outsideHumidity: 58.0,
-    actuators: ActuatorStates(cooler: true, fan: false, heater: false),
+    actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true),
     isAutoMode: true,
     tempTarget: 26.0,
-    humidityTarget: 75.0,
+    humidityTarget: 80.0,
+    airflowTarget: 50.0,
+    lightTarget: 35.0,
     lastUpdated: DateTime.now(),
   );
 
   AIAdvice _aiAdvice = AIAdvice(
     whyText: 'Outside temperature is high (34.2°C) today, so cooling is activated to keep the shed comfortable for silkworms.',
     currentAction: 'Cooling is ON',
-    targetDescription: 'To maintain a suitable temperature of 25.0°C–26.5°C for 3rd instar silkworms.',
+    targetDescription: 'To maintain stable temperature, humidity, airflow, and light for III instar silkworms.',
     bulletPoints: [
       'Outside temperature is high and heat permeates through the shed roof.',
       'Silkworms can get stressed and lose appetite in high heat (>28°C).',
@@ -89,12 +100,17 @@ class SetuProvider with ChangeNotifier {
   bool get isAutoMode => _isAutoMode;
   double get tempSetPoint => _tempSetPoint;
   double get humSetPoint => _humSetPoint;
+  int get airflowSetPoint => _airflowSetPoint;
+  int get lightSetPoint => _lightSetPoint;
   ShedData get shedData => _shedData;
   AIAdvice get aiAdvice => _aiAdvice;
   GrowthStageModel get currentStageInfo => GrowthStageModel.allStages[_currentGrowthStage - 1];
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isInitialized => _isInitialized;
+  bool get hasCompletedOnboarding => _hasCompletedOnboarding;
+  bool get isFirebaseReady => Firebase.apps.isNotEmpty;
+  FirebaseAuth? get _firebaseAuthSafe => isFirebaseReady ? FirebaseAuth.instance : null;
   String? get authToken => _authToken;
   String get backendHost => _backendHost;
 
@@ -121,6 +137,7 @@ class SetuProvider with ChangeNotifier {
   Future<void> _loadSessionFromPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      _hasCompletedOnboarding = prefs.getBool('onboarding_completed') ?? false;
       _isLoggedIn = prefs.getBool('is_logged_in') ?? false;
       _authToken = prefs.getString('auth_token');
       if (_authToken != null) {
@@ -128,10 +145,10 @@ class SetuProvider with ChangeNotifier {
       }
 
       final savedHost = prefs.getString('backend_host');
-      if (savedHost != null && savedHost != '192.168.0.116:8000') {
+      if (savedHost != null && savedHost.trim().isNotEmpty) {
         _backendHost = savedHost;
       } else {
-        _backendHost = '10.38.239.10:8000';
+        _backendHost = '127.0.0.1:8000';
       }
       _apiService.setCustomHost(_backendHost);
       
@@ -149,6 +166,11 @@ class SetuProvider with ChangeNotifier {
       _breed = prefs.getString('breed') ?? _breed;
       final lang = prefs.getString('preferred_language') ?? 'en';
       _locale = Locale(lang);
+
+      final firebaseAuth = _firebaseAuthSafe;
+      if (firebaseAuth?.currentUser != null) {
+        await _applyFirebaseUser(firebaseAuth!.currentUser!);
+      }
 
       if (_isLoggedIn && _authToken != null) {
         _apiService.getMe().then((me) {
@@ -172,6 +194,191 @@ class SetuProvider with ChangeNotifier {
       notifyListeners();
       // Fetch live real-time ambient weather for the saved location
       refreshLiveWeather();
+    }
+  }
+
+  Future<void> completeOnboarding() async {
+    _hasCompletedOnboarding = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_completed', true);
+    notifyListeners();
+  }
+
+  String _firebaseMessage(Object error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-phone-number':
+          return 'Enter a valid phone number with country code.';
+        case 'invalid-verification-code':
+          return 'The OTP you entered is invalid.';
+        case 'too-many-requests':
+          return 'Too many attempts. Please try again later.';
+        case 'network-request-failed':
+          return 'Network error while contacting Firebase.';
+        case 'captcha-check-failed':
+          return 'App verification failed. Reopen the app and try again.';
+      }
+      return error.message ?? 'Firebase authentication failed.';
+    }
+    return error.toString();
+  }
+
+  Future<void> _applyFirebaseUser(
+    User user, {
+    String? preferredName,
+    String? preferredPhone,
+  }) async {
+    final token = await user.getIdToken().catchError((_) => null) ?? 'firebase_${user.uid}';
+    _isLoggedIn = true;
+    _authToken = token;
+    _apiService.setToken(_authToken);
+    _userId = user.uid;
+    _username = user.email?.trim().isNotEmpty == true
+        ? user.email!
+        : (preferredPhone?.trim().isNotEmpty == true ? preferredPhone!.trim() : user.phoneNumber ?? _username);
+    _userName = preferredName?.trim().isNotEmpty == true
+        ? preferredName!.trim()
+        : (user.displayName?.trim().isNotEmpty == true ? user.displayName!.trim() : _userName);
+    _userPhone = preferredPhone?.trim().isNotEmpty == true
+        ? preferredPhone!.trim()
+        : (user.phoneNumber?.trim().isNotEmpty == true ? user.phoneNumber!.trim() : _userPhone);
+
+    await _saveSessionToPreferences(token: _authToken!, userMap: {
+      'id': _userId,
+      'username': _username,
+      'full_name': _userName,
+      'phone': _userPhone,
+      'farm_name': _farmName,
+      'region': _region,
+      'batch_id': _batchId,
+      'dfl_capacity': _dflCapacity,
+      'breed': _breed,
+      'preferred_language': _locale.languageCode,
+    });
+  }
+
+  Future<({bool success, String message, bool codeSent})> startPhoneAuthentication(String phoneNumber) async {
+    if (!isFirebaseReady) {
+      return (
+        success: false,
+        message: 'Firebase is not configured yet. Add google-services.json under mobile/android/app and rebuild.',
+        codeSent: false,
+      );
+    }
+
+    final cleanPhone = phoneNumber.trim();
+    if (cleanPhone.isEmpty) {
+      return (success: false, message: 'Enter your phone number first.', codeSent: false);
+    }
+
+    final completer = Completer<({bool success, String message, bool codeSent})>();
+
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth == null) {
+      return (
+        success: false,
+        message: 'Firebase is not configured for this platform.',
+        codeSent: false,
+      );
+    }
+
+    await firebaseAuth.verifyPhoneNumber(
+      phoneNumber: cleanPhone,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (credential) async {
+        final result = await signInWithPhoneCode(code: null, preferredPhone: cleanPhone, credential: credential);
+        if (!completer.isCompleted) {
+          completer.complete((success: result.success, message: result.message, codeSent: false));
+        }
+      },
+      verificationFailed: (e) {
+        if (!completer.isCompleted) {
+          completer.complete((success: false, message: _firebaseMessage(e), codeSent: false));
+        }
+      },
+      codeSent: (verificationId, resendToken) {
+        _phoneVerificationId = verificationId;
+        if (!completer.isCompleted) {
+          completer.complete((success: true, message: 'Verification code sent to $cleanPhone.', codeSent: true));
+        }
+      },
+      codeAutoRetrievalTimeout: (verificationId) {
+        _phoneVerificationId = verificationId;
+      },
+    );
+
+    return completer.future;
+  }
+
+  Future<({bool success, String message})> signInWithPhoneCode({
+    String? code,
+    String? preferredName,
+    String? preferredPhone,
+    PhoneAuthCredential? credential,
+  }) async {
+    if (!isFirebaseReady) {
+      return (success: false, message: 'Firebase is not configured yet.');
+    }
+
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth == null) {
+      return (success: false, message: 'Firebase is not configured for this platform.');
+    }
+
+    try {
+      final authCredential = credential ?? PhoneAuthProvider.credential(
+        verificationId: _phoneVerificationId ?? '',
+        smsCode: code?.trim() ?? '',
+      );
+      final userCredential = await firebaseAuth.signInWithCredential(authCredential);
+      if (userCredential.user == null) {
+        return (success: false, message: 'Phone authentication did not return a user.');
+      }
+      await _applyFirebaseUser(
+        userCredential.user!,
+        preferredName: preferredName,
+        preferredPhone: preferredPhone,
+      );
+      return (success: true, message: 'Phone number verified. Welcome to Setu.');
+    } catch (e) {
+      return (success: false, message: _firebaseMessage(e));
+    }
+  }
+
+  Future<({bool success, String message})> signInWithGoogle() async {
+    if (!isFirebaseReady) {
+      return (
+        success: false,
+        message: 'Firebase is not configured yet. Add google-services.json under mobile/android/app and rebuild.',
+      );
+    }
+
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth == null) {
+      return (success: false, message: 'Firebase is not configured for this platform.');
+    }
+
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return (success: false, message: 'Google sign-in was cancelled.');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await firebaseAuth.signInWithCredential(credential);
+      if (userCredential.user == null) {
+        return (success: false, message: 'Google sign-in did not return a user.');
+      }
+
+      await _applyFirebaseUser(userCredential.user!);
+      return (success: true, message: 'Google sign-in successful.');
+    } catch (e) {
+      return (success: false, message: _firebaseMessage(e));
     }
   }
 
@@ -592,6 +799,11 @@ class SetuProvider with ChangeNotifier {
     _isLoggedIn = false;
     _authToken = null;
     _apiService.setToken(null);
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth != null) {
+      await firebaseAuth.signOut();
+      await _googleSignIn.signOut();
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('is_logged_in');
     await prefs.remove('auth_token');
@@ -661,8 +873,47 @@ class SetuProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _syncTargetsIntoShedData({
+    bool? isAutoMode,
+    ActuatorStates? actuators,
+  }) {
+    _shedData = _shedData.copyWith(
+      currentStage: _currentGrowthStage,
+      stageName: currentStageInfo.name,
+      actuators: actuators ?? _shedData.actuators,
+      isAutoMode: isAutoMode ?? _shedData.isAutoMode,
+      tempTarget: _tempSetPoint,
+      humidityTarget: _humSetPoint,
+      airflowTarget: _airflowSetPoint.toDouble(),
+      lightTarget: _lightSetPoint.toDouble(),
+      lastUpdated: DateTime.now(),
+    );
+  }
+
+  void _applySimpleStagePreset() {
+    final preset = currentStageInfo;
+    _tempSetPoint = preset.tempTarget;
+    _humSetPoint = preset.humidityTarget;
+    _airflowSetPoint = preset.airflowPercent;
+    _lightSetPoint = preset.lightPercent;
+    _syncTargetsIntoShedData(
+      isAutoMode: true,
+      actuators: ActuatorStates(
+        cooler: _shedData.actuators.cooler,
+        fan: preset.airflowPercent >= 50,
+        heater: _shedData.actuators.heater,
+        light: preset.lightPercent >= 20,
+      ),
+    );
+  }
+
   void setAutoMode(bool auto) {
     _isAutoMode = auto;
+    if (auto) {
+      _applySimpleStagePreset();
+    } else {
+      _syncTargetsIntoShedData(isAutoMode: false);
+    }
     _apiService.updateSetpoints(_shedData.shedId, auto, _tempSetPoint, _humSetPoint);
     notifyListeners();
   }
@@ -670,19 +921,38 @@ class SetuProvider with ChangeNotifier {
   void adjustTempSetPoint(double delta) {
     _tempSetPoint = (_tempSetPoint + delta).clamp(18.0, 35.0);
     _tempSetPoint = double.parse(_tempSetPoint.toStringAsFixed(1));
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
     notifyListeners();
   }
 
   void adjustHumSetPoint(double delta) {
     _humSetPoint = (_humSetPoint + delta).clamp(40.0, 95.0);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
     notifyListeners();
   }
 
+  void adjustAirflowSetPoint(int delta) {
+    _airflowSetPoint = (_airflowSetPoint + delta).clamp(10, 100);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    notifyListeners();
+  }
+
+  void adjustLightSetPoint(int delta) {
+    _lightSetPoint = (_lightSetPoint + delta).clamp(0, 100);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    notifyListeners();
+  }
+
   void setGrowthStage(int stage) {
-    if (stage >= 1 && stage <= 5) {
+    if (stage >= 1 && stage <= GrowthStageModel.allStages.length) {
       _currentGrowthStage = stage;
+      if (_isAutoMode) {
+        _applySimpleStagePreset();
+      } else {
+        _syncTargetsIntoShedData(isAutoMode: false);
+      }
       notifyListeners();
     }
   }
@@ -693,6 +963,7 @@ class SetuProvider with ChangeNotifier {
     bool nextCooler = _shedData.actuators.cooler;
     bool nextFan = _shedData.actuators.fan;
     bool nextHeater = _shedData.actuators.heater;
+    bool nextLight = _shedData.actuators.light;
 
     if (actuator == 'cooler') {
       nextCooler = !nextCooler;
@@ -702,29 +973,23 @@ class SetuProvider with ChangeNotifier {
       if (nextHeater) nextCooler = false;
     } else if (actuator == 'fan') {
       nextFan = !nextFan;
+    } else if (actuator == 'light') {
+      nextLight = !nextLight;
     }
 
-    _shedData = ShedData(
-      shedId: _shedData.shedId,
-      farmName: _shedData.farmName,
-      region: _shedData.region,
-      overallStatus: _shedData.overallStatus,
-      statusHeadline: _shedData.statusHeadline,
-      statusSubline: _shedData.statusSubline,
-      currentStage: _shedData.currentStage,
-      stageName: _shedData.stageName,
-      indoorTemp: _shedData.indoorTemp,
-      indoorHumidity: _shedData.indoorHumidity,
-      outsideTemp: _shedData.outsideTemp,
-      outsideHumidity: _shedData.outsideHumidity,
-      actuators: ActuatorStates(cooler: nextCooler, fan: nextFan, heater: nextHeater),
+    _syncTargetsIntoShedData(
       isAutoMode: false,
-      tempTarget: _tempSetPoint,
-      humidityTarget: _humSetPoint,
-      lastUpdated: DateTime.now(),
+      actuators: ActuatorStates(cooler: nextCooler, fan: nextFan, heater: nextHeater, light: nextLight),
     );
 
-    _apiService.manualActuatorOverride(_shedData.shedId, actuator, actuator == 'cooler' ? nextCooler : (actuator == 'heater' ? nextHeater : nextFan));
+    final nextState = actuator == 'cooler'
+        ? nextCooler
+        : actuator == 'heater'
+            ? nextHeater
+            : actuator == 'light'
+                ? nextLight
+                : nextFan;
+    _apiService.manualActuatorOverride(_shedData.shedId, actuator, nextState);
     notifyListeners();
   }
 

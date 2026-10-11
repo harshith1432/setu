@@ -2,11 +2,13 @@ class ActuatorStates {
   final bool cooler;
   final bool fan;
   final bool heater;
+  final bool light;
 
   ActuatorStates({
     this.cooler = false,
     this.fan = false,
     this.heater = false,
+    this.light = false,
   });
 
   factory ActuatorStates.fromJson(Map<String, dynamic> json) {
@@ -14,6 +16,7 @@ class ActuatorStates {
       cooler: json['cooler'] ?? false,
       fan: json['fan'] ?? false,
       heater: json['heater'] ?? false,
+      light: json['light'] ?? false,
     );
   }
 }
@@ -35,6 +38,8 @@ class ShedData {
   final bool isAutoMode;
   final double tempTarget;
   final double humidityTarget;
+  final double airflowTarget;
+  final double lightTarget;
   final DateTime lastUpdated;
 
   ShedData({
@@ -54,6 +59,8 @@ class ShedData {
     required this.isAutoMode,
     required this.tempTarget,
     required this.humidityTarget,
+    this.airflowTarget = 50.0,
+    this.lightTarget = 30.0,
     required this.lastUpdated,
   });
 
@@ -65,8 +72,8 @@ class ShedData {
       overallStatus: json['overall_status'] ?? 'IDEAL',
       statusHeadline: json['status_headline'] ?? 'Ideal for Silkworms',
       statusSubline: json['status_subline'] ?? 'Everything is normal',
-      currentStage: json['current_stage'] ?? 3,
-      stageName: json['stage_name'] ?? '3rd Instar',
+      currentStage: json['current_stage'] ?? 4,
+      stageName: json['stage_name'] ?? 'III Instar',
       indoorTemp: (json['indoor_temp'] as num?)?.toDouble() ?? 26.2,
       indoorHumidity: (json['indoor_humidity'] as num?)?.toDouble() ?? 74.0,
       outsideTemp: (json['outside_temp'] as num?)?.toDouble() ?? 34.2,
@@ -74,7 +81,9 @@ class ShedData {
       actuators: ActuatorStates.fromJson(json['actuators'] ?? {}),
       isAutoMode: json['is_auto_mode'] ?? true,
       tempTarget: (json['temp_target'] as num?)?.toDouble() ?? 26.0,
-      humidityTarget: (json['humidity_target'] as num?)?.toDouble() ?? 75.0,
+      humidityTarget: (json['humidity_target'] as num?)?.toDouble() ?? 80.0,
+      airflowTarget: (json['airflow_target'] as num?)?.toDouble() ?? 50.0,
+      lightTarget: (json['light_target'] as num?)?.toDouble() ?? 35.0,
       lastUpdated: DateTime.tryParse(json['last_updated'] ?? '') ?? DateTime.now(),
     );
   }
@@ -96,6 +105,8 @@ class ShedData {
     bool? isAutoMode,
     double? tempTarget,
     double? humidityTarget,
+    double? airflowTarget,
+    double? lightTarget,
     DateTime? lastUpdated,
   }) {
     return ShedData(
@@ -115,6 +126,8 @@ class ShedData {
       isAutoMode: isAutoMode ?? this.isAutoMode,
       tempTarget: tempTarget ?? this.tempTarget,
       humidityTarget: humidityTarget ?? this.humidityTarget,
+      airflowTarget: airflowTarget ?? this.airflowTarget,
+      lightTarget: lightTarget ?? this.lightTarget,
       lastUpdated: lastUpdated ?? this.lastUpdated,
     );
   }

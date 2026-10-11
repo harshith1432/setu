@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "751761886912",
+    "project_id": "setu-96d33",
+    "storage_bucket": "setu-96d33.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:751761886912:android:2cb1c5c9279d434f442725",
+        "android_client_info": {
+          "package_name": "com.example.setu"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "751761886912-hdp60cus4mk80m1ahvgm7mcc42b4r931.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_iQ74SbvwMsgJXvtgftL_143DCEy-_fE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "751761886912-hdp60cus4mk80m1ahvgm7mcc42b4r931.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,7 +1,7 @@
 # Setu — Smart IoT Sericulture Environment Management & Control System
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B.svg)](https://flutter.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-336791.svg)](https://www.postgresql.org/)
@@ -127,63 +127,70 @@ setu/
 
 ### 1. Prerequisites
 
-- **Python**: 3.10+ (Recommended: Python 3.11 or 3.13)
-- **PostgreSQL**: 14+ (or cloud-hosted PostgreSQL instance)
-- **Flutter SDK**: 3.x+ (for mobile app development)
+- **Python**: 3.12+ (`uv` uses the root `pyproject.toml`)
+- **PostgreSQL**: 14+ or 15+
+- **Flutter SDK**: 3.x+
 - **Git**
+- **uv**: recommended for backend dependency and test commands
 
 ---
 
 ### 2. Backend Setup
 
-1. **Navigate to the backend directory**:
+`PostgreSQL` is the right choice for this codebase today. The backend is wired directly to `psycopg2` and PostgreSQL SQL semantics, so SQLite would require a real refactor instead of a config change.
+
+1. **Install and start PostgreSQL locally (Ubuntu/Debian)**:
    ```bash
-   cd backend
+   sudo apt update
+   sudo apt install -y postgresql postgresql-contrib
+   sudo systemctl enable --now postgresql
    ```
 
-2. **Create and activate a virtual environment**:
+2. **Create the local Setu database and user**:
    ```bash
-   # On Windows
-   python -m venv venv
-   venv\Scripts\activate
-
-   # On Linux/macOS
-   python3 -m venv venv
-   source venv/bin/activate
+   sudo -u postgres psql
+   ```
+   Then run:
+   ```sql
+   CREATE USER setu_user WITH PASSWORD 'setu_password';
+   CREATE DATABASE setu OWNER setu_user;
+   GRANT ALL PRIVILEGES ON DATABASE setu TO setu_user;
+   \q
    ```
 
-3. **Install dependencies**:
+3. **Install Python dependencies with `uv` from the repo root**:
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
-4. **Configure Environment Variables**:
-   Copy `.env.example` to `.env` and update the parameters:
+4. **Configure environment variables**:
+   A local `.env` file can live either at the repo root or inside `backend/`. Use:
    ```bash
    cp .env.example .env
+   cp backend/.env.example backend/.env
    ```
-   Example `.env` configuration:
+   The default local development values are:
    ```env
-   PROJECT_NAME="Setu IoT Backend"
+   PROJECT_NAME="Setu"
    API_V1_STR="/api/v1"
-   SETU_SECRET_KEY="your-secret-key-change-this-in-production"
-   DATABASE_URL="postgresql://postgres:password@localhost:5432/setu"
+   SETU_SECRET_KEY="setu-local-dev-secret-change-me"
+   DATABASE_URL="postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
    DEFAULT_REGION="Global Sericulture Network"
    DEFAULT_LATITUDE=0.0
    DEFAULT_LONGITUDE=0.0
    ```
 
-5. **Start the API Server**:
+5. **Start the API server**:
    ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   uv run uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000 --reload
    ```
    - **Interactive API Docs (Swagger UI)**: [http://localhost:8000/docs](http://localhost:8000/docs)
    - **Alternative Docs (ReDoc)**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
    - **Super Admin Portal**: [http://localhost:8000/admin](http://localhost:8000/admin)
 
-6. **Run the Automated Test Suite**:
+6. **Run the automated test suite**:
    ```bash
-   pytest tests -v
+   uv run pytest backend/tests -v
    ```
 
 ---
@@ -225,6 +232,24 @@ Then visit [http://localhost:3000](http://localhost:3000).
    ```bash
    flutter run
    ```
+
+4. **Build an installable Android APK**:
+   ```bash
+   flutter build apk --release
+   ```
+   The generated APK will be at:
+   ```bash
+   mobile/build/app/outputs/flutter-apk/app-release.apk
+   ```
+   For a quick test build, use:
+   ```bash
+   flutter build apk --debug
+   ```
+
+5. **If you run the app on a physical Android phone**:
+   - Keep the backend running on your computer.
+   - Connect both phone and computer to the same Wi-Fi network.
+   - In the app settings, set the backend host to your computer's LAN IP, for example `192.168.1.25:8000`.
 
 ---
 

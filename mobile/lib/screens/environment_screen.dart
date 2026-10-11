@@ -22,6 +22,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
     final provider = Provider.of<SetuProvider>(context);
     final shed = provider.shedData;
     final l10n = AppLocalizations.of(context);
+    final stage = provider.currentStageInfo;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -110,7 +111,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
           VisualComfortChart(
             title: l10n.translate('temperature'),
             currentVal: '${shed.indoorTemp}°C',
-            idealZoneText: 'Ideal Zone (24°–27°)',
+            idealZoneText: 'Ideal Zone (${stage.tempMin.toStringAsFixed(0)}C-${stage.tempMax.toStringAsFixed(0)}C)',
             topLabel: l10n.translate('tooHot'),
             midLabel: l10n.translate('ideal'),
             bottomLabel: l10n.translate('tooCool'),
@@ -123,7 +124,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
           VisualComfortChart(
             title: l10n.translate('humidity'),
             currentVal: '${shed.indoorHumidity.toInt()}%',
-            idealZoneText: 'Ideal Zone (70%–80%)',
+            idealZoneText: 'Ideal Zone (${stage.humMin.toInt()}%-${stage.humMax.toInt()}%)',
             topLabel: l10n.translate('tooHigh'),
             midLabel: l10n.translate('ideal'),
             bottomLabel: l10n.translate('tooLow'),
@@ -185,8 +186,10 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
                       _buildMetricCell('Indoor Humidity', '${shed.indoorHumidity.toInt()} %'),
                       _buildMetricCell('Outside Temp (Live)', '${shed.outsideTemp} °C'),
                       _buildMetricCell('Outside Humidity (Live)', '${shed.outsideHumidity.toInt()} %'),
+                      _buildMetricCell('Air Quantity Target', '${provider.airflowSetPoint} %'),
+                      _buildMetricCell('Light Target', '${provider.lightSetPoint} %'),
                       _buildMetricCell('Device Node', 'ESP32 Online', isGreen: true),
-                      _buildMetricCell('Cooling Relay', shed.actuators.cooler ? 'Active (Fogger)' : 'Standby', isGreen: shed.actuators.cooler),
+                      _buildMetricCell('Lighting Relay', shed.actuators.light ? 'ON' : 'OFF', isGreen: shed.actuators.light),
                     ],
                   ),
                 ],
@@ -217,7 +220,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'Adjust setpoints or relays',
+                        'Adjust temp, humidity, air, or light controls',
                         style: TextStyle(fontSize: 10, color: Color(0xFF795548)),
                         overflow: TextOverflow.ellipsis,
                       ),
