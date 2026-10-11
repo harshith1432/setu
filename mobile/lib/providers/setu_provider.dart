@@ -1,5 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shed_data.dart';
 import '../models/growth_stage.dart';
@@ -11,6 +15,7 @@ import '../services/location_weather_service.dart';
 class SetuProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LocationWeatherService _weatherService = LocationWeatherService();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
 
   LiveWeatherData? _liveWeather;
   bool _isLoadingWeather = false;
@@ -29,8 +34,10 @@ class SetuProvider with ChangeNotifier {
   // Session & Auth state
   bool _isLoggedIn = false;
   bool _isInitialized = false;
+  bool _hasCompletedOnboarding = false;
   String? _authToken;
   String _backendHost = '127.0.0.1:8000';
+  String? _phoneVerificationId;
 
   // User Profile Data
   String _userId = 'usr_001';
@@ -101,6 +108,9 @@ class SetuProvider with ChangeNotifier {
 
   bool get isLoggedIn => _isLoggedIn;
   bool get isInitialized => _isInitialized;
+  bool get hasCompletedOnboarding => _hasCompletedOnboarding;
+  bool get isFirebaseReady => Firebase.apps.isNotEmpty;
+  FirebaseAuth? get _firebaseAuthSafe => isFirebaseReady ? FirebaseAuth.instance : null;
   String? get authToken => _authToken;
   String get backendHost => _backendHost;
 
@@ -127,6 +137,7 @@ class SetuProvider with ChangeNotifier {
   Future<void> _loadSessionFromPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      _hasCompletedOnboarding = prefs.getBool('onboarding_completed') ?? false;
       _isLoggedIn = prefs.getBool('is_logged_in') ?? false;
       _authToken = prefs.getString('auth_token');
       if (_authToken != null) {
@@ -156,6 +167,11 @@ class SetuProvider with ChangeNotifier {
       final lang = prefs.getString('preferred_language') ?? 'en';
       _locale = Locale(lang);
 
+      final firebaseAuth = _firebaseAuthSafe;
+      if (firebaseAuth?.currentUser != null) {
+        await _applyFirebaseUser(firebaseAuth!.currentUser!);
+      }
+
       if (_isLoggedIn && _authToken != null) {
         _apiService.getMe().then((me) {
           if (me != null) {
@@ -178,6 +194,191 @@ class SetuProvider with ChangeNotifier {
       notifyListeners();
       // Fetch live real-time ambient weather for the saved location
       refreshLiveWeather();
+    }
+  }
+
+  Future<void> completeOnboarding() async {
+    _hasCompletedOnboarding = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_completed', true);
+    notifyListeners();
+  }
+
+  String _firebaseMessage(Object error) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'invalid-phone-number':
+          return 'Enter a valid phone number with country code.';
+        case 'invalid-verification-code':
+          return 'The OTP you entered is invalid.';
+        case 'too-many-requests':
+          return 'Too many attempts. Please try again later.';
+        case 'network-request-failed':
+          return 'Network error while contacting Firebase.';
+        case 'captcha-check-failed':
+          return 'App verification failed. Reopen the app and try again.';
+      }
+      return error.message ?? 'Firebase authentication failed.';
+    }
+    return error.toString();
+  }
+
+  Future<void> _applyFirebaseUser(
+    User user, {
+    String? preferredName,
+    String? preferredPhone,
+  }) async {
+    final token = await user.getIdToken().catchError((_) => null) ?? 'firebase_${user.uid}';
+    _isLoggedIn = true;
+    _authToken = token;
+    _apiService.setToken(_authToken);
+    _userId = user.uid;
+    _username = user.email?.trim().isNotEmpty == true
+        ? user.email!
+        : (preferredPhone?.trim().isNotEmpty == true ? preferredPhone!.trim() : user.phoneNumber ?? _username);
+    _userName = preferredName?.trim().isNotEmpty == true
+        ? preferredName!.trim()
+        : (user.displayName?.trim().isNotEmpty == true ? user.displayName!.trim() : _userName);
+    _userPhone = preferredPhone?.trim().isNotEmpty == true
+        ? preferredPhone!.trim()
+        : (user.phoneNumber?.trim().isNotEmpty == true ? user.phoneNumber!.trim() : _userPhone);
+
+    await _saveSessionToPreferences(token: _authToken!, userMap: {
+      'id': _userId,
+      'username': _username,
+      'full_name': _userName,
+      'phone': _userPhone,
+      'farm_name': _farmName,
+      'region': _region,
+      'batch_id': _batchId,
+      'dfl_capacity': _dflCapacity,
+      'breed': _breed,
+      'preferred_language': _locale.languageCode,
+    });
+  }
+
+  Future<({bool success, String message, bool codeSent})> startPhoneAuthentication(String phoneNumber) async {
+    if (!isFirebaseReady) {
+      return (
+        success: false,
+        message: 'Firebase is not configured yet. Add google-services.json under mobile/android/app and rebuild.',
+        codeSent: false,
+      );
+    }
+
+    final cleanPhone = phoneNumber.trim();
+    if (cleanPhone.isEmpty) {
+      return (success: false, message: 'Enter your phone number first.', codeSent: false);
+    }
+
+    final completer = Completer<({bool success, String message, bool codeSent})>();
+
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth == null) {
+      return (
+        success: false,
+        message: 'Firebase is not configured for this platform.',
+        codeSent: false,
+      );
+    }
+
+    await firebaseAuth.verifyPhoneNumber(
+      phoneNumber: cleanPhone,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (credential) async {
+        final result = await signInWithPhoneCode(code: null, preferredPhone: cleanPhone, credential: credential);
+        if (!completer.isCompleted) {
+          completer.complete((success: result.success, message: result.message, codeSent: false));
+        }
+      },
+      verificationFailed: (e) {
+        if (!completer.isCompleted) {
+          completer.complete((success: false, message: _firebaseMessage(e), codeSent: false));
+        }
+      },
+      codeSent: (verificationId, resendToken) {
+        _phoneVerificationId = verificationId;
+        if (!completer.isCompleted) {
+          completer.complete((success: true, message: 'Verification code sent to $cleanPhone.', codeSent: true));
+        }
+      },
+      codeAutoRetrievalTimeout: (verificationId) {
+        _phoneVerificationId = verificationId;
+      },
+    );
+
+    return completer.future;
+  }
+
+  Future<({bool success, String message})> signInWithPhoneCode({
+    String? code,
+    String? preferredName,
+    String? preferredPhone,
+    PhoneAuthCredential? credential,
+  }) async {
+    if (!isFirebaseReady) {
+      return (success: false, message: 'Firebase is not configured yet.');
+    }
+
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth == null) {
+      return (success: false, message: 'Firebase is not configured for this platform.');
+    }
+
+    try {
+      final authCredential = credential ?? PhoneAuthProvider.credential(
+        verificationId: _phoneVerificationId ?? '',
+        smsCode: code?.trim() ?? '',
+      );
+      final userCredential = await firebaseAuth.signInWithCredential(authCredential);
+      if (userCredential.user == null) {
+        return (success: false, message: 'Phone authentication did not return a user.');
+      }
+      await _applyFirebaseUser(
+        userCredential.user!,
+        preferredName: preferredName,
+        preferredPhone: preferredPhone,
+      );
+      return (success: true, message: 'Phone number verified. Welcome to Setu.');
+    } catch (e) {
+      return (success: false, message: _firebaseMessage(e));
+    }
+  }
+
+  Future<({bool success, String message})> signInWithGoogle() async {
+    if (!isFirebaseReady) {
+      return (
+        success: false,
+        message: 'Firebase is not configured yet. Add google-services.json under mobile/android/app and rebuild.',
+      );
+    }
+
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth == null) {
+      return (success: false, message: 'Firebase is not configured for this platform.');
+    }
+
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return (success: false, message: 'Google sign-in was cancelled.');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await firebaseAuth.signInWithCredential(credential);
+      if (userCredential.user == null) {
+        return (success: false, message: 'Google sign-in did not return a user.');
+      }
+
+      await _applyFirebaseUser(userCredential.user!);
+      return (success: true, message: 'Google sign-in successful.');
+    } catch (e) {
+      return (success: false, message: _firebaseMessage(e));
     }
   }
 
@@ -598,6 +799,11 @@ class SetuProvider with ChangeNotifier {
     _isLoggedIn = false;
     _authToken = null;
     _apiService.setToken(null);
+    final firebaseAuth = _firebaseAuthSafe;
+    if (firebaseAuth != null) {
+      await firebaseAuth.signOut();
+      await _googleSignIn.signOut();
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('is_logged_in');
     await prefs.remove('auth_token');

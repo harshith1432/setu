@@ -15,12 +15,14 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isSignUp = false;
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _isOtpSent = false;
 
   // Controllers
   final _usernameController = TextEditingController(text: 'ramesh_farmer');
   final _passwordController = TextEditingController(text: 'setu2026');
   final _fullNameController = TextEditingController(text: 'Ramesh Gowda');
   final _phoneController = TextEditingController(text: '+91 98450 12345');
+  final _otpController = TextEditingController();
   final _farmNameController = TextEditingController(text: 'Green Valley Sericulture Farm');
   final _batchIdController = TextEditingController(text: 'SERI-2026-M04');
   final _dflController = TextEditingController(text: '200 DFL');
@@ -31,10 +33,93 @@ class _AuthScreenState extends State<AuthScreen> {
     _passwordController.dispose();
     _fullNameController.dispose();
     _phoneController.dispose();
+    _otpController.dispose();
     _farmNameController.dispose();
     _batchIdController.dispose();
     _dflController.dispose();
     super.dispose();
+  }
+
+  Future<void> _startPhoneAuth() async {
+    final provider = Provider.of<SetuProvider>(context, listen: false);
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your phone number with country code.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final result = await provider.startPhoneAuthentication(phone);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+        ),
+      );
+      if (result.success && result.codeSent) {
+        setState(() => _isOtpSent = true);
+      } else if (result.success) {
+        widget.onLoginSuccess();
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _verifyOtp() async {
+    final provider = Provider.of<SetuProvider>(context, listen: false);
+    final code = _otpController.text.trim();
+    if (code.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter the 6-digit OTP.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final result = await provider.signInWithPhoneCode(
+        code: code,
+        preferredName: _fullNameController.text.trim(),
+        preferredPhone: _phoneController.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+        ),
+      );
+      if (result.success) {
+        widget.onLoginSuccess();
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final provider = Provider.of<SetuProvider>(context, listen: false);
+    setState(() => _isLoading = true);
+    try {
+      final result = await provider.signInWithGoogle();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+        ),
+      );
+      if (result.success) {
+        widget.onLoginSuccess();
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -276,6 +361,117 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFC8E6C9)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'Quick mobile sign-in',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              provider.isFirebaseReady
+                                  ? 'Use Google or phone OTP. Once signed in, Setu will keep you logged in on this device.'
+                                  : 'Firebase is not fully configured in this build yet. Add google-services.json to enable Google and phone OTP sign-in.',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF4E5D50)),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              decoration: InputDecoration(
+                                labelText: 'Phone Number',
+                                hintText: '+91 9876543210',
+                                prefixIcon: const Icon(Icons.phone_android_rounded, color: Color(0xFF2E7D32)),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                                ),
+                              ),
+                            ),
+                            if (_isOtpSent) ...[
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _otpController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  labelText: 'Enter OTP',
+                                  prefixIcon: const Icon(Icons.sms_outlined, color: Color(0xFF2E7D32)),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF1B5E20),
+                                      side: const BorderSide(color: Color(0xFF2E7D32)),
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: _isLoading ? null : _startPhoneAuth,
+                                    icon: const Icon(Icons.sms_rounded, size: 18),
+                                    label: Text(_isOtpSent ? 'Resend OTP' : 'Send OTP'),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2E7D32),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    onPressed: _isLoading || !_isOtpSent ? null : _verifyOtp,
+                                    icon: const Icon(Icons.verified_user_outlined, size: 18),
+                                    label: const Text('Verify OTP'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              height: 46,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: const Color(0xFF1C251D),
+                                  elevation: 0,
+                                  side: const BorderSide(color: Color(0xFFE0E7DC)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                onPressed: _isLoading ? null : _signInWithGoogle,
+                                icon: const Icon(Icons.account_circle_outlined),
+                                label: const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w700)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Row(
+                        children: [
+                          Expanded(child: Divider()),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 10),
+                            child: Text('or use local/demo login', style: TextStyle(fontSize: 11, color: Color(0xFF5A695C))),
+                          ),
+                          Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
                       // Username
                       TextField(
                         controller: _usernameController,
@@ -413,6 +609,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             onTap: () {
                               setState(() {
                                 _isSignUp = !_isSignUp;
+                                _isOtpSent = false;
+                                _otpController.clear();
                                 if (_isSignUp) {
                                   // Clear demo defaults when entering Sign Up mode
                                   if (_usernameController.text == 'ramesh_farmer') _usernameController.clear();

@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -15,8 +16,13 @@ import 'widgets/advanced_mode_modal.dart';
 import 'widgets/system_settings_modal.dart';
 import 'widgets/user_profile_modal.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {
+    // Allow local/offline mode even when Firebase config is not present yet.
+  }
   runApp(
     MultiProvider(
       providers: [
@@ -85,7 +91,6 @@ class AppRootFlow extends StatefulWidget {
 
 class _AppRootFlowState extends State<AppRootFlow> {
   bool _showSplash = true;
-  bool _hasCompletedOnboarding = false;
 
   @override
   Widget build(BuildContext context) {
@@ -111,13 +116,9 @@ class _AppRootFlowState extends State<AppRootFlow> {
       );
     }
 
-    if (!_hasCompletedOnboarding) {
+    if (!provider.hasCompletedOnboarding) {
       return OnboardingScreen(
-        onProceed: () {
-          setState(() {
-            _hasCompletedOnboarding = true;
-          });
-        },
+        onProceed: provider.completeOnboarding,
       );
     }
 
