@@ -5,7 +5,7 @@ import 'providers/setu_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth_screen.dart';
-import 'screens/starting_page_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/ai_guidance_screen.dart';
 import 'screens/environment_screen.dart';
@@ -85,7 +85,7 @@ class AppRootFlow extends StatefulWidget {
 
 class _AppRootFlowState extends State<AppRootFlow> {
   bool _showSplash = true;
-  bool _hasPassedStartingPage = false;
+  bool _hasCompletedOnboarding = false;
 
   @override
   Widget build(BuildContext context) {
@@ -111,20 +111,20 @@ class _AppRootFlowState extends State<AppRootFlow> {
       );
     }
 
-    // If user is not logged in, prompt Login / Sign Up
-    if (!provider.isLoggedIn) {
-      return AuthScreen(
-        onLoginSuccess: () {
+    if (!_hasCompletedOnboarding) {
+      return OnboardingScreen(
+        onProceed: () {
           setState(() {
-            _hasPassedStartingPage = true;
+            _hasCompletedOnboarding = true;
           });
         },
       );
     }
 
-    if (!_hasPassedStartingPage) {
-      return StartingPageScreen(
-        onStart: () => setState(() => _hasPassedStartingPage = true),
+    // If user is not logged in, prompt Login / Sign Up
+    if (!provider.isLoggedIn) {
+      return AuthScreen(
+        onLoginSuccess: () => setState(() {}),
       );
     }
 

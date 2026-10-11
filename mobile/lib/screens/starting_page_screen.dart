@@ -217,7 +217,7 @@ class StartingPageScreen extends StatelessWidget {
                         Container(width: 1, height: 32, color: const Color(0xFFE0E7DC)),
                         Expanded(child: _buildQuickMetric('Humidity', '${provider.shedData.indoorHumidity.toInt()}%', 'Balanced')),
                         Container(width: 1, height: 32, color: const Color(0xFFE0E7DC)),
-                        Expanded(child: _buildQuickMetric('Stage', '3rd Instar', 'Targets Met')),
+                        Expanded(child: _buildQuickMetric('Stage', provider.currentStageInfo.name, 'Targets Met')),
                       ],
                     ),
                   ],

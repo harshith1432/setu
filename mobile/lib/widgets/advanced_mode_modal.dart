@@ -12,6 +12,7 @@ class AdvancedModeModal extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final isAuto = provider.isAutoMode;
     final actuators = provider.shedData.actuators;
+    final preset = provider.currentStageInfo;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -19,10 +20,11 @@ class AdvancedModeModal extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           // Drag handle
           Center(
             child: Container(
@@ -41,7 +43,7 @@ class AdvancedModeModal extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Advanced Mode (Manual Control)',
+                'Simple and Advanced Controls',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
               ),
               IconButton(
@@ -52,7 +54,7 @@ class AdvancedModeModal extends StatelessWidget {
           ),
           const SizedBox(height: 12),
 
-          // Auto Mode vs Manual Mode switch
+          // Simple Mode vs Advanced Mode switch
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -72,7 +74,7 @@ class AdvancedModeModal extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          'Auto Mode',
+                          'Simple Mode',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -94,7 +96,7 @@ class AdvancedModeModal extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          'Manual Mode',
+                          'Advanced Mode',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -109,6 +111,43 @@ class AdvancedModeModal extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+
+          if (isAuto) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Simple mode preset: ${preset.name}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Farmers get stage-wise defaults from the lifecycle chart for temperature, humidity, air quantity, and light.',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF4E5D50)),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildPresetBadge('Temp', '${provider.tempSetPoint.toStringAsFixed(1)} C'),
+                      _buildPresetBadge('Humidity', '${provider.humSetPoint.toInt()}%'),
+                      _buildPresetBadge('Air', '${provider.airflowSetPoint}%'),
+                      _buildPresetBadge('Light', '${provider.lightSetPoint}%'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // Temperature Set Point Stepper
           Row(
@@ -170,6 +209,64 @@ class AdvancedModeModal extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Air Quantity (%)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  Text('Ventilation and fresh air flow target', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildStepBtn('-', () => provider.adjustAirflowSetPoint(-5)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${provider.airflowSetPoint}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStepBtn('+', () => provider.adjustAirflowSetPoint(5)),
+                ],
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Light Level (%)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  Text('Shed lighting intensity target', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
+                ],
+              ),
+              Row(
+                children: [
+                  _buildStepBtn('-', () => provider.adjustLightSetPoint(-5)),
+                  const SizedBox(width: 8),
+                  Text(
+                    '${provider.lightSetPoint}',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildStepBtn('+', () => provider.adjustLightSetPoint(5)),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
           // Manual Relays Overrides with Safety Interlock
           Opacity(
             opacity: isAuto ? 0.5 : 1.0,
@@ -194,6 +291,8 @@ class AdvancedModeModal extends StatelessWidget {
                       _buildRelayBtn('🌀 Fan', actuators.fan, () => provider.toggleActuator('fan')),
                       const SizedBox(width: 6),
                       _buildRelayBtn('🔥 Heater', actuators.heater, () => provider.toggleActuator('heater')),
+                      const SizedBox(width: 6),
+                      _buildRelayBtn('💡 Light', actuators.light, () => provider.toggleActuator('light')),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -221,6 +320,27 @@ class AdvancedModeModal extends StatelessWidget {
           ),
           const SizedBox(height: 10),
         ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPresetBadge(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFC8E6C9)),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(fontSize: 11, color: Color(0xFF1C251D)),
+          children: [
+            TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+            TextSpan(text: value, style: const TextStyle(fontWeight: FontWeight.w800)),
+          ],
+        ),
       ),
     );
   }

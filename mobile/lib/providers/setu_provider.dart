@@ -18,17 +18,19 @@ class SetuProvider with ChangeNotifier {
 
   Locale _locale = const Locale('en');
   int _currentBottomNavIndex = 0;
-  int _currentGrowthStage = 3;
+  int _currentGrowthStage = 4;
   bool _isAdvancedMode = false;
   bool _isAutoMode = true;
   double _tempSetPoint = 26.0;
-  double _humSetPoint = 75.0;
+  double _humSetPoint = 80.0;
+  int _airflowSetPoint = 50;
+  int _lightSetPoint = 35;
 
   // Session & Auth state
   bool _isLoggedIn = false;
   bool _isInitialized = false;
   String? _authToken;
-  String _backendHost = '10.38.239.10:8000';
+  String _backendHost = '127.0.0.1:8000';
 
   // User Profile Data
   String _userId = 'usr_001';
@@ -52,23 +54,25 @@ class SetuProvider with ChangeNotifier {
     overallStatus: 'IDEAL',
     statusHeadline: 'Ideal for Silkworms',
     statusSubline: 'Everything is comfortable inside the shed. No action required.',
-    currentStage: 3,
-    stageName: '3rd Instar',
+    currentStage: 4,
+    stageName: 'III Instar',
     indoorTemp: 26.2,
-    indoorHumidity: 74.0,
+    indoorHumidity: 80.0,
     outsideTemp: 34.2,
     outsideHumidity: 58.0,
-    actuators: ActuatorStates(cooler: true, fan: false, heater: false),
+    actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true),
     isAutoMode: true,
     tempTarget: 26.0,
-    humidityTarget: 75.0,
+    humidityTarget: 80.0,
+    airflowTarget: 50.0,
+    lightTarget: 35.0,
     lastUpdated: DateTime.now(),
   );
 
   AIAdvice _aiAdvice = AIAdvice(
     whyText: 'Outside temperature is high (34.2°C) today, so cooling is activated to keep the shed comfortable for silkworms.',
     currentAction: 'Cooling is ON',
-    targetDescription: 'To maintain a suitable temperature of 25.0°C–26.5°C for 3rd instar silkworms.',
+    targetDescription: 'To maintain stable temperature, humidity, airflow, and light for III instar silkworms.',
     bulletPoints: [
       'Outside temperature is high and heat permeates through the shed roof.',
       'Silkworms can get stressed and lose appetite in high heat (>28°C).',
@@ -89,6 +93,8 @@ class SetuProvider with ChangeNotifier {
   bool get isAutoMode => _isAutoMode;
   double get tempSetPoint => _tempSetPoint;
   double get humSetPoint => _humSetPoint;
+  int get airflowSetPoint => _airflowSetPoint;
+  int get lightSetPoint => _lightSetPoint;
   ShedData get shedData => _shedData;
   AIAdvice get aiAdvice => _aiAdvice;
   GrowthStageModel get currentStageInfo => GrowthStageModel.allStages[_currentGrowthStage - 1];
@@ -128,10 +134,10 @@ class SetuProvider with ChangeNotifier {
       }
 
       final savedHost = prefs.getString('backend_host');
-      if (savedHost != null && savedHost != '192.168.0.116:8000') {
+      if (savedHost != null && savedHost.trim().isNotEmpty) {
         _backendHost = savedHost;
       } else {
-        _backendHost = '10.38.239.10:8000';
+        _backendHost = '127.0.0.1:8000';
       }
       _apiService.setCustomHost(_backendHost);
       
@@ -661,8 +667,47 @@ class SetuProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  void _syncTargetsIntoShedData({
+    bool? isAutoMode,
+    ActuatorStates? actuators,
+  }) {
+    _shedData = _shedData.copyWith(
+      currentStage: _currentGrowthStage,
+      stageName: currentStageInfo.name,
+      actuators: actuators ?? _shedData.actuators,
+      isAutoMode: isAutoMode ?? _shedData.isAutoMode,
+      tempTarget: _tempSetPoint,
+      humidityTarget: _humSetPoint,
+      airflowTarget: _airflowSetPoint.toDouble(),
+      lightTarget: _lightSetPoint.toDouble(),
+      lastUpdated: DateTime.now(),
+    );
+  }
+
+  void _applySimpleStagePreset() {
+    final preset = currentStageInfo;
+    _tempSetPoint = preset.tempTarget;
+    _humSetPoint = preset.humidityTarget;
+    _airflowSetPoint = preset.airflowPercent;
+    _lightSetPoint = preset.lightPercent;
+    _syncTargetsIntoShedData(
+      isAutoMode: true,
+      actuators: ActuatorStates(
+        cooler: _shedData.actuators.cooler,
+        fan: preset.airflowPercent >= 50,
+        heater: _shedData.actuators.heater,
+        light: preset.lightPercent >= 20,
+      ),
+    );
+  }
+
   void setAutoMode(bool auto) {
     _isAutoMode = auto;
+    if (auto) {
+      _applySimpleStagePreset();
+    } else {
+      _syncTargetsIntoShedData(isAutoMode: false);
+    }
     _apiService.updateSetpoints(_shedData.shedId, auto, _tempSetPoint, _humSetPoint);
     notifyListeners();
   }
@@ -670,19 +715,38 @@ class SetuProvider with ChangeNotifier {
   void adjustTempSetPoint(double delta) {
     _tempSetPoint = (_tempSetPoint + delta).clamp(18.0, 35.0);
     _tempSetPoint = double.parse(_tempSetPoint.toStringAsFixed(1));
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
     notifyListeners();
   }
 
   void adjustHumSetPoint(double delta) {
     _humSetPoint = (_humSetPoint + delta).clamp(40.0, 95.0);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
     notifyListeners();
   }
 
+  void adjustAirflowSetPoint(int delta) {
+    _airflowSetPoint = (_airflowSetPoint + delta).clamp(10, 100);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    notifyListeners();
+  }
+
+  void adjustLightSetPoint(int delta) {
+    _lightSetPoint = (_lightSetPoint + delta).clamp(0, 100);
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    notifyListeners();
+  }
+
   void setGrowthStage(int stage) {
-    if (stage >= 1 && stage <= 5) {
+    if (stage >= 1 && stage <= GrowthStageModel.allStages.length) {
       _currentGrowthStage = stage;
+      if (_isAutoMode) {
+        _applySimpleStagePreset();
+      } else {
+        _syncTargetsIntoShedData(isAutoMode: false);
+      }
       notifyListeners();
     }
   }
@@ -693,6 +757,7 @@ class SetuProvider with ChangeNotifier {
     bool nextCooler = _shedData.actuators.cooler;
     bool nextFan = _shedData.actuators.fan;
     bool nextHeater = _shedData.actuators.heater;
+    bool nextLight = _shedData.actuators.light;
 
     if (actuator == 'cooler') {
       nextCooler = !nextCooler;
@@ -702,29 +767,23 @@ class SetuProvider with ChangeNotifier {
       if (nextHeater) nextCooler = false;
     } else if (actuator == 'fan') {
       nextFan = !nextFan;
+    } else if (actuator == 'light') {
+      nextLight = !nextLight;
     }
 
-    _shedData = ShedData(
-      shedId: _shedData.shedId,
-      farmName: _shedData.farmName,
-      region: _shedData.region,
-      overallStatus: _shedData.overallStatus,
-      statusHeadline: _shedData.statusHeadline,
-      statusSubline: _shedData.statusSubline,
-      currentStage: _shedData.currentStage,
-      stageName: _shedData.stageName,
-      indoorTemp: _shedData.indoorTemp,
-      indoorHumidity: _shedData.indoorHumidity,
-      outsideTemp: _shedData.outsideTemp,
-      outsideHumidity: _shedData.outsideHumidity,
-      actuators: ActuatorStates(cooler: nextCooler, fan: nextFan, heater: nextHeater),
+    _syncTargetsIntoShedData(
       isAutoMode: false,
-      tempTarget: _tempSetPoint,
-      humidityTarget: _humSetPoint,
-      lastUpdated: DateTime.now(),
+      actuators: ActuatorStates(cooler: nextCooler, fan: nextFan, heater: nextHeater, light: nextLight),
     );
 
-    _apiService.manualActuatorOverride(_shedData.shedId, actuator, actuator == 'cooler' ? nextCooler : (actuator == 'heater' ? nextHeater : nextFan));
+    final nextState = actuator == 'cooler'
+        ? nextCooler
+        : actuator == 'heater'
+            ? nextHeater
+            : actuator == 'light'
+                ? nextLight
+                : nextFan;
+    _apiService.manualActuatorOverride(_shedData.shedId, actuator, nextState);
     notifyListeners();
   }
 

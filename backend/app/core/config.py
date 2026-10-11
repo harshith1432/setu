@@ -20,16 +20,16 @@ except ImportError:
     pass
 
 class Settings(BaseModel):
-    PROJECT_NAME: str = os.getenv("PROJECT_NAME", "Setu IoT Backend")
+    PROJECT_NAME: str = os.getenv("PROJECT_NAME", "Setu")
     API_V1_STR: str = os.getenv("API_V1_STR", "/api/v1")
     SECRET_KEY: str = os.getenv("SETU_SECRET_KEY", "setu-secret-key-production-safety-2026")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days for farmers
     
-    # Database configuration (PostgreSQL)
+    # Database configuration (PostgreSQL only in the current backend)
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@127.0.0.1:5432/setu"
+        "postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
     )
 
     # Regional defaults (Global Worldwide Dynamic Geocoding)

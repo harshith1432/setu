@@ -4,16 +4,12 @@ import '../models/shed_data.dart';
 import '../models/ai_advice.dart';
 
 class ApiService {
-  // Candidate hosts tried in order:
-  // 1. Current PC Wi-Fi IP (10.38.239.10:8000) for real mobile phone connection
-  // 2. Android emulator host (10.0.2.2:8000)
-  // 3. Localhost (127.0.0.1:8000) for desktop/browser
-  // 4. Previous Wi-Fi IP fallback (192.168.0.116:8000)
+  // Candidate hosts tried in order for local development.
+  // Use the settings modal to enter your computer's LAN IP when testing on a physical phone.
   static const List<String> defaultCandidates = [
-    'http://10.38.239.10:8000/api/v1',
     'http://10.0.2.2:8000/api/v1',
     'http://127.0.0.1:8000/api/v1',
-    'http://192.168.0.116:8000/api/v1',
+    'http://localhost:8000/api/v1',
   ];
 
   String? _customHost;
@@ -191,16 +187,18 @@ class ApiService {
       overallStatus: 'IDEAL',
       statusHeadline: 'Ideal for Silkworms',
       statusSubline: 'Everything is comfortable inside the shed. No action required.',
-      currentStage: 3,
-      stageName: '3rd Instar',
+      currentStage: 4,
+      stageName: 'III Instar',
       indoorTemp: 26.2,
-      indoorHumidity: 74.0,
+      indoorHumidity: 80.0,
       outsideTemp: 28.5,
       outsideHumidity: 55.0,
-      actuators: ActuatorStates(cooler: true, fan: false, heater: false),
+      actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true),
       isAutoMode: true,
       tempTarget: 26.0,
-      humidityTarget: 75.0,
+      humidityTarget: 80.0,
+      airflowTarget: 50.0,
+      lightTarget: 35.0,
       lastUpdated: DateTime.now(),
     );
   }
@@ -219,7 +217,7 @@ class ApiService {
     return AIAdvice(
       whyText: 'Outside temperature is high (34.2°C) today, so cooling is activated to keep the shed comfortable for silkworms.',
       currentAction: 'Cooling is ON',
-      targetDescription: 'To maintain a suitable temperature of 25.0°C–26.5°C for 3rd instar silkworms.',
+      targetDescription: 'To maintain suitable temperature, humidity, airflow, and light for the current lifecycle phase.',
       bulletPoints: [
         'Outside temperature is high and heat permeates through the shed roof.',
         'Silkworms can get stressed and lose appetite in high heat (>28°C).',

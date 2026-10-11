@@ -29,3 +29,19 @@ cd mobile
 flutter pub get
 flutter run
 ```
+
+If the backend is running on the same machine:
+- Android emulator: the app will try `10.0.2.2:8000` automatically.
+- Desktop/web: the app will try `127.0.0.1:8000` automatically.
+- Physical Android phone: open the in-app settings and enter your computer's LAN IP, for example `192.168.1.25:8000`.
+
+## Build APK:
+```bash
+cd mobile
+flutter build apk --release
+```
+
+Release APK output:
+```bash
+build/app/outputs/flutter-apk/app-release.apk
+```
