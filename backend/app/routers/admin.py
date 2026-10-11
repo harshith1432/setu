@@ -93,13 +93,20 @@ def emergency_system_control(payload: EmergencyBypassPayload, admin_user: dict =
         telemetry_service.manual_override_actuator(shed_id, "cooler", False)
         telemetry_service.manual_override_actuator(shed_id, "heater", False)
         telemetry_service.manual_override_actuator(shed_id, "fan", False)
+        telemetry_service.manual_override_actuator(shed_id, "light", False, value=0)
         details = "Emergency shutdown of all actuators executed."
     elif payload.action == "FOGGER_BOOST":
         telemetry_service.manual_override_actuator(shed_id, "cooler", True)
         details = "Emergency fogger boost activated to drop temperature."
-    elif payload.action == "EMERGENCY_VENTILATE":
+    elif payload.action in ("EMERGENCY_VENTILATE", "EMERGENCY_VENTILATE_AIR"):
         telemetry_service.manual_override_actuator(shed_id, "fan", True)
-        details = "Exhaust ventilation fans engaged at 100% capacity."
+        details = "Exhaust ventilation fans engaged at 100% capacity for rapid air quality evacuation."
+    elif payload.action == "EMERGENCY_LIGHTS_OFF":
+        telemetry_service.manual_override_actuator(shed_id, "light", False, value=0)
+        details = "All photoperiod lamps switched OFF (0% PWM) for resting darkness."
+    elif payload.action == "EMERGENCY_DAY_LIGHT":
+        telemetry_service.manual_override_actuator(shed_id, "light", True, value=40)
+        details = "Photoperiod lamps engaged at 40% PWM for daytime feeding inspection."
     else:
         raise HTTPException(status_code=400, detail="Invalid emergency command")
         

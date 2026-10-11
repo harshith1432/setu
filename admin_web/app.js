@@ -20,13 +20,30 @@ let liveTelemetry = null;
 let enrolledFarmers = [];
 let auditLogs = [];
 let autoRefreshTimer = null;
+let lockoutCountdownTimer = null;
 let tempChart = null;
 let humidityChart = null;
+let airQualityChart = null;
+let lightChart = null;
+let isPwmSliding = false;
+
+// Security Policy Configurations
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 30000; // 30s rate-limit cooldown
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30-minute auto-logout
+let lastActivityTime = Date.now();
 
 // Initialize on Document Ready
 document.addEventListener('DOMContentLoaded', () => {
   if (window.lucide) lucide.createIcons();
 
+  // Setup security inactivity tracking
+  setupInactivityMonitor();
+
+  // Setup lockout monitoring
+  setupLockoutMonitor();
+
+  // Verify authentication with zero UI flash
   if (adminToken) {
     checkAdminSession();
   } else {
@@ -35,18 +52,110 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================================================
+// ENTERPRISE SECURITY & INACTIVITY MONITORS
+// ==========================================================================
+function setupInactivityMonitor() {
+  const resetTimer = () => { lastActivityTime = Date.now(); };
+  ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, resetTimer, { passive: true });
+  });
+
+  setInterval(() => {
+    if (adminToken && document.getElementById('dashboardView') && !document.getElementById('dashboardView').classList.contains('hidden')) {
+      if (Date.now() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
+        console.warn('Session expired due to 30 minutes of inactivity.');
+        handleLogout('Session expired due to 30 minutes of administrative inactivity.');
+      }
+    }
+  }, 15000);
+}
+
+function checkBruteForceLockout() {
+  const lockoutUntil = parseInt(localStorage.getItem('setu_admin_lockout_until') || '0', 10);
+  const banner = document.getElementById('lockoutBanner');
+  const timerText = document.getElementById('lockoutTimerText');
+  const loginBtn = document.getElementById('loginBtn');
+  const userInput = document.getElementById('username');
+  const passInput = document.getElementById('password');
+
+  if (Date.now() < lockoutUntil) {
+    const remainingSec = Math.ceil((lockoutUntil - Date.now()) / 1000);
+    if (banner) banner.classList.remove('hidden');
+    if (timerText) timerText.textContent = `Security lockout active: Too many failed attempts. Try again in ${remainingSec}s.`;
+    if (loginBtn) loginBtn.disabled = true;
+    if (userInput) userInput.disabled = true;
+    if (passInput) passInput.disabled = true;
+    return true;
+  } else {
+    if (banner) banner.classList.add('hidden');
+    if (loginBtn) loginBtn.disabled = false;
+    if (userInput) userInput.disabled = false;
+    if (passInput) passInput.disabled = false;
+    localStorage.removeItem('setu_admin_lockout_until');
+    return false;
+  }
+}
+
+function setupLockoutMonitor() {
+  checkBruteForceLockout();
+  if (lockoutCountdownTimer) clearInterval(lockoutCountdownTimer);
+  lockoutCountdownTimer = setInterval(() => {
+    checkBruteForceLockout();
+  }, 1000);
+}
+
+// Centralized Authenticated Request Interceptor
+async function authenticatedFetch(endpoint, options = {}) {
+  const headers = options.headers || {};
+  if (adminToken && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${adminToken}`;
+  }
+  options.headers = headers;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  options.signal = controller.signal;
+
+  try {
+    const response = await fetch(endpoint, options);
+    clearTimeout(timeoutId);
+
+    if (response.status === 401 || response.status === 403) {
+      console.warn('Unauthorized or forbidden API response. Terminating administrative session.');
+      handleLogout('Your session has expired. Please re-authenticate.');
+      throw new Error('Unauthorized');
+    }
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Network request timed out. Please check your connectivity.');
+    }
+    throw err;
+  }
+}
+
+// ==========================================================================
 // VIEW NAVIGATION & TAB CONTROLS
 // ==========================================================================
 function showAuthView() {
+  const gateway = document.getElementById('loadingGateway');
+  if (gateway) gateway.classList.add('hidden');
+
   document.getElementById('authView').classList.remove('hidden');
   document.getElementById('dashboardView').classList.add('hidden');
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  checkBruteForceLockout();
   if (window.lucide) lucide.createIcons();
 }
 
 function showDashboardView() {
+  const gateway = document.getElementById('loadingGateway');
+  if (gateway) gateway.classList.add('hidden');
+
   document.getElementById('authView').classList.add('hidden');
   document.getElementById('dashboardView').classList.remove('hidden');
+  lastActivityTime = Date.now();
   
   // Connect real-time WebSocket stream (falls back to polling timer)
   initTelemetryWebSocket();
@@ -87,6 +196,7 @@ function initTelemetryWebSocket() {
 
 function switchNavTab(tabName) {
   currentTab = tabName;
+  closeSidebar();
   
   // Update sidebar links
   document.querySelectorAll('.app-sidebar .nav-item').forEach(item => {
@@ -140,11 +250,44 @@ function switchNavTab(tabName) {
   if (window.lucide) lucide.createIcons();
 }
 
+function toggleSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  let backdrop = document.getElementById('sidebarBackdrop');
+  if (!backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'sidebarBackdrop';
+    backdrop.className = 'sidebar-backdrop';
+    backdrop.onclick = closeSidebar;
+    document.body.appendChild(backdrop);
+  }
+
+  if (sidebar) {
+    sidebar.classList.toggle('open');
+    if (sidebar.classList.contains('open')) {
+      backdrop.classList.add('active');
+    } else {
+      backdrop.classList.remove('active');
+    }
+  }
+}
+
+function closeSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('active');
+}
+
 // ==========================================================================
 // AUTHENTICATION & SESSION
 // ==========================================================================
 async function handleLogin(event) {
   event.preventDefault();
+
+  if (checkBruteForceLockout()) {
+    return;
+  }
+
   const usernameInput = document.getElementById('username').value.trim();
   const passwordInput = document.getElementById('password').value;
   const errorEl = document.getElementById('loginError');
@@ -163,13 +306,30 @@ async function handleLogin(event) {
 
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.detail || 'Authorization failed. Please check credentials.');
+      // Record failed attempt for rate limiting
+      let attempts = parseInt(localStorage.getItem('setu_admin_login_attempts') || '0', 10) + 1;
+      localStorage.setItem('setu_admin_login_attempts', attempts);
+
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        const lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
+        localStorage.setItem('setu_admin_lockout_until', lockoutUntil);
+        localStorage.setItem('setu_admin_login_attempts', '0');
+        setupLockoutMonitor();
+        throw new Error('Security alert: 5 consecutive failed logins. Portal locked for 30 seconds.');
+      } else {
+        const remainingAttempts = MAX_FAILED_ATTEMPTS - attempts;
+        throw new Error(`${data.detail || 'Authorization failed.'} (${remainingAttempts} attempts remaining before lockout)`);
+      }
     }
 
     const role = (data.user && data.user.role) || data.role;
     if (role !== 'admin' && role !== 'superadmin') {
       throw new Error('Access denied: Account lacks Super Admin command privileges.');
     }
+
+    // Reset rate-limit tracker on valid login
+    localStorage.removeItem('setu_admin_login_attempts');
+    localStorage.removeItem('setu_admin_lockout_until');
 
     adminToken = data.access_token;
     localStorage.setItem('setu_admin_token', adminToken);
@@ -185,8 +345,10 @@ async function handleLogin(event) {
     errorEl.textContent = err.message;
     errorEl.classList.remove('hidden');
   } finally {
-    loginBtn.disabled = false;
-    loginBtn.innerHTML = '<span>Authorize Access</span> <i data-lucide="arrow-right"></i>';
+    if (!checkBruteForceLockout()) {
+      loginBtn.disabled = false;
+      loginBtn.innerHTML = '<span>Authorize Access</span> <i data-lucide="arrow-right"></i>';
+    }
     if (window.lucide) lucide.createIcons();
   }
 }
@@ -209,9 +371,7 @@ function togglePasswordVisibility() {
 
 async function checkAdminSession() {
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/me`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
+    const res = await authenticatedFetch(`${API_BASE_URL}/auth/me`);
     if (!res.ok) throw new Error('Session expired');
     const user = await res.json();
     if (user.role !== 'admin' && user.role !== 'superadmin') {
@@ -224,11 +384,19 @@ async function checkAdminSession() {
   }
 }
 
-function handleLogout() {
+function handleLogout(reason) {
   adminToken = null;
   localStorage.removeItem('setu_admin_token');
   localStorage.removeItem('setu_admin_user');
   showAuthView();
+  if (reason) {
+    const errorEl = document.getElementById('loginError');
+    if (errorEl) {
+      errorEl.textContent = reason;
+      errorEl.classList.remove('hidden');
+    }
+    showToast(reason, 'warning');
+  }
 }
 
 // ==========================================================================
@@ -267,9 +435,7 @@ async function syncLiveTelemetryStream() {
 // 1. Fetch Executive Stats
 async function fetchStats() {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/stats`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/stats`);
     if (!res.ok) return;
     const stats = await res.json();
 
@@ -288,9 +454,7 @@ async function fetchStats() {
 // 2. Fetch Live Telemetry & Historical Readings
 async function fetchLiveTelemetry() {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/telemetry-live?shed_id=${selectedShedId}`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/telemetry-live?shed_id=${selectedShedId}`);
     if (!res.ok) return;
     const data = await res.json();
     liveTelemetry = data;
@@ -313,6 +477,29 @@ async function fetchLiveTelemetry() {
 
     document.getElementById('dialTempTarget').textContent = `Target: ${targets.temp_min}°C – ${targets.temp_max}°C`;
     document.getElementById('dialHumTarget').textContent = `Target: ${targets.hum_min}% – ${targets.hum_max}%`;
+
+    // Overview Air Quality (CO₂) & Light Lux Gauges
+    const aqi = ov.indoor_air_quality !== undefined ? ov.indoor_air_quality : 88;
+    const targetAqi = ov.air_quality_target !== undefined ? ov.air_quality_target : 80;
+    const readingAQ = document.getElementById('readingAirQuality');
+    const targetAQ = document.getElementById('targetAirQuality');
+    if (readingAQ) {
+      readingAQ.textContent = `${aqi.toFixed(0)}%`;
+      readingAQ.style.color = aqi < targetAqi ? 'var(--amber)' : 'var(--green-deep)';
+    }
+    if (targetAQ) {
+      targetAQ.textContent = aqi < targetAqi ? '⚠️ Stale Air (< 80%) • Fan Active' : 'Target: ≥ 80% (Clean Air)';
+    }
+
+    const lux = ov.indoor_light_lux !== undefined ? ov.indoor_light_lux : 22;
+    const readingL = document.getElementById('readingLight');
+    const targetL = document.getElementById('targetLight');
+    if (readingL) {
+      readingL.textContent = `${lux.toFixed(0)} Lux`;
+    }
+    if (targetL) {
+      targetL.textContent = `${ov.photoperiod_mode || 'Day'} • Target: 15–30 Lux`;
+    }
 
     document.getElementById('overviewHeadline').textContent = ov.status_headline || 'Ideal for Silkworms';
     document.getElementById('overviewSubline').textContent = ov.status_subline || 'Microclimate is within biological tolerances.';
@@ -351,6 +538,7 @@ async function fetchLiveTelemetry() {
     updateRelayUI('miniRelayCooler', 'miniStateCooler', ov.actuators.cooler);
     updateRelayUI('miniRelayFan', 'miniStateFan', ov.actuators.fan);
     updateRelayUI('miniRelayHeater', 'miniStateHeater', ov.actuators.heater);
+    updateRelayUI('miniRelayLight', 'miniStateLight', ov.actuators.light);
 
     // Full Telemetry Tab Gauges
     document.getElementById('fullDialIndoorTemp').textContent = `${ov.indoor_temp.toFixed(1)}°C`;
@@ -361,15 +549,12 @@ async function fetchLiveTelemetry() {
     document.getElementById('fullDialOutdoorHum').textContent = `Outside RH: ${ov.outside_humidity.toFixed(0)}%`;
 
     if (document.getElementById('fullDialAirQuality')) {
-      const aqi = ov.indoor_air_quality !== undefined ? ov.indoor_air_quality : 88;
-      const targetAqi = ov.air_quality_target !== undefined ? ov.air_quality_target : 80;
       document.getElementById('fullDialAirQuality').textContent = `${aqi.toFixed(0)}%`;
       document.getElementById('fullDialAirTarget').textContent = aqi < targetAqi ? 'STALE AIR • Fan Engaged' : `Target: ≥ ${targetAqi.toFixed(0)}% (CO₂ < 1%)`;
       document.getElementById('fullDialAirQuality').style.color = aqi < targetAqi ? '#d97706' : 'inherit';
     }
 
     if (document.getElementById('fullDialLightLux')) {
-      const lux = ov.indoor_light_lux !== undefined ? ov.indoor_light_lux : 22;
       document.getElementById('fullDialLightLux').textContent = `${lux.toFixed(0)} Lux`;
       document.getElementById('fullDialLightTarget').textContent = `${ov.photoperiod_mode || 'DAY'} • Research: 15–30 Lux`;
     }
@@ -385,11 +570,18 @@ async function fetchLiveTelemetry() {
         : 'GPIO Pin 25 • Standby (0% PWM)';
     }
 
+    // Sync PWM Dimmer Slider if user is not actively interacting
+    if (!isPwmSliding && ov.actuators.light_brightness !== undefined) {
+      const pwmSlider = document.getElementById('pwmSlider');
+      const pwmValueLabel = document.getElementById('pwmValueLabel');
+      if (pwmSlider) pwmSlider.value = ov.actuators.light_brightness;
+      if (pwmValueLabel) pwmValueLabel.textContent = `${ov.actuators.light_brightness}% PWM`;
+    }
+
     // If on analytics tab, update charts
     if (currentTab === 'analytics') {
       initOrUpdateCharts();
     }
-
 
   } catch (err) {
     console.error('Error fetching live telemetry:', err);
@@ -410,6 +602,48 @@ function updateRelayUI(cardId, tagId, isActive) {
   }
 }
 
+// ==========================================================================
+// PWM PHOTOPERIOD BULB DIMMER CONTROLS
+// ==========================================================================
+function handlePwmInput(val) {
+  isPwmSliding = true;
+  const label = document.getElementById('pwmValueLabel');
+  if (label) label.textContent = `${val}% PWM`;
+}
+
+async function handlePwmChange(val) {
+  isPwmSliding = false;
+  const intVal = parseInt(val, 10);
+  await sendPwmDutyCycle(intVal);
+}
+
+async function setBulbPreset(val) {
+  const slider = document.getElementById('pwmSlider');
+  const label = document.getElementById('pwmValueLabel');
+  if (slider) slider.value = val;
+  if (label) label.textContent = `${val}% PWM`;
+  await sendPwmDutyCycle(val);
+}
+
+async function sendPwmDutyCycle(val) {
+  try {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/actuator`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        actuator: 'light_brightness',
+        state: val > 0,
+        value: val
+      })
+    });
+    const data = await res.json();
+    showToast(`Bulb brightness adjusted to ${val}% PWM duty cycle`, 'success');
+    await fetchLiveTelemetry();
+  } catch (err) {
+    showToast('Failed to adjust bulb PWM: ' + err.message, 'warning');
+  }
+}
+
 function handleShedChange(shedId) {
   selectedShedId = shedId;
   initTelemetryWebSocket();
@@ -421,9 +655,7 @@ function handleShedChange(shedId) {
 // ==========================================================================
 async function fetchStages() {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/stages`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/stages`);
     if (!res.ok) return;
     stagesData = await res.json();
 
@@ -543,11 +775,10 @@ async function saveStageSetpoints() {
   };
 
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/stages/${selectedStageId}`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/stages/${selectedStageId}`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
     });
@@ -567,11 +798,10 @@ async function saveStageSetpoints() {
 
 async function applyCurrentStageToShed() {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/stage`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/stage`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ stage: selectedStageId })
     });
@@ -594,9 +824,8 @@ async function resetStagesToStandards() {
   }
 
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/stages/reset`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${adminToken}` }
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/stages/reset`, {
+      method: 'POST'
     });
 
     if (!res.ok) throw new Error('Reset failed');
@@ -650,11 +879,10 @@ async function manualToggleActuator(actuatorName) {
   const nextVal = !currentVal;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/actuator`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/actuator`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         actuator: actuatorName,
@@ -677,11 +905,10 @@ async function manualToggleActuator(actuatorName) {
 
 async function toggleAutoMode(isAuto) {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/auto-mode`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/sheds/${selectedShedId}/auto-mode`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ is_auto_mode: isAuto })
     });
@@ -706,11 +933,10 @@ async function triggerEmergency(action) {
   if (!confirm(confirmMsg)) return;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/emergency-control`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/emergency-control`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         shed_id: selectedShedId,
@@ -902,6 +1128,139 @@ function initOrUpdateCharts() {
       }
     });
   }
+
+  // 3. Air Quality Chart (CO₂ %)
+  const aqiCanvas = document.getElementById('airQualityChart');
+  if (aqiCanvas) {
+    const ctx = aqiCanvas.getContext('2d');
+    if (airQualityChart) airQualityChart.destroy();
+
+    const indoorAqi = history.map(h => h.air_quality !== undefined ? h.air_quality : 88);
+    const targetAqiLine = history.map(() => 80);
+
+    airQualityChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Air Quality (CO₂ %)',
+            data: indoorAqi,
+            borderColor: '#2A6A4A',
+            backgroundColor: 'rgba(42, 106, 74, 0.08)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointBackgroundColor: '#2A6A4A'
+          },
+          {
+            label: 'Safe Threshold (≥ 80%)',
+            data: targetAqiLine,
+            borderColor: 'rgba(180, 108, 18, 0.8)',
+            borderDash: [6, 4],
+            borderWidth: 1.8,
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 } } },
+          tooltip: {
+            backgroundColor: '#133323',
+            titleFont: { family: "'JetBrains Mono', monospace" },
+            bodyFont: { family: "'Plus Jakarta Sans', sans-serif" }
+          }
+        },
+        scales: {
+          y: {
+            grid: { color: 'rgba(229, 218, 203, 0.5)' },
+            ticks: { font: { family: "'JetBrains Mono', monospace", size: 11 }, callback: v => `${v}%` },
+            min: 50,
+            max: 100
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: "'JetBrains Mono', monospace", size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  // 4. Light Intensity Chart (Lux)
+  const lightCanvas = document.getElementById('lightChart');
+  if (lightCanvas) {
+    const ctx = lightCanvas.getContext('2d');
+    if (lightChart) lightChart.destroy();
+
+    const indoorLux = history.map(h => h.light_lux !== undefined ? h.light_lux : 22);
+    const minLuxLine = history.map(() => 15);
+    const maxLuxLine = history.map(() => 30);
+
+    lightChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Light Intensity (Lux)',
+            data: indoorLux,
+            borderColor: '#B46C12',
+            backgroundColor: 'rgba(180, 108, 18, 0.08)',
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointBackgroundColor: '#B46C12'
+          },
+          {
+            label: 'Photoperiod Min (15 Lux)',
+            data: minLuxLine,
+            borderColor: 'rgba(78, 149, 113, 0.7)',
+            borderDash: [6, 4],
+            borderWidth: 1.5,
+            pointRadius: 0
+          },
+          {
+            label: 'Photoperiod Max (30 Lux)',
+            data: maxLuxLine,
+            borderColor: 'rgba(189, 52, 41, 0.6)',
+            borderDash: [6, 4],
+            borderWidth: 1.5,
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 } } },
+          tooltip: {
+            backgroundColor: '#133323',
+            titleFont: { family: "'JetBrains Mono', monospace" },
+            bodyFont: { family: "'Plus Jakarta Sans', sans-serif" }
+          }
+        },
+        scales: {
+          y: {
+            grid: { color: 'rgba(229, 218, 203, 0.5)' },
+            ticks: { font: { family: "'JetBrains Mono', monospace", size: 11 }, callback: v => `${v} Lux` },
+            min: 0,
+            max: 60
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { family: "'JetBrains Mono', monospace", size: 11 } }
+          }
+        }
+      }
+    });
+  }
 }
 
 function exportCsvData() {
@@ -913,9 +1272,7 @@ function exportCsvData() {
 // ==========================================================================
 async function fetchFarmers() {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/farmers`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/farmers`);
     if (!res.ok) return;
     enrolledFarmers = await res.json();
     renderFarmersTable(enrolledFarmers);
@@ -983,11 +1340,10 @@ function handleFarmerSearch() {
 
 async function toggleFarmerStatus(farmerId, newStatus) {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/farmers/${farmerId}/status`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/farmers/${farmerId}/status`, {
       method: 'PATCH',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminToken}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ is_active: newStatus })
     });
@@ -1007,9 +1363,8 @@ async function confirmDeleteFarmer(farmerId) {
     return;
   }
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/farmers/${farmerId}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${adminToken}` }
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/farmers/${farmerId}`, {
+      method: 'DELETE'
     });
     if (!res.ok) throw new Error('Delete operation failed');
 
@@ -1052,7 +1407,7 @@ async function handleEnrollFarmer(event) {
   };
 
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    const res = await authenticatedFetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1078,9 +1433,7 @@ async function handleEnrollFarmer(event) {
 // ==========================================================================
 async function fetchAuditLogs() {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/audit-logs`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/audit-logs`);
     if (!res.ok) return;
     auditLogs = await res.json();
 

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Setu | Super Admin Command Portal (SeriCare)</title>
   
+  <!-- Setu Official Brand Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo.png">
+
   <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,16 +24,41 @@
 </head>
 <body>
 
+  <!-- ================= INITIAL LOADING GATEWAY (SECURITY SESSIONS) ================= -->
+  <div id="loadingGateway" class="loading-gateway">
+    <div class="loading-gateway-card">
+      <div class="loading-logo-box">
+        <img src="assets/logo.png" alt="Setu Logo" class="pulse">
+      </div>
+      <h3>Setu Command Portal</h3>
+      <p>Verifying secure administrative session...</p>
+      <div class="loading-spinner-bar">
+        <div class="loading-spinner-fill"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ================= AUTHENTICATION VIEW ================= -->
-  <div id="authView" class="auth-wrapper">
+  <div id="authView" class="auth-wrapper hidden">
     <div class="auth-card">
-      <div class="auth-brand-badge">
-        <i data-lucide="shield-check"></i>
-        <span>SERICARE SECURE COMMAND</span>
+      <div class="auth-brand-header">
+        <div class="auth-logo-wrap">
+          <img src="assets/logo.png" alt="Setu Logo" class="auth-logo-img">
+        </div>
+        <div class="auth-brand-badge">
+          <i data-lucide="shield-check"></i>
+          <span>ENTERPRISE SECURE COMMAND</span>
+        </div>
       </div>
       <h2>Super Admin Console</h2>
       <p class="auth-subtitle">Central supervisory portal for Sericulture rearing sheds & IoT microclimate automation.</p>
       
+      <!-- Dynamic Security / Rate-Limit Alert -->
+      <div id="lockoutBanner" class="security-lockout-banner hidden">
+        <i data-lucide="shield-alert"></i>
+        <span id="lockoutTimerText">Security cooldown active.</span>
+      </div>
+
       <form id="loginForm" onsubmit="handleLogin(event)">
         <div class="form-group">
           <label for="username"><i data-lucide="user"></i> Admin Username</label>
@@ -65,14 +93,14 @@
   <div id="dashboardView" class="app-layout hidden">
     
     <!-- LEFT SIDEBAR -->
-    <aside class="app-sidebar">
+    <aside class="app-sidebar" id="appSidebar">
       <div class="sidebar-header">
         <div class="brand-crest">
-          <div class="brand-logo-icon">
-            <i data-lucide="leaf"></i>
+          <div class="sidebar-logo-box">
+            <img src="assets/logo.png" alt="Setu Logo" class="sidebar-logo-img">
           </div>
           <div class="brand-title-wrap">
-            <h1>SeriCare</h1>
+            <h1>Setu <span class="brand-sub">SeriCare</span></h1>
             <span class="brand-role-chip">Super Admin Hub</span>
           </div>
         </div>
@@ -149,10 +177,13 @@
       <!-- TOP NAVIGATION BAR -->
       <header class="top-bar">
         <div class="top-bar-left">
+          <button class="btn-sidebar-toggle" id="btnSidebarToggle" onclick="toggleSidebar()" aria-label="Toggle Navigation">
+            <i data-lucide="menu"></i>
+          </button>
           <div class="page-title-wrap">
             <h2 id="topBarTitle">Cluster Operations Hub</h2>
             <div class="page-breadcrumb">
-              <span>SeriCare</span>
+              <span>Setu SeriCare</span>
               <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
               <span id="topBarBreadcrumb">Live Real-Time Telemetry</span>
             </div>
@@ -233,7 +264,7 @@
                 <div class="kpi-icon"><i data-lucide="cpu"></i></div>
               </div>
               <div class="kpi-value" id="kpiActuators">--</div>
-              <div class="kpi-caption">Coolers, Heaters & Fans running</div>
+              <div class="kpi-caption">Coolers, Heaters, Fans & Bulbs</div>
             </div>
 
             <div class="kpi-card">
@@ -282,6 +313,18 @@
                   <div class="dial-title">Indoor Humidity</div>
                   <div class="dial-reading" id="dialIndoorHum">--%</div>
                   <div class="dial-target" id="dialHumTarget">Target: --</div>
+                </div>
+
+                <div class="dial-card">
+                  <div class="dial-title">Air Quality (CO₂)</div>
+                  <div class="dial-reading" id="dialAirQuality">--%</div>
+                  <div class="dial-target" id="dialAirTarget">Target: &ge; 80%</div>
+                </div>
+
+                <div class="dial-card">
+                  <div class="dial-title">Light Intensity</div>
+                  <div class="dial-reading" id="dialLightLux">-- Lux</div>
+                  <div class="dial-target" id="dialLightTarget">Day: 15–30 Lux</div>
                 </div>
 
                 <div class="dial-card">
@@ -337,6 +380,10 @@
                     <div class="actuator-name">Halogen Heater</div>
                     <span class="relay-status-tag" id="miniStateHeater">OFF</span>
                   </div>
+                  <div class="actuator-card" id="miniRelayLight">
+                    <div class="actuator-name">Photoperiod Bulb</div>
+                    <span class="relay-status-tag" id="miniStateLight">OFF</span>
+                  </div>
                 </div>
 
                 <div style="margin-top: 20px; display:flex; gap:10px;">
@@ -352,6 +399,8 @@
 
           </div>
         </section>
+
+
 
         <!-- ================= SECTION 2: STAGE CLIMATE LEVELS (SUPER ADMIN CONTROLS) ================= -->
         <section id="section-stages" class="view-section hidden">
@@ -640,12 +689,27 @@
                   <div class="actuator-name">Dimmable Photoperiod Bulb</div>
                   <div class="actuator-pin" id="lightBrightnessInfo">GPIO Pin 25 • PWM Dimmer (15–30 Lux)</div>
                 </div>
+
+                <!-- Interactive PWM Dimmer Controls -->
+                <div class="actuator-pwm-container">
+                  <div class="pwm-slider-row">
+                    <span class="pwm-label">Bulb PWM Duty Cycle</span>
+                    <span class="pwm-value-badge" id="pwmValueLabel">35% PWM</span>
+                  </div>
+                  <input type="range" id="pwmSlider" class="pwm-range-slider" min="0" max="100" value="35" oninput="handlePwmInput(this.value)" onchange="handlePwmChange(this.value)">
+                  <div class="pwm-preset-chips">
+                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(0)">Dark 0%</button>
+                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(25)">Dim 25%</button>
+                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(40)">Active 40%</button>
+                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(100)">Full 100%</button>
+                  </div>
+                </div>
+
                 <button class="actuator-toggle-btn" id="btnToggleLight" onclick="manualToggleActuator('light')">
-                  Toggle Bulb
+                  Toggle Bulb Power
                 </button>
               </div>
             </div>
-
 
           </div>
 
@@ -690,6 +754,40 @@
 
             <div class="chart-container-box">
               <canvas id="humidityChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Air Quality & CO2 Line Chart -->
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="wind"></i></div>
+                <div>
+                  <h3>24-Hour Air Quality & CO₂ Telemetry vs Safe Threshold</h3>
+                  <p>Indoor fresh air percentage with automated exhaust ventilation trigger boundary (&ge;80%)</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="chart-container-box">
+              <canvas id="airQualityChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Light Intensity (Lux) Line Chart -->
+          <div class="card-panel">
+            <div class="card-panel-header">
+              <div class="card-title-group">
+                <div class="card-icon-badge"><i data-lucide="sun"></i></div>
+                <div>
+                  <h3>24-Hour Photoperiod Light Intensity (Lux)</h3>
+                  <p>Circadian illuminance curves ensuring optimal larval feeding (15–30 Lux) and cocooning</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="chart-container-box">
+              <canvas id="lightChart"></canvas>
             </div>
           </div>
 
@@ -790,10 +888,43 @@
               <div class="emergency-action-card danger-card">
                 <div>
                   <h4>Emergency Master Equipment Shutdown</h4>
-                  <p>Safely turn OFF all heaters, cooling foggers, and fans instantly. Use during sensor faults, electrical shorts, or repairs.</p>
+                  <p>Safely turn OFF all heaters, cooling foggers, fans, and lamps instantly. Use during sensor faults, electrical shorts, or repairs.</p>
                 </div>
                 <button class="btn btn-danger" onclick="triggerEmergency('COOLDOWN_ALL')">
                   <i data-lucide="power-off"></i> Master Kill All Relays
+                </button>
+              </div>
+
+              <!-- Air Quality Evacuation Purge -->
+              <div class="emergency-action-card">
+                <div>
+                  <h4>Emergency Fresh Air & CO₂ Evacuation</h4>
+                  <p>Force high-velocity exhaust fans to 100% capacity to flush out carbon dioxide or ammonia buildup when air quality deteriorates.</p>
+                </div>
+                <button class="btn btn-warning" onclick="triggerEmergency('EMERGENCY_VENTILATE_AIR')">
+                  <i data-lucide="wind"></i> Force Fresh Air Purge
+                </button>
+              </div>
+
+              <!-- Emergency Darkness Lock -->
+              <div class="emergency-action-card">
+                <div>
+                  <h4>Emergency Photoperiod Darkness Lock</h4>
+                  <p>Instantly switch OFF all shed illumination (0% PWM) to enforce rest and soothe stressed or agitated silkworms.</p>
+                </div>
+                <button class="btn btn-skin" onclick="triggerEmergency('EMERGENCY_LIGHTS_OFF')">
+                  <i data-lucide="moon"></i> Force Complete Darkness (0% PWM)
+                </button>
+              </div>
+
+              <!-- Emergency Daytime Inspection Lighting -->
+              <div class="emergency-action-card">
+                <div>
+                  <h4>Inspection Illumination Override</h4>
+                  <p>Engage photoperiod lamps at uniform 40% PWM for cluster officers and veterinarians inspecting trays without thermal glare.</p>
+                </div>
+                <button class="btn btn-primary" onclick="triggerEmergency('EMERGENCY_DAY_LIGHT')">
+                  <i data-lucide="sun"></i> Engage 40% Inspection Light
                 </button>
               </div>
 
