@@ -32,6 +32,20 @@ class Settings(BaseModel):
         "postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
     )
 
+    # Security & Access Control
+    INITIAL_ADMIN_PASSWORD: str = os.getenv("INITIAL_ADMIN_PASSWORD", "admin")
+    DEVICE_API_KEY: str = os.getenv("DEVICE_API_KEY", "setu-iot-device-key-2026")
+    ALLOWED_ORIGINS: list[str] = [
+        origin.strip()
+        for origin in os.getenv(
+            "ALLOWED_ORIGINS",
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173"
+        ).split(",")
+        if origin.strip()
+    ]
+    FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
+    FIREBASE_SERVICE_ACCOUNT_JSON: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+
     # Regional defaults (Global Worldwide Dynamic Geocoding)
     DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "Global Sericulture Network")
     DEFAULT_LATITUDE: float = float(os.getenv("DEFAULT_LATITUDE", "0.0"))

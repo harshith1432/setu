@@ -128,9 +128,9 @@ class AdvancedModeModal extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
                   ),
                   const SizedBox(height: 4),
-                  Text(
+                  const Text(
                     'Farmers get stage-wise defaults from the lifecycle chart for temperature, humidity, air quantity, and light.',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF4E5D50)),
+                    style: TextStyle(fontSize: 11, color: Color(0xFF4E5D50)),
                   ),
                   const SizedBox(height: 10),
                   Wrap(

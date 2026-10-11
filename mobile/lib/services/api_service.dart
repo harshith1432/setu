@@ -53,6 +53,7 @@ class ApiService {
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
+        'X-Device-Key': 'setu-iot-device-key-2026',
         if (_authToken != null) 'Authorization': 'Bearer $_authToken',
       };
 

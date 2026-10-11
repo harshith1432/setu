@@ -113,14 +113,19 @@ class GrowthStageScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      '${currentInfo.name} (${currentInfo.daysRange})',
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1B5E20),
+                    Expanded(
+                      child: Text(
+                        '${currentInfo.name} (${currentInfo.daysRange})',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1B5E20),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
@@ -128,7 +133,7 @@ class GrowthStageScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Text(
-                        'Active Selection',
+                        'Active',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,

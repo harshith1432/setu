@@ -18,6 +18,7 @@ dependencies:
   http: ^1.2.0
   provider: ^6.1.1
   shared_preferences: ^2.2.2
+  flutter_secure_storage: ^11.2.0
   geolocator: ^14.1.1
 
 dev_dependencies:
@@ -27,3 +28,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/

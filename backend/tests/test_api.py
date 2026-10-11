@@ -1,6 +1,7 @@
 import pytest
 import httpx
 from app.main import app
+from app.core.config import settings
 
 @pytest.fixture
 def anyio_backend():
@@ -40,7 +41,7 @@ async def test_login_invalid_credentials(async_client):
     assert response.status_code == 401
 
 @pytest.mark.anyio
-async def test_telemetry_ingestion(async_client):
+async def test_telemetry_ingestion_and_auth_gate(async_client):
     payload = {
         "shed_id": "shed_01",
         "temperature": 27.5,
@@ -48,11 +49,61 @@ async def test_telemetry_ingestion(async_client):
         "outside_temperature": 34.5,
         "outside_humidity": 55.0
     }
-    response = await async_client.post("/api/v1/telemetry/record", json=payload)
-    assert response.status_code == 200
-    data = response.json()
+    # 1. Unauthenticated request without X-Device-Key must be rejected (SEC-05)
+    unauth_res = await async_client.post("/api/v1/telemetry/record", json=payload)
+    assert unauth_res.status_code == 401
+
+    # 2. Authenticated request with pre-shared X-Device-Key succeeds
+    auth_res = await async_client.post(
+        "/api/v1/telemetry/record",
+        json=payload,
+        headers={"X-Device-Key": settings.DEVICE_API_KEY}
+    )
+    assert auth_res.status_code == 200
+    data = auth_res.json()
     assert data["indoor_temp"] == 27.5
     assert data["shed_id"] == "shed_01"
+
+@pytest.mark.anyio
+async def test_bola_actuator_control_protection(async_client):
+    # Login as ramesh_farmer (assigned to shed_01)
+    ramesh_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": "ramesh_farmer", "password": "setu2026"}
+    )
+    assert ramesh_login.status_code == 200
+    ramesh_token = ramesh_login.json()["access_token"]
+    ramesh_headers = {"Authorization": f"Bearer {ramesh_token}"}
+
+    # 1. Ramesh controls his own shed (shed_01) -> Allowed (200)
+    own_res = await async_client.post(
+        "/api/v1/control/shed_01/override",
+        json={"actuator": "cooler", "state": True},
+        headers=ramesh_headers
+    )
+    assert own_res.status_code == 200
+
+    # 2. Ramesh attempts to control shed_02 (owned by another farmer) -> Forbidden (403 BOLA check SEC-06)
+    alien_res = await async_client.post(
+        "/api/v1/control/shed_02/override",
+        json={"actuator": "cooler", "state": True},
+        headers=ramesh_headers
+    )
+    assert alien_res.status_code == 403
+
+    # 3. Super Admin controls any shed -> Allowed (200)
+    admin_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin"}
+    )
+    assert admin_login.status_code == 200
+    admin_token = admin_login.json()["access_token"]
+    admin_res = await async_client.post(
+        "/api/v1/control/shed_02/override",
+        json={"actuator": "cooler", "state": True},
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert admin_res.status_code == 200
 
 @pytest.mark.anyio
 async def test_authenticated_shed_status(async_client):
@@ -252,5 +303,3 @@ async def test_admin_stage_thresholds_and_software_level_controls(async_client):
     reset_res = await async_client.post("/api/v1/admin/stages/reset", headers=admin_headers)
     assert reset_res.status_code == 200
     assert STAGE_THRESHOLDS[1]["temp_min"] == 27.0
-
-

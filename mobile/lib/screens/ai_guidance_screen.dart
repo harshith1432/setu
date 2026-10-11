@@ -43,22 +43,24 @@ class _AiGuidanceScreenState extends State<AiGuidanceScreen> {
                 child: const Center(child: Text('🤖', style: TextStyle(fontSize: 24))),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.translate('aiTitle'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF4A148C),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.translate('aiTitle'),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF4A148C),
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'Real-time explainable actions for your rearing shed',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF5A695C)),
-                  ),
-                ],
+                    const Text(
+                      'Real-time explainable actions for your rearing shed',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF5A695C)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

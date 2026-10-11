@@ -108,12 +108,9 @@ class StartingPageScreen extends StatelessWidget {
                     Container(
                       width: 86,
                       height: 86,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF81C784), Color(0xFF2E7D32)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: Colors.white,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
@@ -123,8 +120,9 @@ class StartingPageScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Center(
-                        child: Icon(Icons.eco_rounded, size: 46, color: Colors.white),
+                      child: Image.asset(
+                        'assets/images/app_logo.png',
+                        fit: BoxFit.contain,
                       ),
                     ),
                     const SizedBox(height: 14),

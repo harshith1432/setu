@@ -1,18 +1,45 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.models.schemas import SetpointsUpdate, ManualActuatorOverride, ShedOverview
 from app.services.telemetry_service import telemetry_service
+from app.services.db_service import get_user_by_username
 from app.core.security import get_current_user_payload
 
 router = APIRouter(prefix="/control", tags=["Control & Automation"])
+
+def verify_shed_control_access(
+    shed_id: str,
+    user_payload: dict = Depends(get_current_user_payload)
+) -> dict:
+    """
+    SEC-06: Broken Object-Level Authorization (BOLA / IDOR) Protection.
+    Verifies that the caller is either an admin/superadmin OR is assigned to the target shed.
+    """
+    role = user_payload.get("role")
+    if role in ["admin", "superadmin"]:
+        return user_payload
+
+    username = user_payload.get("sub")
+    if username:
+        user = get_user_by_username(username)
+        if user:
+            user_shed = user.get("shed_id") or "shed_01"
+            if user_shed == shed_id:
+                return user_payload
+
+    raise HTTPException(
+        status_code=403,
+        detail=f"Forbidden: You do not have authorization to control equipment in shed '{shed_id}'"
+    )
 
 @router.post("/{shed_id}/setpoints", response_model=ShedOverview)
 def update_setpoints(
     shed_id: str,
     payload: SetpointsUpdate,
-    user_payload: dict = Depends(get_current_user_payload)
+    user_payload: dict = Depends(verify_shed_control_access)
 ):
     """
     Update target setpoints (temperature setpoint, humidity setpoint, and auto/manual toggle).
+    Enforces object-level authorization (SEC-06).
     """
     return telemetry_service.update_setpoints(
         shed_id=shed_id,
@@ -25,10 +52,11 @@ def update_setpoints(
 def manual_actuator_override(
     shed_id: str,
     payload: ManualActuatorOverride,
-    user_payload: dict = Depends(get_current_user_payload)
+    user_payload: dict = Depends(verify_shed_control_access)
 ):
     """
-    Manually toggle cooler, fan, or heater. Automatically enforces safety interlocks.
+    Manually toggle cooler, fan, or heater. Automatically enforces safety interlocks
+    and object-level authorization (SEC-06).
     """
     if payload.actuator not in ["cooler", "fan", "heater"]:
         raise HTTPException(status_code=400, detail="Invalid actuator. Must be cooler, fan, or heater")

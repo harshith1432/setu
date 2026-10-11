@@ -10,12 +10,18 @@ htmlcov/
 venv/
 env/
 
-# Environment files
+# Environment files & Secrets
 .env
 .env.*
 *.env
 !.env.example
 !*.env.example
+*firebase-adminsdk*.json
+*firebase-service-account*.json
+service-account*.json
+*.pem
+*.key
+*.crt
 
 # Logs and SQLite
 *.log

@@ -1,8 +1,8 @@
-import urllib.request
-import urllib.parse
 import json
 import logging
+import time
 from typing import Dict, Any, Optional
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +34,14 @@ WMO_WEATHER_MAP = {
 class WeatherService:
     def __init__(self, default_region: str = "Global Sericulture Network"):
         self.default_region = default_region
+        self._weather_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
+        self._geocode_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
+        self._client = httpx.Client(timeout=4.0, headers={"User-Agent": "Setu-Global/1.0"})
 
     def geocode_region(self, region_name: str) -> Optional[Dict[str, Any]]:
         """
         Geocodes any global region name, city, district, or address using Open-Meteo's geocoding API.
+        Caches results for 24 hours to avoid external API rate limits.
         """
         if not region_name or not region_name.strip():
             return None
@@ -46,12 +50,18 @@ class WeatherService:
         if not clean_name:
             clean_name = region_name.strip()
 
+        cache_key = clean_name.lower()
+        now = time.time()
+        if cache_key in self._geocode_cache:
+            expires, cached_val = self._geocode_cache[cache_key]
+            if now < expires:
+                return cached_val
+
         try:
-            encoded = urllib.parse.quote(clean_name)
-            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={encoded}&count=1&language=en&format=json"
-            req = urllib.request.Request(geo_url, headers={"User-Agent": "Setu-Global/1.0"})
-            with urllib.request.urlopen(req, timeout=4) as res:
-                data = json.loads(res.read().decode())
+            geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={clean_name}&count=1&language=en&format=json"
+            res = self._client.get(geo_url)
+            if res.status_code == 200:
+                data = res.json()
                 results = data.get("results", [])
                 if results:
                     best = results[0]
@@ -60,11 +70,13 @@ class WeatherService:
                     country = best.get("country", "")
                     label_parts = [p for p in [name, admin1, country] if p]
                     formatted_region = ", ".join(label_parts)
-                    return {
+                    result_data = {
                         "latitude": float(best["latitude"]),
                         "longitude": float(best["longitude"]),
                         "formatted_region": formatted_region
                     }
+                    self._geocode_cache[cache_key] = (now + 86400, result_data)  # 24 hours
+                    return result_data
         except Exception as e:
             logger.warning(f"Geocoding failed for '{region_name}': {e}")
         return None
@@ -73,17 +85,26 @@ class WeatherService:
         """
         Reverse geocodes GPS coordinates to city, state, country anywhere in the world.
         """
+        cache_key = f"{round(lat, 2)}:{round(lon, 2)}"
+        now = time.time()
+        if cache_key in self._geocode_cache:
+            expires, cached_val = self._geocode_cache[cache_key]
+            if now < expires:
+                return cached_val.get("formatted_region")
+
         try:
             url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
-            req = urllib.request.Request(url, headers={"User-Agent": "Setu-Global/1.0"})
-            with urllib.request.urlopen(req, timeout=3) as res:
-                data = json.loads(res.read().decode())
+            res = self._client.get(url, timeout=3.0)
+            if res.status_code == 200:
+                data = res.json()
                 city = data.get("city") or data.get("locality") or ""
                 subdiv = data.get("principalSubdivision") or ""
                 country = data.get("countryName") or ""
                 parts = [p for p in [city, subdiv, country] if p]
                 if parts:
-                    return ", ".join(parts)
+                    region_str = ", ".join(parts)
+                    self._geocode_cache[cache_key] = (now + 86400, {"formatted_region": region_str})
+                    return region_str
         except Exception as e:
             logger.warning(f"Reverse geocode failed for {lat}, {lon}: {e}")
         return None
@@ -95,7 +116,8 @@ class WeatherService:
         region: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Fetches live real-time weather from Open-Meteo for any latitude/longitude or region name anywhere in the world.
+        Fetches live real-time weather from Open-Meteo for any latitude/longitude or region name.
+        Uses in-memory TTL caching (15 minutes) to prevent thread starvation and rate-limiting.
         """
         display_region = region.strip() if region and region.strip() else None
         latitude = lat
@@ -117,22 +139,34 @@ class WeatherService:
             else:
                 display_region = self.default_region
 
-        # If lat/lon not provided, resolve via live IP geolocation
+        # If still missing coordinates, resolve via secure IP geolocation (HTTPS)
         if latitude is None or longitude is None:
             try:
-                ip_req = urllib.request.Request("http://ip-api.com/json", headers={"User-Agent": "Setu-Global/1.0"})
-                with urllib.request.urlopen(ip_req, timeout=3) as res:
-                    ip_data = json.loads(res.read().decode())
-                    if ip_data.get("status") == "success":
-                        latitude = float(ip_data["lat"])
-                        longitude = float(ip_data["lon"])
-                        if not region:
-                            city = ip_data.get("city", "")
-                            reg = ip_data.get("regionName", "")
-                            parts = [p for p in [city, reg] if p]
-                            display_region = ", ".join(parts) if parts else "Live Location"
+                ip_res = self._client.get("https://ipapi.co/json/", timeout=3.0)
+                if ip_res.status_code == 200:
+                    ip_data = ip_res.json()
+                    latitude = float(ip_data.get("latitude", 0.0))
+                    longitude = float(ip_data.get("longitude", 0.0))
+                    if not region:
+                        city = ip_data.get("city", "")
+                        reg = ip_data.get("region", "")
+                        parts = [p for p in [city, reg] if p]
+                        display_region = ", ".join(parts) if parts else "Live Location"
             except Exception as e:
                 logger.warning(f"Live IP geolocation failed: {e}")
+                latitude = latitude or 13.08
+                longitude = longitude or 77.58
+
+        # Check weather cache by coordinate bucket (0.01 deg ~= 1.1 km)
+        cache_key = f"weather:{round(latitude or 0.0, 2)}:{round(longitude or 0.0, 2)}"
+        now = time.time()
+        if cache_key in self._weather_cache:
+            expires, cached_weather = self._weather_cache[cache_key]
+            if now < expires:
+                cached_copy = dict(cached_weather)
+                if display_region:
+                    cached_copy["region"] = display_region
+                return cached_copy
 
         try:
             weather_url = (
@@ -140,9 +174,9 @@ class WeatherService:
                 f"latitude={latitude}&longitude={longitude}&"
                 f"current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code"
             )
-            req = urllib.request.Request(weather_url, headers={"User-Agent": "Setu-Global/1.0"})
-            with urllib.request.urlopen(req, timeout=4) as res:
-                payload = json.loads(res.read().decode())
+            res = self._client.get(weather_url, timeout=4.0)
+            if res.status_code == 200:
+                payload = res.json()
                 current = payload.get("current", {})
                 
                 temp = float(current.get("temperature_2m", 28.5))
@@ -156,7 +190,7 @@ class WeatherService:
                 elif temp < 20.0:
                     trend = f"Low outdoor temperature ({temp}°C). Thermal heating recommended."
 
-                return {
+                weather_data = {
                     "region": display_region,
                     "latitude": latitude,
                     "longitude": longitude,
@@ -167,19 +201,24 @@ class WeatherService:
                     "wind_speed_kmh": round(wind, 1),
                     "is_live": True
                 }
+                # Cache for 15 minutes (900 seconds)
+                self._weather_cache[cache_key] = (now + 900, weather_data)
+                return weather_data
         except Exception as e:
             logger.warning(f"Live Open-Meteo query failed for lat={latitude}, lon={longitude}: {e}")
-            # Fallback graceful simulation if offline
-            return {
-                "region": display_region,
-                "latitude": latitude,
-                "longitude": longitude,
-                "outside_temperature": 28.5,
-                "outside_humidity": 55.0,
-                "condition": "Clear Sky",
-                "forecast_trend": "Ambient conditions steady.",
-                "wind_speed_kmh": 12.0,
-                "is_live": False
-            }
+
+        # Fallback graceful simulation if offline
+        fallback_data = {
+            "region": display_region,
+            "latitude": latitude,
+            "longitude": longitude,
+            "outside_temperature": 28.5,
+            "outside_humidity": 55.0,
+            "condition": "Clear Sky",
+            "forecast_trend": "Ambient conditions steady.",
+            "wind_speed_kmh": 12.0,
+            "is_live": False
+        }
+        return fallback_data
 
 weather_service = WeatherService()

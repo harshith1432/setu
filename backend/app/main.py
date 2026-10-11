@@ -1,6 +1,5 @@
 import os
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -14,13 +13,13 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Middleware (securely allowing mobile app & web dashboard requests)
+# SEC-07: Secure CORS Configuration (Restricting wildcard origins with credentials)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Device-Key", "X-API-Key"],
 )
 
 # Register Routers
@@ -47,4 +46,3 @@ def health_check():
         "api_docs": "/docs",
         "super_admin_portal": "/admin"
     }
-

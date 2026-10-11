@@ -69,7 +69,11 @@ class HomeScreen extends StatelessWidget {
                 Icon(heroIcon, size: 48, color: heroIconColor),
                 const SizedBox(height: 8),
                 Text(
-                  shed.statusHeadline,
+                  shed.overallStatus == 'TOO_WARM'
+                      ? l10n.translate('tooWarmHeadline')
+                      : (shed.overallStatus == 'TOO_COOL'
+                          ? l10n.translate('tooCoolHeadline')
+                          : l10n.translate('idealForSilkworms')),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 22,
@@ -92,7 +96,7 @@ class HomeScreen extends StatelessWidget {
                           const Icon(Icons.grass, color: Color(0xFF2E7D32), size: 14),
                           const SizedBox(width: 4),
                           Text(
-                            provider.currentStageInfo.name,
+                            l10n.translate('stage_${provider.currentGrowthStage}'),
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -109,13 +113,13 @@ class HomeScreen extends StatelessWidget {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.circle, color: Color(0xFF2E7D32), size: 8),
-                          SizedBox(width: 5),
+                          const Icon(Icons.circle, color: Color(0xFF2E7D32), size: 8),
+                          const SizedBox(width: 5),
                           Text(
-                            'Shed 01',
-                            style: TextStyle(
+                            l10n.translate('shedNo'),
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF1B5E20),
@@ -161,8 +165,8 @@ class HomeScreen extends StatelessWidget {
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
                       ),
                       Text(
-                        'Target: ${stage.tempMin.toStringAsFixed(0)}-${stage.tempMax.toStringAsFixed(0)}C',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                        '${l10n.translate('target')}: ${stage.tempMin.toStringAsFixed(0)}-${stage.tempMax.toStringAsFixed(0)}°C',
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -196,8 +200,8 @@ class HomeScreen extends StatelessWidget {
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
                       ),
                       Text(
-                        'Target: ${stage.humMin.toInt()}-${stage.humMax.toInt()}%',
-                        style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
+                        '${l10n.translate('target')}: ${stage.humMin.toInt()}-${stage.humMax.toInt()}%',
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -227,11 +231,15 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          provider.aiAdvice.currentAction,
+                          shed.actuators.cooler
+                              ? l10n.translate('coolingIsOn')
+                              : (shed.actuators.heater
+                                  ? l10n.translate('heatingIsOn')
+                                  : (shed.actuators.fan ? l10n.translate('ventilationIsOn') : l10n.translate('allNormal'))),
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF4A148C)),
                         ),
                         Text(
-                          provider.aiAdvice.whyText,
+                          l10n.translate('everythingNormal'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 11, color: Color(0xFF512DA8)),
@@ -285,13 +293,23 @@ class HomeScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      l10n.translate('equipmentStatus'),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    Expanded(
+                      child: Text(
+                        l10n.translate('equipmentStatus'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
                     ),
-                    Text(
-                      l10n.translate('autoActive'),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2E7D32)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        l10n.translate('autoActive'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF2E7D32)),
+                      ),
                     ),
                   ],
                 ),

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/shed_data.dart';
@@ -13,6 +13,7 @@ import '../services/api_service.dart';
 import '../services/location_weather_service.dart';
 
 class SetuProvider with ChangeNotifier {
+  static const _secureStorage = FlutterSecureStorage();
   final ApiService _apiService = ApiService();
   final LocationWeatherService _weatherService = LocationWeatherService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
@@ -139,10 +140,18 @@ class SetuProvider with ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _hasCompletedOnboarding = prefs.getBool('onboarding_completed') ?? false;
       _isLoggedIn = prefs.getBool('is_logged_in') ?? false;
-      _authToken = prefs.getString('auth_token');
+
+      // SEC-04: Read token from Keystore / Keychain secure storage
+      String? secureToken;
+      try {
+        secureToken = await _secureStorage.read(key: 'auth_token');
+      } catch (_) {}
+      _authToken = secureToken ?? prefs.getString('auth_token');
       if (_authToken != null) {
         _apiService.setToken(_authToken);
       }
+      // Purge any legacy plaintext credentials cache
+      await prefs.remove('registered_farmers_cache');
 
       final savedHost = prefs.getString('backend_host');
       if (savedHost != null && savedHost.trim().isNotEmpty) {
@@ -554,6 +563,11 @@ class SetuProvider with ChangeNotifier {
     required String token,
     required Map<String, dynamic> userMap,
   }) async {
+    // SEC-04: Persist sensitive token in Android Keystore / iOS Keychain
+    try {
+      await _secureStorage.write(key: 'auth_token', value: token);
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_logged_in', true);
     await prefs.setString('auth_token', token);
@@ -569,30 +583,19 @@ class SetuProvider with ChangeNotifier {
     await prefs.setString('preferred_language', userMap['preferred_language'] ?? _locale.languageCode);
   }
 
-  // --- Login & Registration Methods (Real PostgreSQL Backend) ---
-  Future<void> _cacheRegisteredAccount(Map<String, dynamic> user, String pwd) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final accountsJson = prefs.getString('registered_farmers_cache') ?? '[]';
-      List<dynamic> accounts = jsonDecode(accountsJson);
-      accounts.removeWhere((acc) => acc['username'] == user['username']);
-      accounts.add({
-        ...user,
-        'password': pwd,
-      });
-      await prefs.setString('registered_farmers_cache', jsonEncode(accounts));
-    } catch (_) {}
-  }
-
-  // --- Login & Registration Methods (Real PostgreSQL Backend + Offline Fallback) ---
+  // --- Authenticated Server Login (SEC-03 & SEC-04 Hardened) ---
   Future<bool> login(String uname, String pwd) async {
-    final res = await _apiService.login(uname, pwd);
-    if (res != null) {
+    final cleanUname = uname.trim();
+    final cleanPwd = pwd.trim();
+    if (cleanUname.isEmpty || cleanPwd.isEmpty) return false;
+
+    final res = await _apiService.login(cleanUname, cleanPwd);
+    if (res != null && res['access_token'] != null) {
       _authToken = res['access_token'];
       final user = res['user'] ?? {};
       _isLoggedIn = true;
       _userId = user['id'] ?? _userId;
-      _username = user['username'] ?? uname;
+      _username = user['username'] ?? cleanUname;
       _userName = user['full_name'] ?? _userName;
       _userPhone = user['phone'] ?? _userPhone;
       _farmName = user['farm_name'] ?? _farmName;
@@ -605,99 +608,13 @@ class SetuProvider with ChangeNotifier {
       }
       
       await _saveSessionToPreferences(token: _authToken!, userMap: user);
-      await _cacheRegisteredAccount(user, pwd.trim());
       notifyListeners();
       return true;
     }
 
-    // Check previously registered accounts cache (allows offline login of newly signed-up users)
-    final cleanUname = uname.trim().toLowerCase();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final accountsJson = prefs.getString('registered_farmers_cache') ?? '[]';
-      List<dynamic> accounts = jsonDecode(accountsJson);
-      for (final acc in accounts) {
-        if (acc['username']?.toString().toLowerCase() == cleanUname &&
-            acc['password']?.toString() == pwd.trim()) {
-          _isLoggedIn = true;
-          _userId = acc['id'] ?? _userId;
-          _username = acc['username'] ?? uname;
-          _userName = acc['full_name'] ?? _userName;
-          _userPhone = acc['phone'] ?? _userPhone;
-          _farmName = acc['farm_name'] ?? _farmName;
-          _region = acc['region'] ?? _region;
-          _batchId = acc['batch_id'] ?? _batchId;
-          _dflCapacity = acc['dfl_capacity'] ?? _dflCapacity;
-          _breed = acc['breed'] ?? _breed;
-          _authToken = 'local_token_${DateTime.now().millisecondsSinceEpoch}';
-          _apiService.setToken(_authToken);
-          await _saveSessionToPreferences(token: _authToken!, userMap: Map<String, dynamic>.from(acc));
-          notifyListeners();
-          return true;
-        }
-      }
-    } catch (_) {}
-
-    // Offline / Demo Login Fallback
-    final validDemoAccounts = {
-      'ramesh_farmer': 'setu2026',
-      'venkatamma_farmer': 'setu2026',
-      'manjunath_kolar': 'setu2026',
-      'admin': 'admin',
-      'superadmin': 'adminsecure2026',
-    };
-
-    if (validDemoAccounts.containsKey(cleanUname) && validDemoAccounts[cleanUname] == pwd.trim()) {
-      _isLoggedIn = true;
-      _username = uname.trim();
-      _userName = cleanUname == 'ramesh_farmer'
-          ? 'Ramesh Gowda'
-          : (cleanUname == 'venkatamma_farmer'
-              ? 'Venkatamma Reddy'
-              : (cleanUname == 'admin' ? 'Setu Admin' : 'Farmer $uname'));
-      _userPhone = '+91 98450 12345';
-      _authToken = 'offline_session_token_${DateTime.now().millisecondsSinceEpoch}';
-      _apiService.setToken(_authToken);
-      await _saveSessionToPreferences(token: _authToken!, userMap: {
-        'id': 'usr_demo',
-        'username': _username,
-        'full_name': _userName,
-        'phone': _userPhone,
-        'farm_name': _farmName,
-        'region': _region,
-        'batch_id': _batchId,
-        'dfl_capacity': _dflCapacity,
-        'breed': _breed,
-        'preferred_language': _locale.languageCode,
-      });
-      notifyListeners();
-      return true;
-    }
-
-    // Fallback for any non-empty farmer login attempt
-    if (uname.trim().isNotEmpty && pwd.trim().length >= 4) {
-      _isLoggedIn = true;
-      _username = uname.trim();
-      _userName = 'Farmer $uname';
-      _userPhone = '+91 98450 12345';
-      _authToken = 'offline_session_token_${DateTime.now().millisecondsSinceEpoch}';
-      _apiService.setToken(_authToken);
-      await _saveSessionToPreferences(token: _authToken!, userMap: {
-        'id': 'usr_${uname.trim()}',
-        'username': _username,
-        'full_name': _userName,
-        'phone': _userPhone,
-        'farm_name': _farmName,
-        'region': _region,
-        'batch_id': _batchId,
-        'dfl_capacity': _dflCapacity,
-        'breed': _breed,
-        'preferred_language': _locale.languageCode,
-      });
-      notifyListeners();
-      return true;
-    }
-
+    _isLoggedIn = false;
+    _authToken = null;
+    notifyListeners();
     return false;
   }
 
@@ -750,55 +667,21 @@ class SetuProvider with ChangeNotifier {
       }
 
       await _saveSessionToPreferences(token: _authToken!, userMap: user);
-      await _cacheRegisteredAccount(user, cleanPwd);
       notifyListeners();
       return (success: true, message: 'Welcome $_userName! Farm registered successfully.');
     }
 
-    // Specific error from server (e.g. "Username already registered")
     final errorMsg = res['error']?.toString();
-    if (errorMsg != null && (errorMsg.contains('already registered') || errorMsg.contains('Username'))) {
-      return (success: false, message: errorMsg);
-    }
-
-    // Offline / Network Fallback: Register locally so user is NEVER blocked!
-    final localUser = {
-      'id': 'usr_local_${DateTime.now().millisecondsSinceEpoch}',
-      'username': cleanUname,
-      'password': cleanPwd,
-      'full_name': fullName.trim().isNotEmpty ? fullName.trim() : 'Farmer $cleanUname',
-      'phone': phone.trim().isNotEmpty ? phone.trim() : '+91 98450 00000',
-      'farm_name': (farmName != null && farmName.trim().isNotEmpty) ? farmName.trim() : 'Green Valley Sericulture Farm',
-      'region': (region != null && region.trim().isNotEmpty) ? region.trim() : (_region.isNotEmpty ? _region : 'Local Rearing Shed'),
-      'batch_id': (batchId != null && batchId.trim().isNotEmpty) ? batchId.trim() : 'SERI-2026-M04',
-      'dfl_capacity': (dflCapacity != null && dflCapacity.trim().isNotEmpty) ? dflCapacity.trim() : '200 DFL',
-      'breed': (breed != null && breed.trim().isNotEmpty) ? breed.trim() : 'Double Hybrid (FC1 x FC2)',
-      'preferred_language': _locale.languageCode,
-    };
-
-    _isLoggedIn = true;
-    _authToken = 'offline_token_${DateTime.now().millisecondsSinceEpoch}';
-    _apiService.setToken(_authToken);
-    _userId = localUser['id']!;
-    _username = cleanUname;
-    _userName = localUser['full_name']!;
-    _userPhone = localUser['phone']!;
-    _farmName = localUser['farm_name']!;
-    _region = localUser['region']!;
-    _batchId = localUser['batch_id']!;
-    _dflCapacity = localUser['dfl_capacity']!;
-    _breed = localUser['breed']!;
-
-    await _saveSessionToPreferences(token: _authToken!, userMap: localUser);
-    await _cacheRegisteredAccount(localUser, cleanPwd);
-    notifyListeners();
-    return (success: true, message: 'Welcome $_userName! Registered successfully on this device.');
+    return (success: false, message: errorMsg ?? 'Could not register account. Please check network connection.');
   }
 
   Future<void> logout() async {
     _isLoggedIn = false;
     _authToken = null;
     _apiService.setToken(null);
+    try {
+      await _secureStorage.delete(key: 'auth_token');
+    } catch (_) {}
     final firebaseAuth = _firebaseAuthSafe;
     if (firebaseAuth != null) {
       await firebaseAuth.signOut();
@@ -807,6 +690,7 @@ class SetuProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('is_logged_in');
     await prefs.remove('auth_token');
+    await prefs.remove('registered_farmers_cache');
     notifyListeners();
   }
 

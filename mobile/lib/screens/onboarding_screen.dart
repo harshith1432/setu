@@ -28,12 +28,9 @@ class OnboardingScreen extends StatelessWidget {
                   Container(
                     width: 90,
                     height: 90,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFC8E6C9), Color(0xFF81C784)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: Colors.white,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
@@ -43,8 +40,9 @@ class OnboardingScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Text('🐛', style: TextStyle(fontSize: 44)),
+                    child: Image.asset(
+                      'assets/images/app_logo.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -143,7 +141,7 @@ class OnboardingScreen extends StatelessWidget {
                       context,
                       flag: '🌾',
                       title: 'ಕನ್ನಡ (Kannada)',
-                      sub: 'ಮುಳಬಾಗಿಲು ಪ್ರಾದೇಶಿಕ ಆವೃತ್ತಿ',
+                      sub: 'ರೈತ ಸ್ನೇಹಿ ಆವೃತ್ತಿ',
                       code: 'kn',
                       isSelected: provider.locale.languageCode == 'kn',
                       onTap: () => provider.setLocale(const Locale('kn')),

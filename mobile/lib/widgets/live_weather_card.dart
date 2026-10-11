@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/setu_provider.dart';
 import '../models/live_weather_data.dart';
+import '../l10n/app_localizations.dart';
 
 class LiveWeatherCard extends StatelessWidget {
   final bool compact;
@@ -10,6 +11,7 @@ class LiveWeatherCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<SetuProvider>(context);
+    final l10n = AppLocalizations.of(context);
     final weather = provider.liveWeather;
     final isLoading = provider.isLoadingWeather;
     final shed = provider.shedData;
@@ -111,7 +113,7 @@ class LiveWeatherCard extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 3),
                                           Text(
-                                            isGps ? 'GPS LIVE' : 'LIVE FEED',
+                                            isGps ? l10n.translate('gpsLive') : l10n.translate('liveFeed'),
                                             style: TextStyle(
                                               fontSize: 8.5,
                                               fontWeight: FontWeight.w800,
@@ -123,9 +125,9 @@ class LiveWeatherCard extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                const Text(
-                                  'Real-time ambient weather from internet',
-                                  style: TextStyle(
+                                Text(
+                                  l10n.translate('weatherSub'),
+                                  style: const TextStyle(
                                     fontSize: 9.5,
                                     fontWeight: FontWeight.w500,
                                     color: Color(0xFF8D6E63),
@@ -195,27 +197,36 @@ class LiveWeatherCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'OUTSIDE TEMP',
-                                  style: TextStyle(
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF8D6E63),
-                                    letterSpacing: 0.3,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    l10n.translate('outsideTemp'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF8D6E63),
+                                      letterSpacing: 0.3,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  '$temp°C',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFFBF360C),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '$temp°C',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFFBF360C),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -247,27 +258,36 @@ class LiveWeatherCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'OUTSIDE HUMIDITY',
-                                  style: TextStyle(
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF8D6E63),
-                                    letterSpacing: 0.3,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    l10n.translate('outsideHumidity'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF8D6E63),
+                                      letterSpacing: 0.3,
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  '${hum.toInt()}% RH',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF01579B),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '${hum.toInt()}% RH',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF01579B),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -473,18 +493,32 @@ class LiveWeatherCard extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Refresh Live Weather Button
-            ElevatedButton.icon(
+            ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 provider.refreshLiveWeather(requestGps: true);
               },
-              icon: const Icon(Icons.my_location_rounded, size: 18),
-              label: const Text('Re-detect Location & Fetch Live Weather', style: TextStyle(fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2E7D32),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.my_location_rounded, size: 18),
+                  SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      'Re-detect Location & Fetch Live Weather',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 10),

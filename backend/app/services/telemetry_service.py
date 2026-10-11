@@ -1,14 +1,51 @@
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
+from collections import deque
 import io
 import csv
+import asyncio
+from fastapi import WebSocket
 from app.models.schemas import TelemetryPayload, ActuatorStates, ShedOverview
 from app.services.rules_engine import rules_engine, STAGE_THRESHOLDS
 from app.services.weather_service import weather_service
+from app.services.db_service import save_telemetry_reading, get_telemetry_history_from_db
+
+class ConnectionManager:
+    """
+    Manages active WebSocket connections for real-time telemetry streaming.
+    """
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in list(self.active_connections):
+            try:
+                await connection.send_json(message)
+            except Exception:
+                self.disconnect(connection)
+
+    def broadcast_sync(self, message: dict):
+        """
+        Non-blocking schedule of broadcast if event loop is running.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(self.broadcast(message))
+        except Exception:
+            pass
 
 class TelemetryService:
     def __init__(self):
-        # In-memory storage for shed state & timeseries (ready for PostgreSQL)
+        # In-memory live state for active sheds
         self.sheds: Dict[str, Dict[str, Any]] = {
             "shed_01": {
                 "farm_name": "Green Valley Farm",
@@ -26,8 +63,9 @@ class TelemetryService:
             }
         }
         
-        # Historical buffer
-        self.history: List[Dict[str, Any]] = []
+        # Bounded historical ring buffer (Max 1000 items in RAM to prevent OOM)
+        self.history: deque = deque(maxlen=1000)
+        self.ws_manager = ConnectionManager()
         self._populate_sample_history("shed_01")
 
     def _populate_sample_history(self, shed_id: str):
@@ -36,7 +74,7 @@ class TelemetryService:
             t = now - timedelta(hours=h)
             temp = 25.0 + (1.5 if 10 <= t.hour <= 16 else -1.0)
             hum = 75.0 - (4.0 if 10 <= t.hour <= 16 else -2.0)
-            self.history.append({
+            record = {
                 "shed_id": shed_id,
                 "timestamp": t,
                 "indoor_temp": round(temp, 1),
@@ -46,7 +84,8 @@ class TelemetryService:
                 "cooler": True if temp > 26.0 else False,
                 "heater": False,
                 "fan": True if temp > 26.5 else False
-            })
+            }
+            self.history.append(record)
 
     def record_reading(self, payload: TelemetryPayload) -> ShedOverview:
         shed = self.sheds.get(payload.shed_id)
@@ -89,8 +128,8 @@ class TelemetryService:
 
         shed["actuators"] = next_actuators
 
-        # Record to history
-        self.history.append({
+        # Record to memory buffer
+        record = {
             "shed_id": payload.shed_id,
             "timestamp": shed["last_updated"],
             "indoor_temp": shed["current_temp"],
@@ -99,10 +138,27 @@ class TelemetryService:
             "outside_hum": shed["outside_hum"],
             "cooler": next_actuators.cooler,
             "heater": next_actuators.heater,
-            "fan": next_actuators.fan
-        })
+            "fan": next_actuators.fan,
+            "mode": "AUTO" if shed["is_auto_mode"] else "MANUAL"
+        }
+        self.history.append(record)
 
-        return self.get_shed_overview(payload.shed_id)
+        # Persist to PostgreSQL timeseries table
+        save_telemetry_reading(record)
+
+        overview = self.get_shed_overview(payload.shed_id)
+
+        # Broadcast real-time update to WebSocket clients
+        try:
+            self.ws_manager.broadcast_sync({
+                "type": "telemetry_update",
+                "shed_id": payload.shed_id,
+                "data": overview.model_dump() if hasattr(overview, "model_dump") else overview.dict()
+            })
+        except Exception:
+            pass
+
+        return overview
 
     def get_shed_overview(
         self,
@@ -199,6 +255,15 @@ class TelemetryService:
             shed["current_stage"] = stage
         return self.get_shed_overview(shed_id)
 
+    def get_history(self, shed_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        # Query from database first
+        db_history = get_telemetry_history_from_db(shed_id, limit=limit)
+        if db_history:
+            return db_history
+        # Fall back to bounded in-memory buffer
+        mem = [r for r in self.history if r["shed_id"] == shed_id]
+        return list(mem)[-limit:]
+
     def generate_csv_export(self, shed_id: str) -> str:
         output = io.StringIO()
         writer = csv.writer(output)
@@ -207,21 +272,21 @@ class TelemetryService:
             "Outside_Temp_C", "Outside_Humidity_pct", "Cooler_Active", "Heater_Active", "Fan_Active"
         ])
         
-        records = [r for r in self.history if r["shed_id"] == shed_id]
-        if not records:
-            records = self.history
+        records = self.get_history(shed_id, limit=200)
 
         for r in records:
+            ts = r["timestamp"]
+            ts_str = ts.isoformat() if hasattr(ts, "isoformat") else str(ts)
             writer.writerow([
-                r["timestamp"].isoformat(),
-                r["shed_id"],
-                r["indoor_temp"],
-                r["indoor_hum"],
-                r["outside_temp"],
-                r["outside_hum"],
-                "YES" if r["cooler"] else "NO",
-                "YES" if r["heater"] else "NO",
-                "YES" if r["fan"] else "NO"
+                ts_str,
+                r.get("shed_id", shed_id),
+                r.get("indoor_temp"),
+                r.get("indoor_hum"),
+                r.get("outside_temp"),
+                r.get("outside_hum"),
+                "YES" if r.get("cooler") else "NO",
+                "YES" if r.get("heater") else "NO",
+                "YES" if r.get("fan") else "NO"
             ])
             
         return output.getvalue()

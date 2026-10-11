@@ -46,13 +46,41 @@ function showDashboardView() {
   document.getElementById('authView').classList.add('hidden');
   document.getElementById('dashboardView').classList.remove('hidden');
   
-  // Start 3-second live telemetry refresh stream
+  // Connect real-time WebSocket stream (falls back to polling timer)
+  initTelemetryWebSocket();
+
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   autoRefreshTimer = setInterval(() => {
     syncLiveTelemetryStream();
-  }, 3500);
+  }, 4000);
 
   syncAllRealtimeData();
+}
+
+let telemetryWs = null;
+function initTelemetryWebSocket() {
+  if (telemetryWs) {
+    try { telemetryWs.close(); } catch (_) {}
+    telemetryWs = null;
+  }
+  try {
+    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host || 'localhost:8000';
+    telemetryWs = new WebSocket(`${wsProto}//${host}/api/v1/telemetry/ws/${selectedShedId}`);
+    telemetryWs.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.data) {
+          syncLiveTelemetryStream();
+        }
+      } catch (_) {}
+    };
+    telemetryWs.onclose = () => {
+      if (adminToken && document.getElementById('dashboardView') && !document.getElementById('dashboardView').classList.contains('hidden')) {
+        setTimeout(initTelemetryWebSocket, 5000);
+      }
+    };
+  } catch (_) {}
 }
 
 function switchNavTab(tabName) {
@@ -361,6 +389,7 @@ function updateRelayUI(cardId, tagId, isActive) {
 
 function handleShedChange(shedId) {
   selectedShedId = shedId;
+  initTelemetryWebSocket();
   syncAllRealtimeData();
 }
 

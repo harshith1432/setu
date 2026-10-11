@@ -193,32 +193,22 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         elevation: 0.5,
         title: Row(
           children: [
-            const Icon(Icons.eco, color: Color(0xFF2E7D32), size: 22),
-            const SizedBox(width: 6),
+            Image.asset(
+              'assets/images/app_logo.png',
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 8),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    l10n.translate('appName'),
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1B5E20),
-                    ),
-                  ),
-                  Text(
-                    '${provider.shedData.shedId.toUpperCase()} · ${provider.region.split(',')[0]}',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF5A695C),
-                    ),
-                  ),
-                ],
+              child: Text(
+                '${provider.shedData.shedId.toUpperCase()} · ${provider.region.split(',')[0]}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1B5E20),
+                ),
               ),
             ),
           ],
