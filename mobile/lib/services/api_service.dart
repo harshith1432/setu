@@ -83,7 +83,7 @@ class ApiService {
           Uri.parse('$base/auth/login'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({'username': username, 'password': password}),
-        ).timeout(const Duration(seconds: 2));
+        ).timeout(const Duration(seconds: 8));
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);
           _authToken = data['access_token'];
@@ -125,7 +125,7 @@ class ApiService {
             'dfl_capacity': (dflCapacity != null && dflCapacity.isNotEmpty) ? dflCapacity : '200 DFL',
             'breed': (breed != null && breed.isNotEmpty) ? breed : 'Double Hybrid (FC1 x FC2)',
           }),
-        ).timeout(const Duration(seconds: 2));
+        ).timeout(const Duration(seconds: 8));
 
         if (res.statusCode == 200) {
           final data = jsonDecode(res.body);

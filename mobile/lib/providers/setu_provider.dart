@@ -154,10 +154,11 @@ class SetuProvider with ChangeNotifier {
       await prefs.remove('registered_farmers_cache');
 
       final savedHost = prefs.getString('backend_host');
-      if (savedHost != null && savedHost.trim().isNotEmpty) {
+      if (savedHost != null && savedHost.trim().isNotEmpty && !savedHost.contains('127.0.0.1')) {
         _backendHost = savedHost;
       } else {
         _backendHost = 'https://setu-8vh9.onrender.com';
+        await prefs.setString('backend_host', _backendHost);
       }
       _apiService.setCustomHost(_backendHost);
       
