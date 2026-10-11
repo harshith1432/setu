@@ -31,8 +31,10 @@ jobs:
           pip install -r backend/requirements.txt
 
       - name: Execute Pytest Suite
+        env:
+          PYTHONPATH: backend
         run: |
-          pytest backend/tests -v
+          python -m pytest backend/tests -v
 
   # =========================================================================
   # 2. ADMIN WEB SYNTAX & ASSET INTEGRITY
