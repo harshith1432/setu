@@ -304,6 +304,18 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
             return d
     return None
 
+def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
+    clean_id = identifier.strip()
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("SELECT * FROM users WHERE username = %s OR phone = %s", (clean_id, clean_id))
+        row = cursor.fetchone()
+        if row:
+            d = dict(row)
+            if isinstance(d.get("created_at"), datetime):
+                d["created_at"] = d["created_at"].isoformat()
+            return d
+    return None
+
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))

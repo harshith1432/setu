@@ -355,23 +355,41 @@ class SetuProvider with ChangeNotifier {
     }
   }
 
-  Future<({bool success, String message})> signInWithGoogle() async {
+  User? _pendingGoogleUser;
+  User? get pendingGoogleUser => _pendingGoogleUser;
+
+  Future<({bool success, bool needsFarmSetup, String message, String? defaultName, String? email})> signInWithGoogle() async {
     if (!isFirebaseReady) {
       return (
         success: false,
+        needsFarmSetup: false,
         message: 'Firebase is not configured yet. Add google-services.json under mobile/android/app and rebuild.',
+        defaultName: null,
+        email: null,
       );
     }
 
     final firebaseAuth = _firebaseAuthSafe;
     if (firebaseAuth == null) {
-      return (success: false, message: 'Firebase is not configured for this platform.');
+      return (
+        success: false,
+        needsFarmSetup: false,
+        message: 'Firebase is not configured for this platform.',
+        defaultName: null,
+        email: null,
+      );
     }
 
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        return (success: false, message: 'Google sign-in was cancelled.');
+        return (
+          success: false,
+          needsFarmSetup: false,
+          message: 'Google sign-in was cancelled.',
+          defaultName: null,
+          email: null,
+        );
       }
 
       final googleAuth = await googleUser.authentication;
@@ -381,15 +399,125 @@ class SetuProvider with ChangeNotifier {
       );
 
       final userCredential = await firebaseAuth.signInWithCredential(credential);
-      if (userCredential.user == null) {
-        return (success: false, message: 'Google sign-in did not return a user.');
+      final user = userCredential.user;
+      if (user == null) {
+        return (
+          success: false,
+          needsFarmSetup: false,
+          message: 'Google sign-in did not return a user.',
+          defaultName: null,
+          email: null,
+        );
       }
 
-      await _applyFirebaseUser(userCredential.user!);
-      return (success: true, message: 'Google sign-in successful.');
+      final lookupKey = (user.email?.trim().isNotEmpty == true) ? user.email!.trim().toLowerCase() : user.uid;
+      final check = await _apiService.checkFarmer(lookupKey);
+
+      if (check != null && check['exists'] == true && check['has_profile'] == true) {
+        // Existing registered farmer with completed profile -> sync immediately
+        final syncRes = await _apiService.googleSync(
+          fullName: user.displayName ?? '',
+          email: user.email,
+          googleId: user.uid,
+          preferredLanguage: _locale.languageCode,
+        );
+        if (syncRes['success'] == true && syncRes['data'] != null) {
+          final data = syncRes['data'];
+          final userMap = data['user'] ?? {};
+          _authToken = data['access_token'];
+          _apiService.setToken(_authToken);
+          _isLoggedIn = true;
+          _userId = userMap['id'] ?? user.uid;
+          _username = userMap['username'] ?? lookupKey;
+          _userName = userMap['full_name'] ?? (user.displayName ?? 'Farmer');
+          _userPhone = userMap['phone'] ?? '';
+          _farmName = userMap['farm_name'] ?? '';
+          _region = userMap['region'] ?? 'Local Rearing Shed';
+          _batchId = userMap['batch_id'] ?? '';
+          _dflCapacity = userMap['dfl_capacity'] ?? '';
+          _breed = userMap['breed'] ?? 'Double Hybrid (FC1 x FC2)';
+          await _saveSessionToPreferences(token: _authToken!, userMap: userMap);
+          notifyListeners();
+          return (
+            success: true,
+            needsFarmSetup: false,
+            message: 'Welcome back, $_userName!',
+            defaultName: _userName,
+            email: user.email,
+          );
+        }
+      }
+
+      // New farmer or profile incomplete -> Needs farm data input
+      _pendingGoogleUser = user;
+      return (
+        success: true,
+        needsFarmSetup: true,
+        message: 'Please complete your farm details.',
+        defaultName: user.displayName ?? '',
+        email: user.email,
+      );
     } catch (e) {
-      return (success: false, message: _firebaseMessage(e));
+      return (
+        success: false,
+        needsFarmSetup: false,
+        message: _firebaseMessage(e),
+        defaultName: null,
+        email: null,
+      );
     }
+  }
+
+  Future<({bool success, String message})> completeGoogleFarmSetup({
+    required String fullName,
+    required String phone,
+    required String farmName,
+    required String batchId,
+    required String dflCapacity,
+    String? region,
+    String? breed,
+  }) async {
+    final user = _pendingGoogleUser ?? _firebaseAuthSafe?.currentUser;
+    final email = user?.email;
+    final googleId = user?.uid;
+
+    final syncRes = await _apiService.googleSync(
+      fullName: fullName.trim(),
+      email: email,
+      googleId: googleId,
+      phone: phone.trim(),
+      farmName: farmName.trim(),
+      batchId: batchId.trim(),
+      dflCapacity: dflCapacity.trim(),
+      region: (region != null && region.trim().isNotEmpty) ? region.trim() : 'Local Rearing Shed',
+      breed: (breed != null && breed.trim().isNotEmpty) ? breed.trim() : 'Double Hybrid (FC1 x FC2)',
+      preferredLanguage: _locale.languageCode,
+    );
+
+    if (syncRes['success'] == true && syncRes['data'] != null) {
+      final data = syncRes['data'];
+      final userMap = data['user'] ?? {};
+      _authToken = data['access_token'];
+      _apiService.setToken(_authToken);
+      _isLoggedIn = true;
+      _userId = userMap['id'] ?? (googleId ?? 'usr_google');
+      _username = userMap['username'] ?? (email ?? phone.trim());
+      _userName = userMap['full_name'] ?? fullName.trim();
+      _userPhone = userMap['phone'] ?? phone.trim();
+      _farmName = userMap['farm_name'] ?? farmName.trim();
+      _region = userMap['region'] ?? 'Local Rearing Shed';
+      _batchId = userMap['batch_id'] ?? batchId.trim();
+      _dflCapacity = userMap['dfl_capacity'] ?? dflCapacity.trim();
+      _breed = userMap['breed'] ?? 'Double Hybrid (FC1 x FC2)';
+      _pendingGoogleUser = null;
+
+      await _saveSessionToPreferences(token: _authToken!, userMap: userMap);
+      notifyListeners();
+      return (success: true, message: 'Welcome $_userName! Farm successfully registered.');
+    }
+
+    final err = syncRes['error']?.toString() ?? 'Failed to enroll farm on server.';
+    return (success: false, message: err);
   }
 
   /// Refreshes live ambient weather from Open-Meteo for the current region/coordinates

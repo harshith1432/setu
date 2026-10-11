@@ -13,13 +13,27 @@ class UserCreate(BaseModel):
     full_name: str
     phone: str
     preferred_language: str = "kn"  # "en", "kn", "te"
-    farm_name: Optional[str] = "Green Valley Sericulture Farm"
-    region: Optional[str] = "Local Rearing Shed"
+    farm_name: Optional[str] = None
+    region: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    batch_id: Optional[str] = "SERI-2026-M04"
-    dfl_capacity: Optional[str] = "200 DFL"
+    batch_id: Optional[str] = None
+    dfl_capacity: Optional[str] = None
     breed: Optional[str] = "Double Hybrid (FC1 x FC2)"
+
+class GoogleAuthRequest(BaseModel):
+    email: Optional[str] = None
+    google_id: Optional[str] = None
+    full_name: str
+    phone: Optional[str] = None
+    farm_name: Optional[str] = None
+    region: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    batch_id: Optional[str] = None
+    dfl_capacity: Optional[str] = None
+    breed: Optional[str] = "Double Hybrid (FC1 x FC2)"
+    preferred_language: Optional[str] = "en"
 
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = None

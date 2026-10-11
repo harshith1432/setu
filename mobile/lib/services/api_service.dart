@@ -148,6 +148,71 @@ class ApiService {
     return {'success': false, 'error': serverError ?? 'Could not connect to backend server'};
   }
 
+  Future<Map<String, dynamic>?> checkFarmer(String identifier) async {
+    for (final base in candidateUrls) {
+      try {
+        final res = await http.get(
+          Uri.parse('$base/auth/check-farmer?identifier=${Uri.encodeComponent(identifier)}'),
+          headers: {'Content-Type': 'application/json'},
+        ).timeout(const Duration(seconds: 5));
+        if (res.statusCode == 200) {
+          return jsonDecode(res.body);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> googleSync({
+    required String fullName,
+    String? email,
+    String? googleId,
+    String? phone,
+    String? farmName,
+    String? region,
+    String? batchId,
+    String? dflCapacity,
+    String? breed,
+    String? preferredLanguage,
+  }) async {
+    String? serverError;
+    for (final base in candidateUrls) {
+      try {
+        final res = await http.post(
+          Uri.parse('$base/auth/google-sync'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'full_name': fullName,
+            if (email != null) 'email': email,
+            if (googleId != null) 'google_id': googleId,
+            if (phone != null) 'phone': phone,
+            if (farmName != null) 'farm_name': farmName,
+            if (region != null) 'region': region,
+            if (batchId != null) 'batch_id': batchId,
+            if (dflCapacity != null) 'dfl_capacity': dflCapacity,
+            if (breed != null) 'breed': breed,
+            if (preferredLanguage != null) 'preferred_language': preferredLanguage,
+          }),
+        ).timeout(const Duration(seconds: 10));
+
+        if (res.statusCode == 200) {
+          final data = jsonDecode(res.body);
+          _authToken = data['access_token'];
+          _workingBaseUrl = base;
+          return {'success': true, 'data': data};
+        } else {
+          try {
+            final errBody = jsonDecode(res.body);
+            serverError = errBody['detail']?.toString() ?? 'Server error (${res.statusCode})';
+          } catch (_) {
+            serverError = 'Server error (${res.statusCode})';
+          }
+        }
+      } catch (_) {}
+    }
+    return {'success': false, 'error': serverError ?? 'Could not connect to backend server'};
+  }
+
   Future<Map<String, dynamic>?> getMe() async {
     for (final base in candidateUrls) {
       try {
