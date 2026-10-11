@@ -20,12 +20,30 @@ class ApiService {
     if (host != null && host.trim().isNotEmpty) {
       String clean = host.trim();
       if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
-        clean = 'http://$clean';
+        if (clean.contains('.onrender.com') ||
+            clean.contains('.vercel.app') ||
+            clean.contains('.app') ||
+            clean.contains('.com') ||
+            clean.contains('.io')) {
+          clean = 'https://$clean';
+        } else {
+          clean = 'http://$clean';
+        }
       }
-      if (!clean.contains(':8000') && !clean.contains('/api')) {
-        clean = '$clean:8000/api/v1';
-      } else if (!clean.endsWith('/api/v1')) {
+      // Only append :8000 if it is a local IP or localhost without any port specified
+      final hostPart = clean.replaceFirst(RegExp(r'^https?://'), '').split('/').first;
+      final isLocalOrIp = hostPart.contains('127.0.0.1') ||
+          hostPart.contains('localhost') ||
+          hostPart.contains('10.0.2.2') ||
+          RegExp(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}').hasMatch(hostPart);
+      if (isLocalOrIp && !hostPart.contains(':')) {
+        clean = clean.replaceFirst(hostPart, '$hostPart:8000');
+      }
+      // Ensure /api/v1 path
+      if (!clean.contains('/api')) {
         clean = '$clean/api/v1';
+      } else if (!clean.endsWith('/api/v1')) {
+        clean = clean.replaceAll(RegExp(r'/api.*'), '/api/v1');
       }
       _customHost = clean;
     } else {
