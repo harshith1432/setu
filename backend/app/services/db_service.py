@@ -297,8 +297,12 @@ def init_db():
                     now_dt
                 ))
 
-# Initialize DB on module import
-init_db()
+# Initialize DB on module import safely
+try:
+    init_db()
+except Exception as e:
+    # Gracefully handle DB unavailability during builds / imports
+    pass
 
 # Database CRUD helpers
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
