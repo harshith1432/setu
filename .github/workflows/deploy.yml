@@ -1,0 +1,104 @@
+name: CI/CD Pipeline (Render & Vercel)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  # =========================================================================
+  # 1. BACKEND VALIDATION & UNIT TESTS
+  # =========================================================================
+  test-backend:
+    name: Backend Test Suite (Pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Execute Pytest Suite
+        run: |
+          pytest backend/tests -v
+
+  # =========================================================================
+  # 2. ADMIN WEB SYNTAX & ASSET INTEGRITY
+  # =========================================================================
+  test-admin-web:
+    name: Admin Web Integrity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate JavaScript Syntax
+        run: |
+          node -c admin_web/app.js
+
+      - name: Check Static Web Assets
+        run: |
+          test -f admin_web/index.html
+          test -f admin_web/style.css
+          test -f admin_web/assets/logo.png
+
+  # =========================================================================
+  # 3. AUTOMATED DEPLOYMENT ORCHESTRATION (RENDER & VERCEL)
+  # =========================================================================
+  deploy:
+    name: Trigger Automated Cloud Deployments
+    needs: [test-backend, test-admin-web]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Trigger Render Backend Deployment
+        run: |
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "Triggering Render deployment webhook..."
+            HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+            echo "Render webhook responded with status: $HTTP_RESPONSE"
+            if [ "$HTTP_RESPONSE" -ge 200 ] && [ "$HTTP_RESPONSE" -lt 300 ]; then
+              echo "Render deploy triggered successfully!"
+            else
+              echo "Warning: Render deploy hook returned HTTP $HTTP_RESPONSE. Check webhook secret."
+            fi
+          else
+            echo "Notice: RENDER_DEPLOY_HOOK_URL secret not set. Render will auto-deploy via GitHub integration using render.yaml."
+          fi
+
+      - name: Trigger Vercel Admin Web Deployment
+        run: |
+          if [ -n "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" ]; then
+            echo "Triggering Vercel deployment webhook..."
+            HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}")
+            echo "Vercel webhook responded with status: $HTTP_RESPONSE"
+            if [ "$HTTP_RESPONSE" -ge 200 ] && [ "$HTTP_RESPONSE" -lt 300 ]; then
+              echo "Vercel deploy triggered successfully!"
+            else
+              echo "Warning: Vercel deploy hook returned HTTP $HTTP_RESPONSE. Check webhook secret."
+            fi
+          else
+            echo "Notice: VERCEL_DEPLOY_HOOK_URL secret not set. Vercel will auto-deploy via GitHub integration using vercel.json."
+          fi
