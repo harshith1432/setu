@@ -66,23 +66,30 @@ class VisualComfortChart extends StatelessWidget {
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withValues(alpha: 0.25),
-                      border: Border.all(color: const Color(0xFF2E7D32)),
-                      borderRadius: BorderRadius.circular(3),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4CAF50).withValues(alpha: 0.25),
+                        border: Border.all(color: const Color(0xFF2E7D32)),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    idealZoneText,
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF5A695C)),
-                  ),
-                ],
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        idealZoneText,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF5A695C)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

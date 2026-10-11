@@ -137,7 +137,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
           VisualComfortChart(
             title: 'Air Quality (CO₂ Concentration)',
             currentVal: '${shed.indoorAirQuality.toInt()}%',
-            idealZoneText: 'Safe Fresh Air (>= 80% / CO₂ < 1%)',
+            idealZoneText: 'Safe (>= 80%)',
             topLabel: 'Clean (100%)',
             midLabel: 'Target (>= 80%)',
             bottomLabel: 'Stale / Fan ON',
@@ -150,7 +150,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
           VisualComfortChart(
             title: 'Light Intensity (Lux)',
             currentVal: '${shed.indoorLightLux.toInt()} Lux',
-            idealZoneText: 'Research Photoperiod (15–30 Lux)',
+            idealZoneText: 'Ideal (15–30 Lux)',
             topLabel: 'Bright (> 40)',
             midLabel: 'Ideal (15–30)',
             bottomLabel: 'Dark (< 10)',

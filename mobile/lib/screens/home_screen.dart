@@ -485,32 +485,33 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildEquipmentChip(IconData icon, String name, String state, bool active) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFFE0F2F1) : const Color(0xFFF9FBF8),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: active ? const Color(0xFF80CBC4) : const Color(0xFFE0E7DC),
-          ),
+    return Container(
+      width: 100,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFFE0F2F1) : const Color(0xFFF9FBF8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: active ? const Color(0xFF80CBC4) : const Color(0xFFE0E7DC),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20, color: active ? const Color(0xFF00695C) : const Color(0xFF5A695C)),
-            const SizedBox(height: 4),
-            Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-            Text(
-              state,
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-                color: active ? const Color(0xFF00695C) : const Color(0xFF5A695C),
-              ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: active ? const Color(0xFF00695C) : const Color(0xFF5A695C)),
+          const SizedBox(height: 4),
+          Text(name, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            state,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: active ? FontWeight.w700 : FontWeight.normal,
+              color: active ? const Color(0xFF00695C) : const Color(0xFF5A695C),
             ),
-          ],
-        ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }
