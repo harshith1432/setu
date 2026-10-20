@@ -175,12 +175,21 @@ function initTelemetryWebSocket() {
     telemetryWs = null;
   }
   try {
-    const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host || 'localhost:8000';
-    telemetryWs = new WebSocket(`${wsProto}//${host}/api/v1/telemetry/ws/${selectedShedId}`);
+    const wsHost = (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1'))
+      ? (window.location.host || 'localhost:8000')
+      : (window.location.hostname.includes('onrender.com')
+          ? window.location.host
+          : 'setu-8vh9.onrender.com');
+    const wsProto = (wsHost.includes('localhost') || wsHost.includes('127.0.0.1')) ? 'ws:' : 'wss:';
+    telemetryWs = new WebSocket(`${wsProto}//${wsHost}/api/v1/telemetry/ws/${selectedShedId}`);
     telemetryWs.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+        if (msg.type === 'farmer_profile_updated') {
+          fetchFarmers();
+          fetchSheds();
+          fetchStats();
+        }
         if (msg.data) {
           syncLiveTelemetryStream();
         }
@@ -425,9 +434,17 @@ async function syncAllRealtimeData() {
 }
 
 // Lighter interval sync for real-time telemetry stream
+let syncTickCount = 0;
 async function syncLiveTelemetryStream() {
   try {
     await fetchLiveTelemetry();
+    syncTickCount++;
+    if (syncTickCount % 3 === 0) {
+      await fetchStats();
+      if (currentTab === 'farmers') {
+        await fetchFarmers();
+      }
+    }
   } catch (err) {
     console.error('Live telemetry stream error:', err);
   }

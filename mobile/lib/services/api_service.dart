@@ -275,6 +275,21 @@ class ApiService {
     return false;
   }
 
+  Future<Map<String, dynamic>?> setGrowthStage(String shedId, int stage) async {
+    for (final base in candidateUrls) {
+      try {
+        final res = await http.post(
+          Uri.parse('$base/sheds/$shedId/stage/$stage'),
+          headers: _headers,
+        ).timeout(const Duration(seconds: 4));
+        if (res.statusCode == 200) {
+          return jsonDecode(res.body);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   Future<ShedData> getShedStatus(
     String shedId, {
     double? lat,

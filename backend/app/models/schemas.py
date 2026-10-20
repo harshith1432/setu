@@ -51,6 +51,8 @@ class UserProfileUpdate(BaseModel):
     batch_id: Optional[str] = None
     dfl_capacity: Optional[str] = None
     breed: Optional[str] = None
+    current_stage: Optional[int] = None
+    shed_id: Optional[str] = None
     preferred_language: Optional[str] = None
 
 class UserOut(BaseModel):

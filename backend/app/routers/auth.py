@@ -341,13 +341,39 @@ def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_curre
     username = payload.get("sub")
     user = get_user_by_username(username)
     if not user:
+        user = get_user_by_id(payload.get("user_id") or "") or get_user_by_username_or_phone(username or "")
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     updated_dict = update_user_profile(user["id"], updates.model_dump(exclude_unset=True))
     if not updated_dict:
         raise HTTPException(status_code=500, detail="Failed to update user profile")
     
-    log_audit(username, "PROFILE_UPDATE", f"Farmer updated profile/location: {updates.region or ''}")
+    log_audit(user["username"], "PROFILE_UPDATE", f"Farmer updated profile/location: {updates.region or ''}")
+    
+    # Sync with shed telemetry and broadcast to admin web
+    from app.services.telemetry_service import telemetry_service
+    shed_id = updated_dict.get("shed_id") or "shed_01"
+    if updates.current_stage:
+        telemetry_service.set_growth_stage(shed_id, updates.current_stage)
+        
+    if updates.region or updates.latitude is not None or updates.longitude is not None:
+        telemetry_service.get_shed_overview(
+            shed_id,
+            lat=updated_dict.get("latitude"),
+            lon=updated_dict.get("longitude"),
+            region_override=updated_dict.get("region")
+        )
+
+    try:
+        telemetry_service.ws_manager.broadcast_sync({
+            "type": "farmer_profile_updated",
+            "farmer_id": user["id"],
+            "shed_id": shed_id,
+            "data": updated_dict
+        })
+    except Exception:
+        pass
     
     return UserOut(
         id=updated_dict["id"],

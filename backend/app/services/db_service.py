@@ -497,7 +497,7 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
     allowed = [
         "full_name", "phone", "whatsapp_number", "whatsapp_verified",
         "preferred_language", "farm_name", "region", "latitude", "longitude",
-        "shed_id", "batch_id", "dfl_capacity", "breed"
+        "shed_id", "batch_id", "dfl_capacity", "breed", "current_stage"
     ]
     for k in allowed:
         if k in updates and updates[k] is not None:

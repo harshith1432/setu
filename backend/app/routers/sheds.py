@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from app.models.schemas import ShedOverview
 from app.services.telemetry_service import telemetry_service
-from app.services.db_service import get_user_by_username
+from app.services.db_service import get_user_by_username, update_user_profile
 from app.core.security import get_current_user_payload
 
 router = APIRouter(prefix="/sheds", tags=["Sheds"])
@@ -46,4 +46,11 @@ def set_rearing_stage(shed_id: str, stage_num: int, payload: dict = Depends(get_
     """
     if stage_num < 1 or stage_num > 5:
         raise HTTPException(status_code=400, detail="Stage must be between 1 and 5 (Instars)")
+
+    username = payload.get("sub")
+    if username:
+        user = get_user_by_username(username)
+        if user:
+            update_user_profile(user["id"], {"current_stage": stage_num})
+
     return telemetry_service.set_growth_stage(shed_id, stage_num)

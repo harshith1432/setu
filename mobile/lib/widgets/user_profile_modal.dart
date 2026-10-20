@@ -12,6 +12,7 @@ class UserProfileModal extends StatefulWidget {
 class _UserProfileModalState extends State<UserProfileModal> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
+  late TextEditingController _farmNameController;
   late TextEditingController _batchController;
   late TextEditingController _capacityController;
   late TextEditingController _regionController;
@@ -24,6 +25,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
     final provider = Provider.of<SetuProvider>(context, listen: false);
     _nameController = TextEditingController(text: provider.userName);
     _phoneController = TextEditingController(text: provider.userPhone);
+    _farmNameController = TextEditingController(text: provider.farmName);
     _batchController = TextEditingController(text: provider.batchId);
     _capacityController = TextEditingController(text: provider.dflCapacity);
     _regionController = TextEditingController(text: provider.region);
@@ -33,6 +35,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _farmNameController.dispose();
     _batchController.dispose();
     _capacityController.dispose();
     _regionController.dispose();
@@ -43,6 +46,7 @@ class _UserProfileModalState extends State<UserProfileModal> {
     provider.updateUserProfile(
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
+      farmName: _farmNameController.text.trim(),
       batch: _batchController.text.trim(),
       capacity: _capacityController.text.trim(),
       region: _regionController.text.trim(),
@@ -234,6 +238,8 @@ class _UserProfileModalState extends State<UserProfileModal> {
               _buildTextField('Farmer Name', _nameController, Icons.person),
               const SizedBox(height: 10),
               _buildTextField('Phone Number', _phoneController, Icons.phone, keyboardType: TextInputType.phone),
+              const SizedBox(height: 10),
+              _buildTextField('Farm / Shed Name', _farmNameController, Icons.agriculture),
               const SizedBox(height: 10),
               _buildTextField('Batch ID', _batchController, Icons.tag),
               const SizedBox(height: 10),

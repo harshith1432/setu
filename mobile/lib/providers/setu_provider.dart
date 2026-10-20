@@ -272,6 +272,39 @@ class SetuProvider with ChangeNotifier {
         ? preferredPhone!.trim()
         : (user.phoneNumber?.trim().isNotEmpty == true ? user.phoneNumber!.trim() : _userPhone);
 
+    // Sync with backend immediately to obtain valid backend JWT and latest profile
+    _apiService.googleSync(
+      fullName: _userName,
+      email: user.email,
+      googleId: user.uid,
+      phone: _userPhone,
+      farmName: _farmName,
+      region: _region,
+      batchId: _batchId,
+      dflCapacity: _dflCapacity,
+      breed: _breed,
+      preferredLanguage: _locale.languageCode,
+    ).then((syncRes) {
+      if (syncRes['success'] == true && syncRes['data'] != null) {
+        final data = syncRes['data'];
+        final userMap = data['user'] ?? {};
+        _authToken = data['access_token'];
+        _apiService.setToken(_authToken);
+        _userId = userMap['id'] ?? _userId;
+        _farmName = userMap['farm_name'] ?? _farmName;
+        _region = userMap['region'] ?? _region;
+        final userShed = userMap['shed_id'] ?? _shedData.shedId;
+        _shedData = _shedData.copyWith(
+          shedId: userShed,
+          farmName: _farmName,
+          region: _region,
+        );
+        _saveSessionToPreferences(token: _authToken!, userMap: userMap);
+        notifyListeners();
+        _syncTelemetryToBackend();
+      }
+    });
+
     await _saveSessionToPreferences(token: _authToken!, userMap: {
       'id': _userId,
       'username': _username,
@@ -605,6 +638,7 @@ class SetuProvider with ChangeNotifier {
         );
       }
       _updateAdviceForWeather();
+      _syncTelemetryToBackend();
     } catch (e) {
       _weatherErrorMessage = e.toString();
     } finally {
@@ -908,6 +942,11 @@ class SetuProvider with ChangeNotifier {
       if (region != null && region.trim().isNotEmpty) prefs.setString('region', _region);
     });
 
+    _shedData = _shedData.copyWith(
+      farmName: _farmName,
+      region: _region,
+    );
+
     _apiService.updateProfile({
       'full_name': name,
       'phone': phone,
@@ -915,8 +954,10 @@ class SetuProvider with ChangeNotifier {
       'dfl_capacity': capacity,
       if (farmName != null && farmName.trim().isNotEmpty) 'farm_name': _farmName,
       if (region != null && region.trim().isNotEmpty) 'region': _region,
+      'current_stage': _currentGrowthStage,
     });
 
+    _syncTelemetryToBackend();
     notifyListeners();
   }
 
@@ -1081,8 +1122,26 @@ class SetuProvider with ChangeNotifier {
       } else {
         _syncTargetsIntoShedData(isAutoMode: false);
       }
+      _apiService.setGrowthStage(_shedData.shedId, stage);
+      _apiService.updateProfile({'current_stage': stage});
+      _syncTelemetryToBackend();
       notifyListeners();
     }
+  }
+
+  Future<void> _syncTelemetryToBackend() async {
+    if (!_isLoggedIn) return;
+    try {
+      await _apiService.recordTelemetry(
+        shedId: _shedData.shedId,
+        temperature: _shedData.indoorTemp,
+        humidity: _shedData.indoorHumidity,
+        airQuality: _shedData.indoorAirQuality,
+        lightLux: _shedData.indoorLightLux,
+        outsideTemp: _shedData.outsideTemp,
+        outsideHumidity: _shedData.outsideHumidity,
+      );
+    } catch (_) {}
   }
 
   void toggleActuator(String actuator) {
@@ -1127,6 +1186,7 @@ class SetuProvider with ChangeNotifier {
                 ? nextLight
                 : nextFan;
     _apiService.manualActuatorOverride(_shedData.shedId, actuator, nextState);
+    _syncTelemetryToBackend();
     notifyListeners();
   }
 
