@@ -31,3 +31,25 @@ flutter run -d linux
 #
 flutter devices
 flutter run -d <android-device-id>
+
+curl -sS -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin"
+  }'
+
+
+TOKEN=$(curl -sS -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' | python -c 'import sys, json; print(json.load(sys.stdin)["access_token"])')
+
+curl -sS -X POST "http://localhost:8000/api/v1/control/shed_01/alerts/test" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Setu alert: Cooling action required for shed_01. Outside temperature is high and the environment is too warm.",
+    "dry_run": false,
+    "recipient": "whatsapp:+916361606828"
+  }'
+

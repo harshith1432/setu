@@ -46,6 +46,13 @@ class Settings(BaseModel):
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
     FIREBASE_SERVICE_ACCOUNT_JSON: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
 
+    # Twilio / WhatsApp notifications
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SSID", "")
+    TWILIO_ACCOUNT_SSID: str = os.getenv("TWILIO_ACCOUNT_SSID") or os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_WHATSAPP_FROM: str = os.getenv("TWILIO_WHATSAPP_FROM", "")
+    TWILIO_WHATSAPP_TO: str = os.getenv("TWILIO_WHATSAPP_TO", "")
+
     # Regional defaults (Global Worldwide Dynamic Geocoding)
     DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "Global Sericulture Network")
     DEFAULT_LATITUDE: float = float(os.getenv("DEFAULT_LATITUDE", "0.0"))

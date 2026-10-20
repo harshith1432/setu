@@ -9,6 +9,7 @@ from app.models.schemas import TelemetryPayload, ActuatorStates, ShedOverview
 from app.services.rules_engine import rules_engine, STAGE_THRESHOLDS
 from app.services.weather_service import weather_service
 from app.services.db_service import save_telemetry_reading, get_telemetry_history_from_db
+from app.services.whatsapp_alerts import alert_service
 
 class ConnectionManager:
     """
@@ -299,16 +300,38 @@ class TelemetryService:
     ) -> ShedOverview:
         shed = self.sheds.get(shed_id, self.sheds["shed_01"])
         shed["is_auto_mode"] = False
-        
+
         # Enforce safety interlock
         if actuator == "cooler":
             shed["actuators"].cooler = state
             if state:
                 shed["actuators"].heater = False
+                alert_service.send(
+                    message=alert_service.build_manual_alert(
+                        actuator="cooler",
+                        outside_temp=shed.get("outside_temp", 0.0),
+                        outside_humidity=shed.get("outside_hum", 0.0),
+                        region=shed.get("region"),
+                        current_temp=shed.get("current_temp", 0.0),
+                        current_humidity=shed.get("current_hum", 0.0),
+                    ),
+                    dry_run=False,
+                )
         elif actuator == "heater":
             shed["actuators"].heater = state
             if state:
                 shed["actuators"].cooler = False
+                alert_service.send(
+                    message=alert_service.build_manual_alert(
+                        actuator="heater",
+                        outside_temp=shed.get("outside_temp", 0.0),
+                        outside_humidity=shed.get("outside_hum", 0.0),
+                        region=shed.get("region"),
+                        current_temp=shed.get("current_temp", 0.0),
+                        current_humidity=shed.get("current_hum", 0.0),
+                    ),
+                    dry_run=False,
+                )
         elif actuator == "fan":
             shed["actuators"].fan = state
         elif actuator == "light":
@@ -321,7 +344,7 @@ class TelemetryService:
             val = max(0, min(100, value if value is not None else (35 if state else 0)))
             shed["actuators"].light_brightness = val
             shed["actuators"].light = val > 0
-            
+
         return self.get_shed_overview(shed_id)
 
     def set_growth_stage(self, shed_id: str, stage: int) -> ShedOverview:
