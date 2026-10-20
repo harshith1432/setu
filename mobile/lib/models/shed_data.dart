@@ -41,6 +41,7 @@ class ShedData {
   final double outsideHumidity;
   final ActuatorStates actuators;
   final bool isAutoMode;
+  final bool isAdvancedMode;
   final double tempTarget;
   final double humidityTarget;
   final double airflowTarget;
@@ -67,6 +68,7 @@ class ShedData {
     required this.outsideHumidity,
     required this.actuators,
     required this.isAutoMode,
+    this.isAdvancedMode = false,
     required this.tempTarget,
     required this.humidityTarget,
     this.airflowTarget = 50.0,
@@ -95,6 +97,7 @@ class ShedData {
       outsideHumidity: (json['outside_humidity'] as num?)?.toDouble() ?? 58.0,
       actuators: ActuatorStates.fromJson(json['actuators'] ?? {}),
       isAutoMode: json['is_auto_mode'] ?? true,
+      isAdvancedMode: json['is_advanced_mode'] ?? false,
       tempTarget: (json['temp_target'] as num?)?.toDouble() ?? 26.0,
       humidityTarget: (json['humidity_target'] as num?)?.toDouble() ?? 80.0,
       airflowTarget: (json['airflow_target'] as num?)?.toDouble() ?? 50.0,
@@ -123,6 +126,7 @@ class ShedData {
     double? outsideHumidity,
     ActuatorStates? actuators,
     bool? isAutoMode,
+    bool? isAdvancedMode,
     double? tempTarget,
     double? humidityTarget,
     double? airflowTarget,
@@ -149,6 +153,7 @@ class ShedData {
       outsideHumidity: outsideHumidity ?? this.outsideHumidity,
       actuators: actuators ?? this.actuators,
       isAutoMode: isAutoMode ?? this.isAutoMode,
+      isAdvancedMode: isAdvancedMode ?? this.isAdvancedMode,
       tempTarget: tempTarget ?? this.tempTarget,
       humidityTarget: humidityTarget ?? this.humidityTarget,
       airflowTarget: airflowTarget ?? this.airflowTarget,

@@ -53,3 +53,61 @@ def test_safety_interlock_mutual_exclusion():
     )
     # Simultaneous operation is strictly prohibited
     assert not (next_actuators.cooler and next_actuators.heater)
+
+def test_advanced_mode_custom_temp_target_regulation():
+    # Farmer sets custom setpoint to 20.0°C in Advanced Mode
+    # Shed inside temperature is 26.2°C
+    actuators = ActuatorStates(cooler=False, heater=False, fan=False)
+    status, headline, subline, next_actuators, _ = rules_engine.evaluate(
+        current_temp=26.2,
+        current_hum=72.0,
+        outside_temp=30.0,
+        stage=3,
+        is_auto_mode=True,
+        is_advanced_mode=True,
+        manual_temp_target=20.0,
+        current_actuators=actuators
+    )
+    # 26.2°C is above 20.0°C -> Cooling must activate to maintain farmer's custom setpoint!
+    assert status == "TOO_WARM"
+    assert next_actuators.cooler is True
+    assert next_actuators.heater is False
+    assert "20.0" in headline or "20.0" in subline or "Cooling" in headline
+
+def test_advanced_mode_heating_for_high_custom_target():
+    # Farmer sets custom setpoint to 29.0°C in Advanced Mode
+    # Shed inside temperature is 26.2°C
+    actuators = ActuatorStates(cooler=False, heater=False, fan=False)
+    status, headline, subline, next_actuators, _ = rules_engine.evaluate(
+        current_temp=26.2,
+        current_hum=72.0,
+        outside_temp=25.0,
+        stage=3,
+        is_auto_mode=True,
+        is_advanced_mode=True,
+        manual_temp_target=29.0,
+        current_actuators=actuators
+    )
+    # 26.2°C is below 29.0°C -> Heating must activate to reach farmer's target!
+    assert status == "TOO_COOL"
+    assert next_actuators.heater is True
+    assert next_actuators.cooler is False
+
+def test_simple_mode_ignores_custom_target_and_uses_stage_defaults():
+    # When is_advanced_mode=False, system uses Central Silk Board stage 3 defaults (25.0 - 26.5)
+    # At 26.2°C, it should be IDEAL, even if manual_temp_target was passed as 20.0
+    actuators = ActuatorStates(cooler=False, heater=False, fan=False)
+    status, headline, subline, next_actuators, _ = rules_engine.evaluate(
+        current_temp=26.2,
+        current_hum=72.0,
+        outside_temp=28.0,
+        stage=3,
+        is_auto_mode=True,
+        is_advanced_mode=False,
+        manual_temp_target=20.0,
+        current_actuators=actuators
+    )
+    assert status == "IDEAL"
+    assert next_actuators.cooler is False
+    assert next_actuators.heater is False
+

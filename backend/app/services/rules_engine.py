@@ -89,8 +89,9 @@ class RulesEngine:
         stage: int,
         is_auto_mode: bool,
         current_actuators: ActuatorStates,
-        manual_temp_target: float = 26.0,
-        manual_hum_target: float = 75.0,
+        is_advanced_mode: bool = False,
+        manual_temp_target: float = None,
+        manual_hum_target: float = None,
         current_air_quality: float = 88.0,
         current_light_lux: float = 22.0,
         air_quality_target: float = 80.0,
@@ -103,20 +104,26 @@ class RulesEngine:
             (overall_status, status_headline, status_subline, next_actuators, photoperiod_mode)
         """
         thresholds = STAGE_THRESHOLDS.get(stage, STAGE_THRESHOLDS[3])
-        # If user specified a manual target setpoint, center operational envelope around it
-        if manual_temp_target is not None and manual_temp_target > 0:
+
+        # In Advanced Mode: if farmer set custom setpoint, maintain the farmer's custom setpoint!
+        # If in Simple Mode OR if farmer didn't set custom setpoint, use admin default stage thresholds!
+        if is_advanced_mode and manual_temp_target is not None and manual_temp_target > 0:
             target_temp_max = round(manual_temp_target + 0.5, 1)
             target_temp_min = round(manual_temp_target - 0.5, 1)
+            effective_target_temp = manual_temp_target
         else:
             target_temp_max = thresholds["temp_max"]
             target_temp_min = thresholds["temp_min"]
+            effective_target_temp = round((target_temp_min + target_temp_max) / 2.0, 1)
 
-        if manual_hum_target is not None and manual_hum_target > 0:
+        if is_advanced_mode and manual_hum_target is not None and manual_hum_target > 0:
             target_hum_max = round(manual_hum_target + 5.0, 1)
             target_hum_min = round(manual_hum_target - 5.0, 1)
+            effective_target_hum = manual_hum_target
         else:
             target_hum_max = thresholds["hum_max"]
             target_hum_min = thresholds["hum_min"]
+            effective_target_hum = round((target_hum_min + target_hum_max) / 2.0, 1)
 
         new_actuators = ActuatorStates(
             cooler=current_actuators.cooler,
@@ -153,12 +160,16 @@ class RulesEngine:
             if current_temp > target_temp_max + 0.3:
                 new_actuators.cooler = True
                 new_actuators.heater = False  # HARD INTERLOCK
-                if current_temp > target_temp_max + 1.5 or outside_temp > 35.0:
+                if current_temp > target_temp_max + 1.2 or outside_temp > 33.0:
                     new_actuators.fan = True
                     temp_requires_fan = True
                 overall_status = "TOO_WARM"
                 headline = "Too Warm — Cooling Active"
-                subline = f"Shed is {current_temp:.1f}°C (target max {target_temp_max}°C). Cooling running to prevent heat stress."
+                subline = (
+                    f"Shed is {current_temp:.1f}°C (target {effective_target_temp:.1f}°C). Cooling running to maintain your target."
+                    if is_advanced_mode else
+                    f"Shed is {current_temp:.1f}°C (target max {target_temp_max}°C). Cooling running to prevent heat stress."
+                )
             
             elif current_temp < target_temp_min - 0.3:
                 new_actuators.heater = True
@@ -166,7 +177,11 @@ class RulesEngine:
                 new_actuators.fan = False
                 overall_status = "TOO_COOL"
                 headline = "Too Cool — Heating Active"
-                subline = f"Shed is {current_temp:.1f}°C (target min {target_temp_min}°C). Heater running to maintain warmth."
+                subline = (
+                    f"Shed is {current_temp:.1f}°C (target {effective_target_temp:.1f}°C). Heater running to maintain warmth."
+                    if is_advanced_mode else
+                    f"Shed is {current_temp:.1f}°C (target min {target_temp_min}°C). Heater running to maintain warmth."
+                )
 
             else:
                 # Return to ideal with hysteresis
@@ -179,8 +194,8 @@ class RulesEngine:
 
                 if not new_actuators.cooler and not new_actuators.heater:
                     overall_status = "IDEAL"
-                    headline = "Ideal for Silkworms"
-                    subline = "Everything is comfortable inside the shed. No action required."
+                    headline = f"Ideal at Target ({effective_target_temp:.1f}°C)" if is_advanced_mode else "Ideal for Silkworms"
+                    subline = f"Microclimate is perfectly maintained at target ({effective_target_temp:.1f}°C)." if is_advanced_mode else "Everything is comfortable inside the shed. No action required."
 
             # 2. Air Quality Automation (Grounded in Sericulture Research: CO2 < 1% / safe air quality)
             # If air quality drops below the expected target (e.g. 80.0%), turn ON ventilation fan

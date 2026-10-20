@@ -114,11 +114,32 @@ class TelemetryService:
         """
         session = self._get_or_create_shed(payload.shed_id)
         current_stage = session.get("current_stage", 3)
-        is_auto_mode = session.get("is_auto_mode", True)
-        temp_target = session.get("temp_target", 26.0)
-        hum_target = session.get("humidity_target", 75.0)
-        air_quality_target = session.get("air_quality_target", 80.0)
-        light_lux_target = session.get("light_lux_target", 25.0)
+
+        from app.services.db_service import get_shed_settings
+        settings = get_shed_settings(payload.shed_id)
+        if settings:
+            is_advanced_mode = bool(settings.get("is_advanced_mode", False))
+            is_auto_mode = bool(settings.get("is_auto_mode", True))
+            custom_temp = settings.get("custom_temp_target")
+            custom_hum = settings.get("custom_hum_target")
+            if is_advanced_mode and custom_temp is not None:
+                temp_target = float(custom_temp)
+                hum_target = float(custom_hum or 75.0)
+            else:
+                stage_defaults = STAGE_THRESHOLDS.get(current_stage, STAGE_THRESHOLDS[3])
+                temp_target = round((stage_defaults["temp_min"] + stage_defaults["temp_max"]) / 2.0, 1)
+                hum_target = round((stage_defaults["hum_min"] + stage_defaults["hum_max"]) / 2.0, 1)
+            air_quality_target = float(settings.get("custom_air_quality_target") or 80.0)
+            light_lux_target = float(settings.get("custom_light_lux_target") or 25.0)
+        else:
+            is_advanced_mode = session.get("is_advanced_mode", False)
+            is_auto_mode = session.get("is_auto_mode", True)
+            stage_defaults = STAGE_THRESHOLDS.get(current_stage, STAGE_THRESHOLDS[3])
+            temp_target = session.get("temp_target") or round((stage_defaults["temp_min"] + stage_defaults["temp_max"]) / 2.0, 1)
+            hum_target = session.get("humidity_target") or round((stage_defaults["hum_min"] + stage_defaults["hum_max"]) / 2.0, 1)
+            air_quality_target = session.get("air_quality_target", 80.0)
+            light_lux_target = session.get("light_lux_target", 25.0)
+
         current_act = session.get("actuators", ActuatorStates())
 
         # Evaluate deterministic rules engine
@@ -129,6 +150,7 @@ class TelemetryService:
             stage=current_stage,
             is_auto_mode=is_auto_mode,
             current_actuators=current_act,
+            is_advanced_mode=is_advanced_mode,
             manual_temp_target=temp_target,
             manual_hum_target=hum_target,
             current_air_quality=payload.air_quality or 88.0,
@@ -169,9 +191,13 @@ class TelemetryService:
         session["photoperiod_mode"] = photo_mode
 
         # Check for temperature variation or microclimate anomaly
-        thresholds = STAGE_THRESHOLDS.get(session.get("current_stage", 3), STAGE_THRESHOLDS[3])
-        target_temp_max = thresholds.get("temp_max", 27.0)
-        target_temp_min = thresholds.get("temp_min", 25.0)
+        if is_advanced_mode and temp_target is not None:
+            target_temp_max = temp_target + 0.5
+            target_temp_min = temp_target - 0.5
+        else:
+            thresholds = STAGE_THRESHOLDS.get(session.get("current_stage", 3), STAGE_THRESHOLDS[3])
+            target_temp_max = thresholds.get("temp_max", 27.0)
+            target_temp_min = thresholds.get("temp_min", 25.0)
         temp_deviation = abs(payload.temperature - temp_target)
 
         is_temp_varying = (
@@ -389,11 +415,31 @@ class TelemetryService:
         # 3. Retrieve real-time telemetry from database or L1 cache
         session = self._get_or_create_shed(shed_id)
         current_stage = session.get("current_stage") or user_stage or 3
-        temp_target = session.get("temp_target", 26.0)
-        hum_target = session.get("humidity_target", 75.0)
-        air_quality_target = session.get("air_quality_target", 80.0)
-        light_lux_target = session.get("light_lux_target", 25.0)
-        is_auto_mode = session.get("is_auto_mode", True)
+
+        from app.services.db_service import get_shed_settings, save_shed_settings
+        settings = get_shed_settings(shed_id)
+        if settings:
+            is_advanced_mode = bool(settings.get("is_advanced_mode", False))
+            is_auto_mode = bool(settings.get("is_auto_mode", True))
+            custom_temp = settings.get("custom_temp_target")
+            custom_hum = settings.get("custom_hum_target")
+            if is_advanced_mode and custom_temp is not None:
+                temp_target = float(custom_temp)
+                hum_target = float(custom_hum or 75.0)
+            else:
+                stage_defaults = STAGE_THRESHOLDS.get(current_stage, STAGE_THRESHOLDS[3])
+                temp_target = round((stage_defaults["temp_min"] + stage_defaults["temp_max"]) / 2.0, 1)
+                hum_target = round((stage_defaults["hum_min"] + stage_defaults["hum_max"]) / 2.0, 1)
+            air_quality_target = float(settings.get("custom_air_quality_target") or 80.0)
+            light_lux_target = float(settings.get("custom_light_lux_target") or 25.0)
+        else:
+            is_advanced_mode = session.get("is_advanced_mode", False)
+            is_auto_mode = session.get("is_auto_mode", True)
+            stage_defaults = STAGE_THRESHOLDS.get(current_stage, STAGE_THRESHOLDS[3])
+            temp_target = session.get("temp_target") or round((stage_defaults["temp_min"] + stage_defaults["temp_max"]) / 2.0, 1)
+            hum_target = session.get("humidity_target") or round((stage_defaults["hum_min"] + stage_defaults["hum_max"]) / 2.0, 1)
+            air_quality_target = session.get("air_quality_target", 80.0)
+            light_lux_target = session.get("light_lux_target", 25.0)
 
         latest_reading = get_latest_telemetry_reading_from_db(shed_id)
         if latest_reading:
@@ -433,6 +479,7 @@ class TelemetryService:
             stage=current_stage,
             is_auto_mode=is_auto_mode,
             current_actuators=actuators,
+            is_advanced_mode=is_advanced_mode,
             manual_temp_target=temp_target,
             manual_hum_target=hum_target,
             current_air_quality=current_air_quality,
@@ -447,6 +494,10 @@ class TelemetryService:
         # Cache resolved farm & region
         session["farm_name"] = farm_name
         session["region"] = display_region
+        session["is_advanced_mode"] = is_advanced_mode
+        session["is_auto_mode"] = is_auto_mode
+        session["temp_target"] = temp_target
+        session["humidity_target"] = hum_target
 
         return ShedOverview(
             shed_id=shed_id,
@@ -465,6 +516,7 @@ class TelemetryService:
             outside_humidity=outside_hum,
             actuators=actuators if not is_auto_mode else next_actuators,
             is_auto_mode=is_auto_mode,
+            is_advanced_mode=is_advanced_mode,
             temp_target=temp_target,
             humidity_target=hum_target,
             air_quality_target=air_quality_target,
@@ -477,15 +529,18 @@ class TelemetryService:
         self,
         shed_id: str,
         is_auto: bool,
-        temp_target: float,
-        hum_target: float,
+        is_advanced_mode: bool = False,
+        temp_target: Optional[float] = 26.0,
+        hum_target: Optional[float] = 75.0,
         air_quality_target: Optional[float] = None,
         light_lux_target: Optional[float] = None,
         light_brightness: Optional[int] = None,
         caller_user: Optional[str] = "operator"
     ) -> ShedOverview:
+        from app.services.db_service import save_shed_settings
         session = self._get_or_create_shed(shed_id)
         session["is_auto_mode"] = is_auto
+        session["is_advanced_mode"] = is_advanced_mode
         session["temp_target"] = temp_target
         session["humidity_target"] = hum_target
         if air_quality_target is not None:
@@ -498,6 +553,22 @@ class TelemetryService:
             current_act.light = light_brightness > 0
             session["actuators"] = current_act
 
+        # Persist custom setpoints to PostgreSQL
+        try:
+            save_shed_settings(
+                shed_id=shed_id,
+                is_advanced_mode=is_advanced_mode,
+                is_auto_mode=is_auto,
+                custom_temp_target=temp_target if is_advanced_mode else None,
+                custom_hum_target=hum_target if is_advanced_mode else None,
+                custom_air_quality_target=air_quality_target or 80.0,
+                custom_light_lux_target=light_lux_target or 25.0,
+                custom_light_brightness=light_brightness or 0,
+                updated_by=caller_user or "farmer"
+            )
+        except Exception as e:
+            logger.warning("save_shed_settings error: %s", e)
+
         # Record command in safe lifecycle table for IoT nodes
         try:
             create_device_command(
@@ -507,6 +578,7 @@ class TelemetryService:
                 command_type="SET_SETPOINTS",
                 command_payload={
                     "is_auto_mode": is_auto,
+                    "is_advanced_mode": is_advanced_mode,
                     "temp_target": temp_target,
                     "humidity_target": hum_target,
                     "air_quality_target": air_quality_target,

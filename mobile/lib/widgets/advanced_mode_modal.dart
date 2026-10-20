@@ -11,6 +11,7 @@ class AdvancedModeModal extends StatelessWidget {
     final provider = Provider.of<SetuProvider>(context);
     final l10n = AppLocalizations.of(context);
     final isAuto = provider.isAutoMode;
+    final isAdvanced = provider.isAdvancedMode;
     final actuators = provider.shedData.actuators;
     final preset = provider.currentStageInfo;
 
@@ -67,11 +68,11 @@ class AdvancedModeModal extends StatelessWidget {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () => provider.setAutoMode(true),
+                    onTap: () => provider.setAdvancedMode(false),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: isAuto ? const Color(0xFF2E7D32) : Colors.transparent,
+                        color: !isAdvanced ? const Color(0xFF2E7D32) : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
@@ -80,7 +81,7 @@ class AdvancedModeModal extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: isAuto ? Colors.white : const Color(0xFF5A695C),
+                            color: !isAdvanced ? Colors.white : const Color(0xFF5A695C),
                           ),
                         ),
                       ),
@@ -89,11 +90,11 @@ class AdvancedModeModal extends StatelessWidget {
                 ),
                 Expanded(
                   child: InkWell(
-                    onTap: () => provider.setAutoMode(false),
+                    onTap: () => provider.setAdvancedMode(true),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: !isAuto ? const Color(0xFF2E7D32) : Colors.transparent,
+                        color: isAdvanced ? const Color(0xFF2E7D32) : Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
@@ -102,7 +103,7 @@ class AdvancedModeModal extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: !isAuto ? Colors.white : const Color(0xFF5A695C),
+                            color: isAdvanced ? Colors.white : const Color(0xFF5A695C),
                           ),
                         ),
                       ),
@@ -114,7 +115,7 @@ class AdvancedModeModal extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          if (isAuto) ...[
+          if (!isAdvanced) ...[
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -145,6 +146,36 @@ class AdvancedModeModal extends StatelessWidget {
                       _buildPresetBadge('Light Target', '${provider.lightLuxSetPoint.toInt()} Lux'),
                       _buildPresetBadge('Bulb PWM', '${provider.lightBrightness}%'),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFA5D6A7)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.tune, color: Color(0xFF1B5E20), size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Advanced Custom Setpoint Mode Active',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'The system will maintain your custom temperature (${provider.tempSetPoint.toStringAsFixed(1)}°C) and climate. Actuators will automatically turn on/off to reach this target.',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF4E5D50)),
                   ),
                 ],
               ),
@@ -387,7 +418,22 @@ class AdvancedModeModal extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () async {
+              await provider.applySetpointsSettings();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF2E7D32),
+                    content: Text(
+                      isAdvanced
+                          ? 'Settings saved! Shed is maintaining ${provider.tempSetPoint.toStringAsFixed(1)}°C.'
+                          : 'Simple Mode applied! Shed is maintaining stage defaults (${provider.currentStageInfo.tempTarget.toStringAsFixed(1)}°C).',
+                    ),
+                  ),
+                );
+              }
+            },
             child: Text(
               l10n.translate('saveApply'),
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),

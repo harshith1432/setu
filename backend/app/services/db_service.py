@@ -313,6 +313,23 @@ def init_db():
         );
         """)
 
+        # 5b. Shed Custom Setpoints & Advanced Mode Settings
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shed_settings (
+            shed_id VARCHAR(64) PRIMARY KEY,
+            is_advanced_mode BOOLEAN NOT NULL DEFAULT FALSE,
+            is_auto_mode BOOLEAN NOT NULL DEFAULT TRUE,
+            custom_temp_target FLOAT,
+            custom_hum_target FLOAT,
+            custom_air_quality_target FLOAT DEFAULT 80.0,
+            custom_light_lux_target FLOAT DEFAULT 25.0,
+            custom_light_brightness INT DEFAULT 0,
+            updated_at TIMESTAMPTZ NOT NULL,
+            updated_by VARCHAR(64) DEFAULT 'farmer'
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_shed_settings_shed ON shed_settings (shed_id);")
+
         # 6. Shed Telemetry Storage (Standard)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS shed_telemetry (
@@ -552,6 +569,88 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
             _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
         return dict(res) if res else None
 
+_shed_settings_cache: Dict[str, tuple[float, Optional[Dict[str, Any]]]] = {}
+
+def get_shed_settings(shed_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves custom farmer setpoints & advanced mode configuration for a shed."""
+    clean_id = shed_id.strip().lower()
+    now = time.time()
+    with _user_cache_lock:
+        if clean_id in _shed_settings_cache:
+            exp, val = _shed_settings_cache[clean_id]
+            if now < exp:
+                return dict(val) if val else None
+
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("SELECT * FROM shed_settings WHERE LOWER(shed_id) = %s", (clean_id,))
+        row = cursor.fetchone()
+        res = dict(row) if row else None
+        if res and isinstance(res.get("updated_at"), datetime):
+            res["updated_at"] = res["updated_at"].isoformat()
+
+        with _user_cache_lock:
+            _shed_settings_cache[clean_id] = (now + USER_CACHE_TTL, res)
+        return dict(res) if res else None
+
+def save_shed_settings(
+    shed_id: str,
+    is_advanced_mode: bool,
+    is_auto_mode: bool = True,
+    custom_temp_target: Optional[float] = None,
+    custom_hum_target: Optional[float] = None,
+    custom_air_quality_target: Optional[float] = 80.0,
+    custom_light_lux_target: Optional[float] = 25.0,
+    custom_light_brightness: Optional[int] = 0,
+    updated_by: Optional[str] = "farmer"
+) -> Dict[str, Any]:
+    """Persists farmer custom setpoints to PostgreSQL and invalidates cache."""
+    clean_id = shed_id.strip().lower()
+    now_dt = datetime.now(timezone.utc)
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("""
+        INSERT INTO shed_settings (
+            shed_id, is_advanced_mode, is_auto_mode, custom_temp_target, custom_hum_target,
+            custom_air_quality_target, custom_light_lux_target, custom_light_brightness,
+            updated_at, updated_by
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (shed_id) DO UPDATE SET
+            is_advanced_mode = EXCLUDED.is_advanced_mode,
+            is_auto_mode = EXCLUDED.is_auto_mode,
+            custom_temp_target = EXCLUDED.custom_temp_target,
+            custom_hum_target = EXCLUDED.custom_hum_target,
+            custom_air_quality_target = EXCLUDED.custom_air_quality_target,
+            custom_light_lux_target = EXCLUDED.custom_light_lux_target,
+            custom_light_brightness = EXCLUDED.custom_light_brightness,
+            updated_at = EXCLUDED.updated_at,
+            updated_by = EXCLUDED.updated_by
+        RETURNING *;
+        """, (
+            clean_id, is_advanced_mode, is_auto_mode, custom_temp_target, custom_hum_target,
+            custom_air_quality_target, custom_light_lux_target, custom_light_brightness,
+            now_dt, updated_by
+        ))
+        row = cursor.fetchone()
+        res = dict(row) if row else {
+            "shed_id": clean_id,
+            "is_advanced_mode": is_advanced_mode,
+            "is_auto_mode": is_auto_mode,
+            "custom_temp_target": custom_temp_target,
+            "custom_hum_target": custom_hum_target,
+            "custom_air_quality_target": custom_air_quality_target,
+            "custom_light_lux_target": custom_light_lux_target,
+            "custom_light_brightness": custom_light_brightness,
+            "updated_at": now_dt.isoformat(),
+            "updated_by": updated_by
+        }
+        if isinstance(res.get("updated_at"), datetime):
+            res["updated_at"] = res["updated_at"].isoformat()
+
+        with _user_cache_lock:
+            _shed_settings_cache[clean_id] = (time.time() + USER_CACHE_TTL, res)
+        return res
+
 def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
     clean_id = identifier.strip()
     with get_db_cursor(dict_cursor=True) as cursor:
@@ -590,6 +689,88 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         with _user_cache_lock:
             _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
         return dict(res) if res else None
+
+_shed_settings_cache: Dict[str, tuple[float, Optional[Dict[str, Any]]]] = {}
+
+def get_shed_settings(shed_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves custom farmer setpoints & advanced mode configuration for a shed."""
+    clean_id = shed_id.strip().lower()
+    now = time.time()
+    with _user_cache_lock:
+        if clean_id in _shed_settings_cache:
+            exp, val = _shed_settings_cache[clean_id]
+            if now < exp:
+                return dict(val) if val else None
+
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("SELECT * FROM shed_settings WHERE LOWER(shed_id) = %s", (clean_id,))
+        row = cursor.fetchone()
+        res = dict(row) if row else None
+        if res and isinstance(res.get("updated_at"), datetime):
+            res["updated_at"] = res["updated_at"].isoformat()
+
+        with _user_cache_lock:
+            _shed_settings_cache[clean_id] = (now + USER_CACHE_TTL, res)
+        return dict(res) if res else None
+
+def save_shed_settings(
+    shed_id: str,
+    is_advanced_mode: bool,
+    is_auto_mode: bool = True,
+    custom_temp_target: Optional[float] = None,
+    custom_hum_target: Optional[float] = None,
+    custom_air_quality_target: Optional[float] = 80.0,
+    custom_light_lux_target: Optional[float] = 25.0,
+    custom_light_brightness: Optional[int] = 0,
+    updated_by: Optional[str] = "farmer"
+) -> Dict[str, Any]:
+    """Persists farmer custom setpoints to PostgreSQL and invalidates cache."""
+    clean_id = shed_id.strip().lower()
+    now_dt = datetime.now(timezone.utc)
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("""
+        INSERT INTO shed_settings (
+            shed_id, is_advanced_mode, is_auto_mode, custom_temp_target, custom_hum_target,
+            custom_air_quality_target, custom_light_lux_target, custom_light_brightness,
+            updated_at, updated_by
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (shed_id) DO UPDATE SET
+            is_advanced_mode = EXCLUDED.is_advanced_mode,
+            is_auto_mode = EXCLUDED.is_auto_mode,
+            custom_temp_target = EXCLUDED.custom_temp_target,
+            custom_hum_target = EXCLUDED.custom_hum_target,
+            custom_air_quality_target = EXCLUDED.custom_air_quality_target,
+            custom_light_lux_target = EXCLUDED.custom_light_lux_target,
+            custom_light_brightness = EXCLUDED.custom_light_brightness,
+            updated_at = EXCLUDED.updated_at,
+            updated_by = EXCLUDED.updated_by
+        RETURNING *;
+        """, (
+            clean_id, is_advanced_mode, is_auto_mode, custom_temp_target, custom_hum_target,
+            custom_air_quality_target, custom_light_lux_target, custom_light_brightness,
+            now_dt, updated_by
+        ))
+        row = cursor.fetchone()
+        res = dict(row) if row else {
+            "shed_id": clean_id,
+            "is_advanced_mode": is_advanced_mode,
+            "is_auto_mode": is_auto_mode,
+            "custom_temp_target": custom_temp_target,
+            "custom_hum_target": custom_hum_target,
+            "custom_air_quality_target": custom_air_quality_target,
+            "custom_light_lux_target": custom_light_lux_target,
+            "custom_light_brightness": custom_light_brightness,
+            "updated_at": now_dt.isoformat(),
+            "updated_by": updated_by
+        }
+        if isinstance(res.get("updated_at"), datetime):
+            res["updated_at"] = res["updated_at"].isoformat()
+
+        with _user_cache_lock:
+            _shed_settings_cache[clean_id] = (time.time() + USER_CACHE_TTL, res)
+        return res
 
 def get_all_farmers() -> List[Dict[str, Any]]:
     ensure_unique_farmer_sheds()

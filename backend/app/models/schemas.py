@@ -129,9 +129,10 @@ class TelemetryBatchPayload(BaseModel):
 
 class SetpointsUpdate(BaseModel):
     is_auto_mode: bool = True
-    temp_target: float = Field(26.0, ge=18.0, le=35.0)
-    humidity_target: float = Field(75.0, ge=40.0, le=95.0)
-    air_quality_target: Optional[float] = Field(80.0, ge=50.0, le=100.0)
+    is_advanced_mode: Optional[bool] = False
+    temp_target: Optional[float] = Field(26.0, ge=15.0, le=40.0)
+    humidity_target: Optional[float] = Field(75.0, ge=30.0, le=99.0)
+    air_quality_target: Optional[float] = Field(80.0, ge=40.0, le=100.0)
     light_lux_target: Optional[float] = Field(25.0, ge=5.0, le=100.0)
     light_brightness: Optional[int] = Field(None, ge=0, le=100)
 
@@ -225,6 +226,7 @@ class ShedOverview(BaseModel):
     outside_humidity: float
     actuators: ActuatorStates
     is_auto_mode: bool
+    is_advanced_mode: bool = False
     temp_target: float
     humidity_target: float
     air_quality_target: float = 80.0

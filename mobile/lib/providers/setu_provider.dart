@@ -82,6 +82,7 @@ class SetuProvider with ChangeNotifier {
     outsideHumidity: 58.0,
     actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true, lightBrightness: 35),
     isAutoMode: true,
+    isAdvancedMode: false,
     tempTarget: 26.0,
     humidityTarget: 80.0,
     airflowTarget: 50.0,
@@ -1002,7 +1003,44 @@ class SetuProvider with ChangeNotifier {
   }
 
   void toggleAdvancedMode() {
-    _isAdvancedMode = !_isAdvancedMode;
+    setAdvancedMode(!_isAdvancedMode);
+  }
+
+  void setAdvancedMode(bool advanced) {
+    markUserAction();
+    _isAdvancedMode = advanced;
+    if (!advanced) {
+      _applySimpleStagePreset();
+    } else {
+      _isAutoMode = true;
+      _syncTargetsIntoShedData(isAutoMode: true);
+    }
+    _apiService.updateSetpoints(
+      _shedData.shedId,
+      _isAutoMode,
+      _tempSetPoint,
+      _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
+      airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
+    );
+    notifyListeners();
+  }
+
+  Future<void> applySetpointsSettings() async {
+    markUserAction();
+    _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
+    await _apiService.updateSetpoints(
+      _shedData.shedId,
+      _isAutoMode,
+      _tempSetPoint,
+      _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
+      airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
+    );
     notifyListeners();
   }
 
@@ -1086,6 +1124,7 @@ class SetuProvider with ChangeNotifier {
         lightBrightness: brightness,
       ),
       isAutoMode: auto,
+      isAdvancedMode: _isAdvancedMode,
       tempTarget: _tempSetPoint,
       humidityTarget: _humSetPoint,
       airflowTarget: _airflowSetPoint.toDouble(),
@@ -1151,7 +1190,11 @@ class SetuProvider with ChangeNotifier {
     markUserAction();
     _isAutoMode = auto;
     if (auto) {
-      _applySimpleStagePreset();
+      if (!_isAdvancedMode) {
+        _applySimpleStagePreset();
+      } else {
+        _syncTargetsIntoShedData(isAutoMode: true);
+      }
     } else {
       _syncTargetsIntoShedData(isAutoMode: false);
     }
@@ -1160,6 +1203,7 @@ class SetuProvider with ChangeNotifier {
       auto,
       _tempSetPoint,
       _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
       airQualityTarget: _airQualitySetPoint,
       lightLuxTarget: _lightLuxSetPoint,
       lightBrightness: _lightBrightness,
@@ -1172,7 +1216,16 @@ class SetuProvider with ChangeNotifier {
     _tempSetPoint = (_tempSetPoint + delta).clamp(18.0, 35.0);
     _tempSetPoint = double.parse(_tempSetPoint.toStringAsFixed(1));
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
-    _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
+    _apiService.updateSetpoints(
+      _shedData.shedId,
+      _isAutoMode,
+      _tempSetPoint,
+      _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
+      airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
+    );
     notifyListeners();
   }
 
@@ -1180,7 +1233,16 @@ class SetuProvider with ChangeNotifier {
     markUserAction();
     _humSetPoint = (_humSetPoint + delta).clamp(40.0, 95.0);
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
-    _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
+    _apiService.updateSetpoints(
+      _shedData.shedId,
+      _isAutoMode,
+      _tempSetPoint,
+      _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
+      airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
+    );
     notifyListeners();
   }
 
@@ -1207,7 +1269,10 @@ class SetuProvider with ChangeNotifier {
       _isAutoMode,
       _tempSetPoint,
       _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
       airQualityTarget: _airQualitySetPoint,
+      lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
     );
     notifyListeners();
   }
@@ -1221,7 +1286,10 @@ class SetuProvider with ChangeNotifier {
       _isAutoMode,
       _tempSetPoint,
       _humSetPoint,
+      isAdvancedMode: _isAdvancedMode,
+      airQualityTarget: _airQualitySetPoint,
       lightLuxTarget: _lightLuxSetPoint,
+      lightBrightness: _lightBrightness,
     );
     notifyListeners();
   }
@@ -1381,6 +1449,7 @@ class SetuProvider with ChangeNotifier {
         if (!isRecentAction) {
           _currentGrowthStage = serverShed.currentStage;
           _isAutoMode = serverShed.isAutoMode;
+          _isAdvancedMode = serverShed.isAdvancedMode;
           _tempSetPoint = serverShed.tempTarget;
           _humSetPoint = serverShed.humidityTarget;
           _airflowSetPoint = serverShed.airflowTarget.toInt();

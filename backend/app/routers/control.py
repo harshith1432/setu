@@ -159,6 +159,7 @@ def update_setpoints(
     return telemetry_service.update_setpoints(
         shed_id=shed_id,
         is_auto=payload.is_auto_mode,
+        is_advanced_mode=bool(payload.is_advanced_mode),
         temp_target=payload.temp_target,
         hum_target=payload.humidity_target,
         air_quality_target=payload.air_quality_target,

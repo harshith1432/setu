@@ -345,6 +345,7 @@ class ApiService {
     bool isAuto,
     double tempTarget,
     double humTarget, {
+    bool isAdvancedMode = false,
     double? airQualityTarget,
     double? lightLuxTarget,
     int? lightBrightness,
@@ -353,6 +354,7 @@ class ApiService {
       try {
         final payload = <String, dynamic>{
           'is_auto_mode': isAuto,
+          'is_advanced_mode': isAdvancedMode,
           'temp_target': tempTarget,
           'humidity_target': humTarget,
         };

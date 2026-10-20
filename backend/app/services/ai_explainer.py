@@ -100,7 +100,9 @@ class AIExplainerService:
         indoor_hum: float,
         out_temp: float,
         stage: int,
-        lang: str = "en"
+        lang: str = "en",
+        is_advanced_mode: bool = False,
+        temp_target: float = None
     ) -> AIExplanation:
         from app.services.rules_engine import STAGE_THRESHOLDS
         thresholds = STAGE_THRESHOLDS.get(stage, STAGE_THRESHOLDS[3])
@@ -115,17 +117,22 @@ class AIExplainerService:
         selected_lang = lang if lang in ["en", "kn", "te"] else "en"
         tpl = EXPLANATION_TEMPLATES[mode][selected_lang]
 
+        target_max = (temp_target + 0.5) if (is_advanced_mode and temp_target) else thresholds["temp_max"]
+        target_min = (temp_target - 0.5) if (is_advanced_mode and temp_target) else thresholds["temp_min"]
+
         why_text = tpl["why"].format(
             out_temp=out_temp,
-            target_max=thresholds["temp_max"],
-            target_min=thresholds["temp_min"],
+            target_max=target_max,
+            target_min=target_min,
             stage_name=stage_name
         )
         target_desc = tpl["target"].format(
-            target_max=thresholds["temp_max"],
-            target_min=thresholds["temp_min"],
+            target_max=target_max,
+            target_min=target_min,
             stage_name=stage_name
         )
+        if is_advanced_mode and temp_target and selected_lang == "en":
+            target_desc = f"Target: Maintain {temp_target:.1f}°C (Farmer Setpoint)"
 
         return AIExplanation(
             why_text=why_text,

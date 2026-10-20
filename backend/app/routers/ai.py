@@ -24,5 +24,7 @@ def get_ai_explanation(
         indoor_hum=shed.indoor_humidity,
         out_temp=shed.outside_temp,
         stage=shed.current_stage,
-        lang=lang
+        lang=lang,
+        is_advanced_mode=shed.is_advanced_mode,
+        temp_target=shed.temp_target
     )
