@@ -42,9 +42,11 @@ class AdvancedModeModal extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Simple and Advanced Controls',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              const Expanded(
+                child: Text(
+                  'Simple and Advanced Controls',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.close, size: 20),
@@ -154,17 +156,21 @@ class AdvancedModeModal extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.translate('tempSetPoint'),
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                  ),
-                  const Text('Target cooling/heating activation', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.translate('tempSetPoint'),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const Text('Target cooling/heating activation', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildStepBtn('-', () => provider.adjustTempSetPoint(-0.5)),
                   const SizedBox(width: 8),
@@ -184,7 +190,8 @@ class AdvancedModeModal extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
+              Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -194,7 +201,10 @@ class AdvancedModeModal extends StatelessWidget {
                   const Text('Target fogger/dehumidifier range', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
                 ],
               ),
+              ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildStepBtn('-', () => provider.adjustHumSetPoint(-5.0)),
                   const SizedBox(width: 8),
@@ -214,7 +224,8 @@ class AdvancedModeModal extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              const Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -224,7 +235,10 @@ class AdvancedModeModal extends StatelessWidget {
                   Text('Triggers ventilation fan if below target', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
                 ],
               ),
+              ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildStepBtn('-', () => provider.adjustAirQualitySetPoint(-5.0)),
                   const SizedBox(width: 8),
@@ -244,7 +258,8 @@ class AdvancedModeModal extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              const Expanded(
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -254,7 +269,10 @@ class AdvancedModeModal extends StatelessWidget {
                   Text('Research photoperiod (15–30 Lux)', style: TextStyle(fontSize: 10, color: Color(0xFF5A695C))),
                 ],
               ),
+              ),
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildStepBtn('-', () => provider.adjustLightLuxSetPoint(-5.0)),
                   const SizedBox(width: 8),
@@ -305,8 +323,10 @@ class AdvancedModeModal extends StatelessWidget {
                 label: '${provider.lightBrightness}%',
                 onChanged: (val) => provider.setLightBrightness(val.round()),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   _buildPresetSliderBtn('Dark (0%)', 0, provider),
                   _buildPresetSliderBtn('Dim (25%)', 25, provider),
