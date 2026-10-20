@@ -254,7 +254,7 @@ class ApiService {
     for (final base in candidateUrls) {
       try {
         final res = await http.post(
-          Uri.parse('/telemetry/record'),
+          Uri.parse('$base/telemetry/record'),
           headers: _headers,
           body: jsonEncode({
             'shed_id': shedId,

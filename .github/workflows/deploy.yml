@@ -54,6 +54,7 @@ jobs:
         env:
           PYTHONPATH: backend
           DATABASE_URL: postgresql://setu_user:setu_password@127.0.0.1:5432/setu
+          SEED_DEMO_FARMERS: "true"
         run: |
           python -m pytest backend/tests -v
 
