@@ -2,8 +2,12 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from app.core.security import get_current_user_payload
+from app.models.schemas import UserProfileUpdate
 from app.services.db_service import (
     get_all_farmers,
+    get_user_by_id,
+    get_user_by_username,
+    update_user_profile,
     update_user_status,
     delete_user,
     get_audit_logs,
@@ -106,6 +110,64 @@ def list_monitored_sheds(admin_user: dict = Depends(require_superadmin)) -> List
 @router.get("/farmers")
 def list_enrolled_farmers(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:
     return get_all_farmers()
+
+@router.get("/farmers/{farmer_id}")
+def get_farmer_detail(farmer_id: str, admin_user: dict = Depends(require_superadmin)):
+    """
+    Get full farmer profile, linked shed overview, recent telemetry history, and alert context.
+    """
+    user = get_user_by_id(farmer_id) or get_user_by_username(farmer_id)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Farmer '{farmer_id}' not found")
+
+    shed_id = user.get("shed_id") or "shed_01"
+    shed_overview = telemetry_service.get_shed_overview(
+        shed_id,
+        lat=user.get("latitude"),
+        lon=user.get("longitude"),
+        region_override=user.get("region")
+    )
+    history = telemetry_service.get_history(shed_id, limit=30)
+
+    return {
+        "status": "success",
+        "farmer": user,
+        "shed": shed_overview,
+        "history": history
+    }
+
+@router.put("/farmers/{farmer_id}")
+@router.patch("/farmers/{farmer_id}")
+def update_farmer_details(
+    farmer_id: str,
+    payload: UserProfileUpdate,
+    admin_user: dict = Depends(require_superadmin)
+):
+    """
+    Super Admin endpoint to edit farmer personal info, farm setup, and growth stage.
+    """
+    updates = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields provided for update")
+
+    updated_user = update_user_profile(farmer_id, updates)
+    if not updated_user:
+        raise HTTPException(status_code=404, detail=f"Farmer '{farmer_id}' not found")
+
+    if "current_stage" in updates and updates["current_stage"] is not None:
+        shed_id = updated_user.get("shed_id") or "shed_01"
+        try:
+            telemetry_service.set_growth_stage(shed_id, updates["current_stage"])
+        except Exception:
+            pass
+
+    log_audit(
+        admin_user.get("sub", "admin"),
+        "UPDATE_FARMER",
+        f"Farmer {farmer_id} ({updated_user.get('full_name')}) details updated by superadmin"
+    )
+
+    return {"status": "success", "farmer": updated_user}
 
 @router.patch("/farmers/{farmer_id}/status")
 def change_farmer_status(farmer_id: str, payload: FarmerStatusUpdate, admin_user: dict = Depends(require_superadmin)):

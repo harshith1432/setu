@@ -177,6 +177,29 @@ async def test_super_admin_stats_and_farmer_management(async_client):
     farmers = farmers_res.json()
     assert any(f["username"] == "ramesh_farmer" for f in farmers)
 
+    # Fetch farmer detail
+    detail_res = await async_client.get("/api/v1/admin/farmers/ramesh_farmer", headers=admin_headers)
+    assert detail_res.status_code == 200
+    detail_data = detail_res.json()
+    assert detail_data["status"] == "success"
+    assert detail_data["farmer"]["username"] == "ramesh_farmer"
+    assert "shed" in detail_data
+    assert "history" in detail_data
+
+    # Update farmer details
+    update_res = await async_client.put(
+        "/api/v1/admin/farmers/ramesh_farmer",
+        headers=admin_headers,
+        json={
+            "full_name": "Ramesh Gowda Updated",
+            "phone": "+91 98450 99999",
+            "farm_name": "Green Valley Sericulture Farm Updated",
+            "batch_id": "SERI-2026-M04-REV"
+        }
+    )
+    assert update_res.status_code == 200
+    assert update_res.json()["farmer"]["full_name"] == "Ramesh Gowda Updated"
+
     # Test Web Portal Static route
     portal_res = await async_client.get("/admin/")
     assert portal_res.status_code == 200

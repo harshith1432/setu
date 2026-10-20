@@ -214,41 +214,156 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: CircleAvatar(
-              radius: 13,
-              backgroundColor: const Color(0xFF2E7D32),
-              child: Text(
-                provider.userName.isNotEmpty ? provider.userName[0].toUpperCase() : 'R',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
+          PopupMenuButton<String>(
+            icon: const Icon(
+              Icons.more_vert,
+              color: Color(0xFF1C251D),
+              size: 24,
             ),
-            tooltip: 'User Profile',
-            onPressed: () => _openProfileSheet(context),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10.0),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE8F5E9),
-                foregroundColor: const Color(0xFF1B5E20),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              icon: const Icon(Icons.tune, size: 14),
-              label: Text(
-                l10n.translate('advMode'),
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-              ),
-              onPressed: () => _openAdvancedSheet(context),
+            tooltip: 'Menu',
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
+            elevation: 4,
+            color: Colors.white,
+            offset: const Offset(0, 48),
+            onSelected: (value) {
+              if (value == 'profile') {
+                _openProfileSheet(context);
+              } else if (value == 'advanced') {
+                _openAdvancedSheet(context);
+              } else if (value == 'settings') {
+                _openSettingsSheet(context);
+              }
+            },
+            itemBuilder: (BuildContext ctx) => [
+              PopupMenuItem<String>(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: const Color(0xFF2E7D32),
+                      child: Text(
+                        provider.userName.isNotEmpty
+                            ? provider.userName[0].toUpperCase()
+                            : 'R',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l10n.translate('profile'),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1C251D),
+                            ),
+                          ),
+                          if (provider.userName.isNotEmpty)
+                            Text(
+                              provider.userName,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF757575),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(height: 1),
+              PopupMenuItem<String>(
+                value: 'advanced',
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.tune,
+                        size: 16,
+                        color: Color(0xFF1B5E20),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        l10n.translate('advMode'),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1C251D),
+                        ),
+                      ),
+                    ),
+                    if (provider.isAdvancedMode)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1B5E20),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'ON',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.settings_outlined,
+                        size: 16,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        l10n.translate('settings'),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1C251D),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Color(0xFF1C251D)),
-            onPressed: () => _openSettingsSheet(context),
-          ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(

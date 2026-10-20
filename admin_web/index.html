@@ -1065,6 +1065,378 @@
     </div>
   </div>
 
+  <!-- ================= FARMER COMPLETE DATA & HISTORY MODAL ================= -->
+  <div id="farmerDetailsModal" class="modal-backdrop hidden" onclick="if(event.target===this) closeFarmerDetailsModal()">
+    <div class="modal-dialog modal-xl">
+      <!-- Modal Header Banner -->
+      <div class="farmer-modal-header">
+        <div class="farmer-header-info">
+          <div class="farmer-avatar-circle" id="fdAvatar">HK</div>
+          <div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <h2 id="fdFullName" style="font-size:1.35rem; font-weight:800; color:var(--green-deep); margin:0;">Harshith Kd</h2>
+              <span id="fdStatusBadge" class="badge-status active">Active Rearing</span>
+              <span id="fdShedBadge" class="badge" style="background:#E8F5E9; color:#1B5E20; border:1px solid #A5D6A7; font-weight:700;">SHED_01</span>
+            </div>
+            <p id="fdSubline" style="font-size:0.85rem; color:var(--text-muted); margin:4px 0 0 0;">
+              @harshithkd032@gmail.com &bull; Farm: vfgt &bull; Region: Katteri, Mysore Division, India
+            </p>
+          </div>
+        </div>
+        <div class="farmer-header-actions">
+          <button class="btn btn-primary btn-sm" onclick="openEditFarmerFromDetails()">
+            <i data-lucide="edit-3"></i> Edit Info
+          </button>
+          <button class="btn btn-outline btn-sm" id="fdMonitorBtn" onclick="monitorCurrentFarmerShed()">
+            <i data-lucide="radio"></i> Monitor Live
+          </button>
+          <button class="btn-close-modal" onclick="closeFarmerDetailsModal()" title="Close">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick KPI Ribbon -->
+      <div class="farmer-kpi-ribbon">
+        <div class="kpi-mini-card">
+          <div class="kpi-mini-label"><i data-lucide="git-commit"></i> Current Growth Stage</div>
+          <div class="kpi-mini-val" id="fdStageVal">III Instar</div>
+          <div class="kpi-mini-sub" id="fdStageSub">Active rearing cycle</div>
+        </div>
+        <div class="kpi-mini-card">
+          <div class="kpi-mini-label"><i data-lucide="thermometer"></i> Live Shed Climate</div>
+          <div class="kpi-mini-val" id="fdClimateVal">26.2°C &bull; 80% RH</div>
+          <div class="kpi-mini-sub" id="fdClimateStatus">Comfortable &bull; IDEAL</div>
+        </div>
+        <div class="kpi-mini-card">
+          <div class="kpi-mini-label"><i data-lucide="cloud-sun"></i> Ambient Weather</div>
+          <div class="kpi-mini-val" id="fdOutdoorVal">30.5°C &bull; 58% RH</div>
+          <div class="kpi-mini-sub" id="fdWeatherLoc">Katteri, Mysore Division</div>
+        </div>
+        <div class="kpi-mini-card">
+          <div class="kpi-mini-label"><i data-lucide="layers"></i> Batch & Capacity</div>
+          <div class="kpi-mini-val" id="fdBatchVal">200 DFL</div>
+          <div class="kpi-mini-sub" id="fdBatchId">SERI-2026-B01</div>
+        </div>
+      </div>
+
+      <!-- Tab Buttons -->
+      <div class="farmer-modal-tabs">
+        <button class="farmer-tab-btn active" id="btnTabPersonal" onclick="switchFarmerTab('personal')">
+          <i data-lucide="user"></i> Personal Profile
+        </button>
+        <button class="farmer-tab-btn" id="btnTabFarm" onclick="switchFarmerTab('farm')">
+          <i data-lucide="home"></i> Farm & Rearing Setup
+        </button>
+        <button class="farmer-tab-btn" id="btnTabClimate" onclick="switchFarmerTab('climate')">
+          <i data-lucide="activity"></i> Live Microclimate & Actuators
+        </button>
+        <button class="farmer-tab-btn" id="btnTabHistory" onclick="switchFarmerTab('history')">
+          <i data-lucide="history"></i> Telemetry History (Last 30)
+        </button>
+      </div>
+
+      <!-- Modal Body Content -->
+      <div class="modal-body" style="padding:20px 24px;">
+        <!-- TAB 1: PERSONAL & CONTACT -->
+        <div id="fdTabPersonal" class="farmer-tab-content">
+          <div class="detail-cards-grid">
+            <div class="detail-card">
+              <h4><i data-lucide="user-check"></i> Identity & Registration</h4>
+              <div class="detail-row">
+                <span class="detail-label">Full Name</span>
+                <span class="detail-value" id="fdDetFullName">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Username / Login ID</span>
+                <span class="detail-value" id="fdDetUsername">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Account Role</span>
+                <span class="detail-value" id="fdDetRole">Farmer (Rearer)</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Enrolled Date</span>
+                <span class="detail-value" id="fdDetCreatedAt">-</span>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h4><i data-lucide="phone"></i> Contact & Communication</h4>
+              <div class="detail-row">
+                <span class="detail-label">Phone Number</span>
+                <span class="detail-value" id="fdDetPhone">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">WhatsApp Channel</span>
+                <span class="detail-value" id="fdDetWhatsApp">
+                  <span class="badge" style="background:#E8F5E9; color:#2E7D32;">Direct Alerts Active</span>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Preferred Language</span>
+                <span class="detail-value" id="fdDetLang">English (en)</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Alert Notifications</span>
+                <span class="detail-value" style="color:var(--green-leaf); font-weight:700;">Automated Temp & Humidity Warnings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: FARM & REARING SETUP -->
+        <div id="fdTabFarm" class="farmer-tab-content hidden">
+          <div class="detail-cards-grid">
+            <div class="detail-card">
+              <h4><i data-lucide="map-pin"></i> Farm & Shed Location</h4>
+              <div class="detail-row">
+                <span class="detail-label">Farm / Facility Name</span>
+                <span class="detail-value" id="fdDetFarmName">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Allocated Shed ID</span>
+                <span class="detail-value" id="fdDetShedId">SHED_01</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Region / Cluster</span>
+                <span class="detail-value" id="fdDetRegion">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">GPS Coordinates</span>
+                <span class="detail-value" id="fdDetCoordinates">Live Device GPS</span>
+              </div>
+            </div>
+
+            <div class="detail-card">
+              <h4><i data-lucide="sprout"></i> Silkworm Batch Specifications</h4>
+              <div class="detail-row">
+                <span class="detail-label">Active Batch Code</span>
+                <span class="detail-value" id="fdDetBatchId">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Silkworm Breed</span>
+                <span class="detail-value" id="fdDetBreed">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">DFL Capacity</span>
+                <span class="detail-value" id="fdDetDfl">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Rearing Growth Phase</span>
+                <span class="detail-value" id="fdDetGrowthStage" style="color:var(--green-leaf); font-weight:700;">III Instar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: LIVE MICROCLIMATE & ACTUATORS -->
+        <div id="fdTabClimate" class="farmer-tab-content hidden">
+          <!-- 4 live metric boxes -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-bottom:16px;">
+            <div class="metric-card" style="margin:0;">
+              <div class="metric-header">
+                <span class="metric-title"><i data-lucide="thermometer"></i> Indoor Temp</span>
+                <span class="badge" id="fdLiveTempBadge" style="background:#E8F5E9; color:#1B5E20;">Target: 26.0°C</span>
+              </div>
+              <div class="metric-value-wrap">
+                <span class="metric-val" id="fdLiveTemp">26.2</span>
+                <span class="metric-unit">°C</span>
+              </div>
+            </div>
+
+            <div class="metric-card" style="margin:0;">
+              <div class="metric-header">
+                <span class="metric-title"><i data-lucide="droplets"></i> Indoor Humidity</span>
+                <span class="badge" id="fdLiveHumBadge" style="background:#E1F5FE; color:#0288D1;">Target: 80%</span>
+              </div>
+              <div class="metric-value-wrap">
+                <span class="metric-val" id="fdLiveHum">80</span>
+                <span class="metric-unit">% RH</span>
+              </div>
+            </div>
+
+            <div class="metric-card" style="margin:0;">
+              <div class="metric-header">
+                <span class="metric-title"><i data-lucide="wind"></i> Air Quality (CO2)</span>
+                <span class="badge" style="background:#FFF3E0; color:#E65100;">Target &ge; 80%</span>
+              </div>
+              <div class="metric-value-wrap">
+                <span class="metric-val" id="fdLiveAqi">88</span>
+                <span class="metric-unit">%</span>
+              </div>
+            </div>
+
+            <div class="metric-card" style="margin:0;">
+              <div class="metric-header">
+                <span class="metric-title"><i data-lucide="sun"></i> Light Target</span>
+                <span class="badge" style="background:#FFF8E1; color:#F57F17;">Photoperiod</span>
+              </div>
+              <div class="metric-value-wrap">
+                <span class="metric-val" id="fdLiveLux">25</span>
+                <span class="metric-unit">Lux</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actuators Panel -->
+          <div class="detail-card">
+            <h4><i data-lucide="cpu"></i> Active Shed Actuators & Relays</h4>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-top:8px;">
+              <div class="actuator-item" id="fdActCooler">
+                <span>❄️ Evaporative Cooler</span>
+                <strong class="act-state">OFF</strong>
+              </div>
+              <div class="actuator-item" id="fdActHeater">
+                <span>🔥 Infrared Heater</span>
+                <strong class="act-state">OFF</strong>
+              </div>
+              <div class="actuator-item" id="fdActFan">
+                <span>🌀 Ventilation Exhaust</span>
+                <strong class="act-state">OFF</strong>
+              </div>
+              <div class="actuator-item" id="fdActLight">
+                <span>💡 Research Photoperiod</span>
+                <strong class="act-state">OFF</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: TELEMETRY HISTORY -->
+        <div id="fdTabHistory" class="farmer-tab-content hidden">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <p style="margin:0; font-size:0.85rem; color:var(--text-muted);">
+              Recent historical timeseries recorded from ESP32 IoT node / farmer app for this shed.
+            </p>
+            <button class="btn btn-outline btn-sm" onclick="exportCurrentFarmerTelemetry()">
+              <i data-lucide="download"></i> Export CSV
+            </button>
+          </div>
+          <div class="table-responsive" style="max-height:360px; overflow-y:auto;">
+            <table class="data-table" style="font-size:0.82rem;">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Indoor Temp</th>
+                  <th>Indoor Hum</th>
+                  <th>Air Quality</th>
+                  <th>Light Lux</th>
+                  <th>Cooler</th>
+                  <th>Heater</th>
+                  <th>Fan</th>
+                  <th>Mode</th>
+                </tr>
+              </thead>
+              <tbody id="fdHistoryTableBody">
+                <tr><td colspan="9" style="text-align:center; padding:24px;">Loading telemetry history...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer" style="background:#FAF8F5;">
+        <span style="margin-right:auto; font-size:0.8rem; color:var(--text-muted);" id="fdLastUpdated">Last sync: just now</span>
+        <button class="btn btn-skin" onclick="closeFarmerDetailsModal()">Close Window</button>
+        <button class="btn btn-primary" onclick="openEditFarmerFromDetails()">
+          <i data-lucide="edit-3"></i> Edit Farmer Profile
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= EDIT FARMER PERSONAL & FARM INFO MODAL ================= -->
+  <div id="editFarmerModal" class="modal-backdrop hidden" onclick="if(event.target===this) closeEditFarmerModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3><i data-lucide="edit-3"></i> Edit Farmer Personal & Farm Details</h3>
+        <button class="btn-close-modal" onclick="closeEditFarmerModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="editFarmerForm" onsubmit="handleEditFarmerSubmit(event)">
+        <input type="hidden" id="editFarmerId">
+        <div class="modal-body">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="editFullName">Full Name *</label>
+              <input type="text" id="editFullName" required placeholder="e.g. Harshith Kd">
+            </div>
+            <div class="form-group">
+              <label for="editPhone">Phone / WhatsApp Number *</label>
+              <input type="text" id="editPhone" required placeholder="e.g. +91 80889 15514">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="editFarmName">Shed / Farm Name *</label>
+              <input type="text" id="editFarmName" required placeholder="e.g. vfgt or Green Valley Silk">
+            </div>
+            <div class="form-group">
+              <label for="editRegion">Region / Location Cluster *</label>
+              <input type="text" id="editRegion" required placeholder="e.g. Katteri, Mysore Division, India">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="editBatchId">Active Batch ID *</label>
+              <input type="text" id="editBatchId" required placeholder="e.g. SERI-2026-B01">
+            </div>
+            <div class="form-group">
+              <label for="editDfl">DFL Capacity</label>
+              <input type="text" id="editDfl" placeholder="e.g. 200 DFL">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="editBreed">Silkworm Breed</label>
+              <select id="editBreed">
+                <option value="Double Hybrid (FC1 x FC2)">Double Hybrid (FC1 x FC2)</option>
+                <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
+                <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
+                <option value="Pure Mysore">Pure Mysore</option>
+                <option value="Multivoltine">Multivoltine</option>
+                <option value="Other">Other / Custom</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="editGrowthStage">Silkworm Rearing Stage</label>
+              <select id="editGrowthStage">
+                <option value="1">I Instar (Chawki Stage 1)</option>
+                <option value="2">II Instar (Chawki Stage 2)</option>
+                <option value="3">III Instar (Late Stage 3)</option>
+                <option value="4">IV Instar (Late Stage 4)</option>
+                <option value="5">V Instar & Cocooning</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="editLang">Preferred Language</label>
+            <select id="editLang">
+              <option value="en">English (Default)</option>
+              <option value="kn">Kannada (ಕನ್ನಡ)</option>
+              <option value="te">Telugu (తెలుగు)</option>
+            </select>
+          </div>
+
+          <div id="editFarmerError" class="alert-box error hidden"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-skin" onclick="closeEditFarmerModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="editSubmitBtn">
+            <i data-lucide="save"></i> Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toastContainer" class="toast-container"></div>
 
