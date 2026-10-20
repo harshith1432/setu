@@ -89,20 +89,17 @@ def list_monitored_sheds(admin_user: dict = Depends(require_superadmin)) -> List
         })
         seen_ids.add(s_id)
 
-    # 2. Add in-memory sheds known to telemetry_service if not already covered
-    for s_id, s_data in telemetry_service.sheds.items():
-        if s_id not in seen_ids:
-            farm_name = s_data.get("farm_name", f"Shed {s_id}")
-            sheds_list.append({
-                "shed_id": s_id,
-                "farm_name": farm_name,
-                "farmer_name": None,
-                "region": s_data.get("region", "Sericulture Shed"),
-                "batch_id": "SERI-2026",
-                "display_name": farm_name,
-                "is_active": True
-            })
-            seen_ids.add(s_id)
+    # 2. Only if no farmers exist in database at all, provide a single default fallback shed
+    if not sheds_list:
+        sheds_list.append({
+            "shed_id": "shed_01",
+            "farm_name": "Rearing Shed 01",
+            "farmer_name": "Default Farmer",
+            "region": "Sericulture Shed",
+            "batch_id": "SERI-2026",
+            "display_name": "Rearing Shed 01",
+            "is_active": True
+        })
 
     return sheds_list
 

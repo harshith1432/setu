@@ -482,19 +482,19 @@ async function fetchLiveTelemetry() {
     // Overview Air Quality (CO₂) & Light Lux Gauges
     const aqi = ov.indoor_air_quality !== undefined ? ov.indoor_air_quality : 88;
     const targetAqi = ov.air_quality_target !== undefined ? ov.air_quality_target : 80;
-    const readingAQ = document.getElementById('readingAirQuality');
-    const targetAQ = document.getElementById('targetAirQuality');
+    const readingAQ = document.getElementById('dialAirQuality') || document.getElementById('readingAirQuality');
+    const targetAQ = document.getElementById('dialAirTarget') || document.getElementById('targetAirQuality');
     if (readingAQ) {
       readingAQ.textContent = `${aqi.toFixed(0)}%`;
       readingAQ.style.color = aqi < targetAqi ? 'var(--amber)' : 'var(--green-deep)';
     }
     if (targetAQ) {
-      targetAQ.textContent = aqi < targetAqi ? '⚠️ Stale Air (< 80%) • Fan Active' : 'Target: ≥ 80% (Clean Air)';
+      targetAQ.textContent = aqi < targetAqi ? '⚠️ Stale Air (< 80%) • Fan Active' : 'Target: ≥ 80%';
     }
 
     const lux = ov.indoor_light_lux !== undefined ? ov.indoor_light_lux : 22;
-    const readingL = document.getElementById('readingLight');
-    const targetL = document.getElementById('targetLight');
+    const readingL = document.getElementById('dialLightLux') || document.getElementById('readingLight');
+    const targetL = document.getElementById('dialLightTarget') || document.getElementById('targetLight');
     if (readingL) {
       readingL.textContent = `${lux.toFixed(0)} Lux`;
     }

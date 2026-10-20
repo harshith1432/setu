@@ -58,51 +58,13 @@ class TelemetryService:
                 "air_quality_target": 80.0,
                 "light_lux_target": 25.0,
                 "current_temp": 26.2,
-                "current_hum": 74.0,
+                "current_hum": 80.0,
                 "current_air_quality": 88.0,
                 "current_light_lux": 22.0,
                 "photoperiod_mode": "DAY",
                 "outside_temp": 34.2,
                 "outside_hum": 58.0,
                 "actuators": ActuatorStates(cooler=True, fan=False, heater=False, light=True, light_brightness=35),
-                "last_updated": datetime.now(timezone.utc)
-            },
-            "shed_02": {
-                "farm_name": "Sri Lakshmi Silk Farm",
-                "region": "Kolar Silk Belt, KA",
-                "current_stage": 2,
-                "is_auto_mode": True,
-                "temp_target": 27.0,
-                "humidity_target": 80.0,
-                "air_quality_target": 80.0,
-                "light_lux_target": 20.0,
-                "current_temp": 26.8,
-                "current_hum": 81.0,
-                "current_air_quality": 92.0,
-                "current_light_lux": 18.0,
-                "photoperiod_mode": "DAY",
-                "outside_temp": 31.0,
-                "outside_hum": 62.0,
-                "actuators": ActuatorStates(cooler=False, fan=False, heater=False, light=True, light_brightness=20),
-                "last_updated": datetime.now(timezone.utc)
-            },
-            "shed_03": {
-                "farm_name": "Kolar Silk Fields",
-                "region": "Ramanagara Silk Hub, KA",
-                "current_stage": 4,
-                "is_auto_mode": True,
-                "temp_target": 24.5,
-                "humidity_target": 70.0,
-                "air_quality_target": 80.0,
-                "light_lux_target": 30.0,
-                "current_temp": 24.2,
-                "current_hum": 69.5,
-                "current_air_quality": 85.0,
-                "current_light_lux": 28.0,
-                "photoperiod_mode": "DAY",
-                "outside_temp": 29.5,
-                "outside_hum": 65.0,
-                "actuators": ActuatorStates(cooler=False, fan=True, heater=False, light=True, light_brightness=40),
                 "last_updated": datetime.now(timezone.utc)
             }
         }
@@ -111,8 +73,6 @@ class TelemetryService:
         self.history: deque = deque(maxlen=1000)
         self.ws_manager = ConnectionManager()
         self._populate_sample_history("shed_01")
-        self._populate_sample_history("shed_02")
-        self._populate_sample_history("shed_03")
 
     def _get_or_create_shed(self, shed_id: str) -> Dict[str, Any]:
         if shed_id not in self.sheds:
@@ -284,15 +244,39 @@ class TelemetryService:
     ) -> ShedOverview:
         shed = self._get_or_create_shed(shed_id)
 
+        # Refresh live farm details and GPS coordinates directly from DB for this shed
+        farmer_lat = lat
+        farmer_lon = lon
+        try:
+            from app.services.db_service import get_db_cursor
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                    SELECT farm_name, region, latitude, longitude 
+                    FROM users 
+                    WHERE shed_id = %s OR id = %s OR username = %s 
+                    ORDER BY (role = 'farmer') DESC 
+                    LIMIT 1
+                """, (shed_id, shed_id, shed_id))
+                row = cursor.fetchone()
+                if row:
+                    if row.get("farm_name"):
+                        shed["farm_name"] = row["farm_name"]
+                    if row.get("region") and not region_override:
+                        shed["region"] = row["region"]
+                    if farmer_lat is None and row.get("latitude") is not None:
+                        farmer_lat = float(row["latitude"])
+                    if farmer_lon is None and row.get("longitude") is not None:
+                        farmer_lon = float(row["longitude"])
+        except Exception:
+            pass
+
         # Fetch real-time weather dynamically from Open-Meteo
-        lookup_region = region_override
-        if not lookup_region and (lat is None or lon is None):
-            lookup_region = shed.get("region")
+        lookup_region = region_override or shed.get("region")
 
         try:
             live_weather = weather_service.get_current_weather(
-                lat=lat,
-                lon=lon,
+                lat=farmer_lat,
+                lon=farmer_lon,
                 region=lookup_region
             )
             shed["outside_temp"] = live_weather["outside_temperature"]

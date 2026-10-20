@@ -294,7 +294,7 @@ class WhatsAppAlertService:
 
         def _worker():
             try:
-                self.send(
+                res = self.send(
                     message=message,
                     recipient=recipient,
                     dry_run=dry_run,
@@ -302,8 +302,12 @@ class WhatsAppAlertService:
                     cooldown_key=None,
                     cooldown_seconds=0,
                 )
+                if res.get("status") == "error":
+                    logger.error("WhatsApp dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
+                elif res.get("status") == "sent":
+                    logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
             except Exception as e:
-                logger.error("Background WhatsApp send failed: %s", e)
+                logger.error("Background WhatsApp send crashed: %s", e)
 
         thread = threading.Thread(target=_worker, daemon=True)
         thread.start()
