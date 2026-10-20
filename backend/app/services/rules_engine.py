@@ -103,10 +103,20 @@ class RulesEngine:
             (overall_status, status_headline, status_subline, next_actuators, photoperiod_mode)
         """
         thresholds = STAGE_THRESHOLDS.get(stage, STAGE_THRESHOLDS[3])
-        target_temp_max = thresholds["temp_max"]
-        target_temp_min = thresholds["temp_min"]
-        target_hum_max = thresholds["hum_max"]
-        target_hum_min = thresholds["hum_min"]
+        # If user specified a manual target setpoint, center operational envelope around it
+        if manual_temp_target is not None and manual_temp_target > 0:
+            target_temp_max = round(manual_temp_target + 0.5, 1)
+            target_temp_min = round(manual_temp_target - 0.5, 1)
+        else:
+            target_temp_max = thresholds["temp_max"]
+            target_temp_min = thresholds["temp_min"]
+
+        if manual_hum_target is not None and manual_hum_target > 0:
+            target_hum_max = round(manual_hum_target + 5.0, 1)
+            target_hum_min = round(manual_hum_target - 5.0, 1)
+        else:
+            target_hum_max = thresholds["hum_max"]
+            target_hum_min = thresholds["hum_min"]
 
         new_actuators = ActuatorStates(
             cooler=current_actuators.cooler,

@@ -165,7 +165,7 @@ class HomeScreen extends StatelessWidget {
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
                       ),
                       Text(
-                        '${l10n.translate('target')}: ${stage.tempMin.toStringAsFixed(0)}-${stage.tempMax.toStringAsFixed(0)}°C',
+                        '${l10n.translate('target')}: ${shed.tempTarget.toStringAsFixed(1)}°C',
                         style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                       ),
                     ],
@@ -200,7 +200,7 @@ class HomeScreen extends StatelessWidget {
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF5A695C)),
                       ),
                       Text(
-                        '${l10n.translate('target')}: ${stage.humMin.toInt()}-${stage.humMax.toInt()}%',
+                        '${l10n.translate('target')}: ${shed.humidityTarget.toInt()}%',
                         style: const TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                       ),
                     ],

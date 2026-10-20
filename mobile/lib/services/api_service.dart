@@ -268,6 +268,7 @@ class ApiService {
           }),
         ).timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) {
+          _workingBaseUrl = base;
           return true;
         }
       } catch (_) {}
@@ -342,6 +343,7 @@ class ApiService {
         final res = await http.get(Uri.parse('$base/ai/explain/$shedId?lang=$lang'), headers: _headers)
             .timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) {
+          _workingBaseUrl = base;
           return AIAdvice.fromJson(jsonDecode(res.body));
         }
       } catch (_) {}
@@ -360,7 +362,7 @@ class ApiService {
     );
   }
 
-  Future<bool> updateSetpoints(
+  Future<ShedData?> updateSetpoints(
     String shedId,
     bool isAuto,
     double tempTarget,
@@ -385,10 +387,12 @@ class ApiService {
           headers: _headers,
           body: jsonEncode(payload),
         ).timeout(const Duration(seconds: 4));
-        if (res.statusCode == 200) return true;
+        if (res.statusCode == 200) {
+          return ShedData.fromJson(jsonDecode(res.body));
+        }
       } catch (_) {}
     }
-    return false;
+    return null;
   }
 
   Future<bool> manualActuatorOverride(

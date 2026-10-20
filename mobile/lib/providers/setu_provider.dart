@@ -983,11 +983,82 @@ class SetuProvider with ChangeNotifier {
     bool? isAutoMode,
     ActuatorStates? actuators,
   }) {
+    final auto = isAutoMode ?? _isAutoMode;
+    final curTemp = _shedData.indoorTemp;
+    final curHum = _shedData.indoorHumidity;
+    final curAqi = _shedData.indoorAirQuality;
+    final curLux = _shedData.indoorLightLux;
+
+    String overallStatus = 'IDEAL';
+    String headline = 'Ideal for Silkworms';
+    String subline = 'Microclimate is stable and within target boundaries.';
+
+    bool cooler = actuators?.cooler ?? _shedData.actuators.cooler;
+    bool heater = actuators?.heater ?? _shedData.actuators.heater;
+    bool fan = actuators?.fan ?? _shedData.actuators.fan;
+    bool light = actuators?.light ?? _shedData.actuators.light;
+    int brightness = actuators?.lightBrightness ?? _lightBrightness;
+
+    if (auto) {
+      // Dynamic precaution evaluation against user setpoints
+      if (curTemp > _tempSetPoint + 0.5) {
+        overallStatus = 'TOO_WARM';
+        headline = 'Too Warm — Cooling Active';
+        subline = 'Indoor temperature (${curTemp.toStringAsFixed(1)}°C) exceeds target (${_tempSetPoint.toStringAsFixed(1)}°C). Automated cooling active.';
+        cooler = true;
+        heater = false;
+        fan = true;
+      } else if (curTemp < _tempSetPoint - 0.5) {
+        overallStatus = 'TOO_COOL';
+        headline = 'Too Cool — Shed Heater ON';
+        subline = 'Indoor temperature (${curTemp.toStringAsFixed(1)}°C) is below target (${_tempSetPoint.toStringAsFixed(1)}°C). Heating activated safely.';
+        heater = true;
+        cooler = false;
+        fan = false;
+      } else if (curHum > _humSetPoint + 5.0) {
+        overallStatus = 'HIGH_HUMIDITY';
+        headline = 'High Humidity — Exhaust Active';
+        subline = 'Indoor humidity (${curHum.toInt()}%) is above target (${_humSetPoint.toInt()}%). Exhaust fan active.';
+        fan = true;
+        cooler = false;
+        heater = false;
+      } else if (curHum < _humSetPoint - 5.0) {
+        overallStatus = 'LOW_HUMIDITY';
+        headline = 'Low Humidity — Foggers Active';
+        subline = 'Indoor humidity (${curHum.toInt()}%) is below target (${_humSetPoint.toInt()}%). Fogger humidification running.';
+        fan = false;
+        cooler = false;
+        heater = false;
+      } else if (curAqi < _airQualitySetPoint) {
+        overallStatus = 'AIR_LOW';
+        headline = 'Air Quality Low — Ventilation Active';
+        subline = 'Air quality is ${curAqi.toInt()}% (target >= ${_airQualitySetPoint.toInt()}%). Exhaust fan active.';
+        fan = true;
+      } else {
+        overallStatus = 'IDEAL';
+        headline = 'Ideal for Silkworms';
+        subline = 'Microclimate is comfortable at target (${_tempSetPoint.toStringAsFixed(1)}°C • ${_humSetPoint.toInt()}% RH).';
+        cooler = false;
+        heater = false;
+        fan = false;
+      }
+      light = curLux >= 5.0;
+    }
+
     _shedData = _shedData.copyWith(
       currentStage: _currentGrowthStage,
       stageName: currentStageInfo.name,
-      actuators: actuators ?? _shedData.actuators,
-      isAutoMode: isAutoMode ?? _shedData.isAutoMode,
+      overallStatus: overallStatus,
+      statusHeadline: headline,
+      statusSubline: subline,
+      actuators: ActuatorStates(
+        cooler: cooler,
+        heater: heater,
+        fan: fan,
+        light: light,
+        lightBrightness: brightness,
+      ),
+      isAutoMode: auto,
       tempTarget: _tempSetPoint,
       humidityTarget: _humSetPoint,
       airflowTarget: _airflowSetPoint.toDouble(),
@@ -996,6 +1067,35 @@ class SetuProvider with ChangeNotifier {
       lightLuxTarget: _lightLuxSetPoint,
       lastUpdated: DateTime.now(),
     );
+
+    // Update AI advice to match active precautions
+    if (cooler) {
+      _aiAdvice = _aiAdvice.copyWith(
+        currentAction: 'Cooling is ON (Target: ${_tempSetPoint.toStringAsFixed(1)}°C)',
+        whyText: 'Shed temperature is ${curTemp.toStringAsFixed(1)}°C, which is above your setpoint of ${_tempSetPoint.toStringAsFixed(1)}°C. Coolers are actively running to lower temperature.',
+        targetDescription: 'Targeting ${_tempSetPoint.toStringAsFixed(1)}°C and ${_humSetPoint.toInt()}% humidity for healthy growth.',
+      );
+    } else if (heater) {
+      _aiAdvice = _aiAdvice.copyWith(
+        currentAction: 'Heating is ON (Target: ${_tempSetPoint.toStringAsFixed(1)}°C)',
+        whyText: 'Shed temperature is ${curTemp.toStringAsFixed(1)}°C, below your setpoint of ${_tempSetPoint.toStringAsFixed(1)}°C. Heater is running to maintain warmth.',
+        targetDescription: 'Targeting ${_tempSetPoint.toStringAsFixed(1)}°C and ${_humSetPoint.toInt()}% humidity for healthy growth.',
+      );
+    } else if (fan) {
+      _aiAdvice = _aiAdvice.copyWith(
+        currentAction: 'Ventilation Fan is ON',
+        whyText: curHum > _humSetPoint + 5.0
+            ? 'Humidity is ${curHum.toInt()}% (target ${_humSetPoint.toInt()}%). Exhaust fan is running to remove excess moisture.'
+            : 'Exhaust fan is active to improve air quality to >=${_airQualitySetPoint.toInt()}%.',
+        targetDescription: 'Maintaining healthy airflow and safe CO₂ levels in the shed.',
+      );
+    } else {
+      _aiAdvice = _aiAdvice.copyWith(
+        currentAction: 'Microclimate Optimal',
+        whyText: 'Shed is currently at ${curTemp.toStringAsFixed(1)}°C and ${curHum.toInt()}% humidity, within your target ranges.',
+        targetDescription: 'Targeting ${_tempSetPoint.toStringAsFixed(1)}°C and ${_humSetPoint.toInt()}% humidity.',
+      );
+    }
   }
 
   void _applySimpleStagePreset() {
