@@ -19,6 +19,7 @@ class UserCreate(BaseModel):
     region: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    shed_id: Optional[str] = None
     batch_id: Optional[str] = None
     dfl_capacity: Optional[str] = None
     breed: Optional[str] = "Double Hybrid (FC1 x FC2)"
@@ -32,6 +33,7 @@ class GoogleAuthRequest(BaseModel):
     region: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    shed_id: Optional[str] = None
     batch_id: Optional[str] = None
     dfl_capacity: Optional[str] = None
     breed: Optional[str] = "Double Hybrid (FC1 x FC2)"
@@ -64,6 +66,7 @@ class UserOut(BaseModel):
     region: Optional[str] = "Local Rearing Shed"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    shed_id: Optional[str] = "shed_01"
     batch_id: Optional[str] = "SERI-2026-M04"
     dfl_capacity: Optional[str] = "200 DFL"
     breed: Optional[str] = "Double Hybrid (FC1 x FC2)"

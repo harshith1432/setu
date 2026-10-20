@@ -1,4 +1,8 @@
+import logging
 import os
+import re
+import threading
+import time
 from typing import Any, Dict, Optional
 
 try:
@@ -8,9 +12,14 @@ except ImportError:
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
+_cooldown_lock = threading.Lock()
+_last_alert_timestamps: Dict[str, float] = {}
+
 
 class WhatsAppAlertService:
-    """Simple WhatsApp notifier for Setu. Supports dry-run to test without hardware or sending."""
+    """Production-ready WhatsApp notifier for Setu. Supports dry-run, background dispatch, and cooldown throttling."""
 
     def __init__(self):
         self.account_sid = (
@@ -30,14 +39,50 @@ class WhatsAppAlertService:
             except Exception:
                 self._client = None
 
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.account_sid and self.auth_token and self.from_number)
+
     @staticmethod
     def normalize_whatsapp(value: str) -> str:
-        value = (value or "").strip()
-        if not value:
-            return value
-        if value.startswith("whatsapp:"):
-            return value
-        return f"whatsapp:{value}"
+        """Normalizes any phone string into valid E.164 with whatsapp: prefix."""
+        raw = (value or "").strip()
+        if not raw:
+            return ""
+        if raw.startswith("whatsapp:"):
+            raw = raw[len("whatsapp:"):].strip()
+
+        # Remove spaces, dashes, parentheses, dots
+        cleaned = re.sub(r"[\s\-\(\)\.]", "", raw)
+
+        # Standardize country codes (defaulting 10-digit to India +91)
+        if cleaned.startswith("+"):
+            digits = re.sub(r"\D", "", cleaned[1:])
+            normalized = f"+{digits}"
+        else:
+            digits = re.sub(r"\D", "", cleaned)
+            if len(digits) == 10:
+                normalized = f"+91{digits}"
+            elif len(digits) == 11 and digits.startswith("0"):
+                normalized = f"+91{digits[1:]}"
+            elif len(digits) == 12 and digits.startswith("91"):
+                normalized = f"+{digits}"
+            else:
+                normalized = f"+{digits}" if digits else ""
+
+        return f"whatsapp:{normalized}" if normalized else ""
+
+    def check_and_update_cooldown(self, cooldown_key: Optional[str], cooldown_seconds: int) -> bool:
+        """Returns True if the alert is permitted, False if throttled."""
+        if not cooldown_key or cooldown_seconds <= 0:
+            return True
+        now = time.time()
+        with _cooldown_lock:
+            last = _last_alert_timestamps.get(cooldown_key, 0.0)
+            if now - last < cooldown_seconds:
+                return False
+            _last_alert_timestamps[cooldown_key] = now
+            return True
 
     def build_manual_alert(
         self,
@@ -48,15 +93,44 @@ class WhatsAppAlertService:
         region: Optional[str] = None,
         current_temp: Optional[float] = None,
         current_humidity: Optional[float] = None,
+        lang: str = "en",
     ) -> str:
         region_name = region or "the shed"
-        temp_text = f"{outside_temp:.1f}°C" if outside_temp is not None else "the outside climate"
+        temp_text = f"{outside_temp:.1f}°C" if outside_temp is not None else "outside conditions"
         humidity_text = (
-            f"{outside_humidity:.0f}% humidity" if outside_humidity is not None else "humid conditions"
+            f"{outside_humidity:.0f}% humidity" if outside_humidity is not None else "humid"
         )
         current_temp_text = f"{current_temp:.1f}°C" if current_temp is not None else "optimal"
         current_hum_text = f"{current_humidity:.0f}%" if current_humidity is not None else "optimal"
 
+        lang_code = (lang or "en").lower()
+        if lang_code == "kn":
+            if actuator == "cooler":
+                return (
+                    f"ಸೇತು ಕೈಚಾಲಿತ ಎಚ್ಚರಿಕೆ: {region_name} ಶೆಡ್‌ಗಾಗಿ ಕೂಲರ್ ಆರಂಭಿಸಲಾಗಿದೆ. "
+                    f"ಹೊರಗಿನ ತಾಪಮಾನ {temp_text}, ಶೆಡ್ ಪ್ರಸ್ತುತ ತಾಪಮಾನ {current_temp_text} ಮತ್ತು ಆರ್ದ್ರತೆ {current_hum_text}."
+                )
+            if actuator == "heater":
+                return (
+                    f"ಸೇತು ಕೈಚಾಲಿತ ಎಚ್ಚರಿಕೆ: {region_name} ಶೆಡ್‌ಗಾಗಿ ಹೀಟರ್ ಆರಂಭಿಸಲಾಗಿದೆ. "
+                    f"ಹೊರಗಿನ ಆರ್ದ್ರತೆ {humidity_text}, ಶೆಡ್ ಪ್ರಸ್ತುತ ತಾಪಮಾನ {current_temp_text} ಮತ್ತು ಆರ್ದ್ರತೆ {current_hum_text}."
+                )
+            return f"ಸೇತು ಎಚ್ಚರಿಕೆ: {region_name} ಶೆಡ್‌ನಲ್ಲಿ {actuator} ಹಸ್ತಚಾಲಿತವಾಗಿ ನಿಯಂತ್ರಿಸಲಾಗಿದೆ."
+
+        if lang_code == "te":
+            if actuator == "cooler":
+                return (
+                    f"సేతు హెచ్చరిక: {region_name} షెడ్ కోసం కూలర్ ప్రారంభించబడింది. "
+                    f"వెలుపలి ఉష్ణోగ్రత {temp_text}, ప్రస్తుత షెడ్ ఉష్ణోగ్రత {current_temp_text} మరియు తేమ {current_hum_text}."
+                )
+            if actuator == "heater":
+                return (
+                    f"సేతు హెచ్చరిక: {region_name} షెడ్ కోసం హీటర్ ప్రారంభించబడింది. "
+                    f"వెలుపలి తేమ {humidity_text}, ప్రస్తుత షెడ్ ఉష్ಣోగ్రత {current_temp_text} మరియు తేమ {current_hum_text}."
+                )
+            return f"సేతు హెచ్చరిక: {region_name} షెడ్‌లో {actuator} మాన్యువల్‌గా నియంత్రించబడింది."
+
+        # Default English
         if actuator == "cooler":
             return (
                 f"Setu manual alert: cooling was started for {region_name}. "
@@ -72,8 +146,51 @@ class WhatsAppAlertService:
             )
 
         return (
-            f"Setu manual alert: a manual control action was triggered in {region_name}. "
+            f"Setu manual alert: a manual control action ({actuator}) was triggered in {region_name}. "
             f"Outside conditions are {temp_text} and {humidity_text}."
+        )
+
+    def build_critical_telemetry_alert(
+        self,
+        *,
+        shed_id: str,
+        temperature: float,
+        humidity: float,
+        status: str = "CRITICAL",
+        reason: Optional[str] = None,
+        lang: str = "en",
+    ) -> str:
+        lang_code = (lang or "en").lower()
+        reason_txt = f"\nReason: {reason}" if reason else ""
+
+        if lang_code == "kn":
+            return (
+                f"⚠️ ತೀವ್ರ ಎಚ್ಚರಿಕೆ - ಸೇತು ಮೈಕ್ರೋಕ್ಲೈಮೇಟ್\n"
+                f"ಶೆಡ್: {shed_id}\n"
+                f"ತಾಪಮಾನ: {temperature:.1f}°C\n"
+                f"ಆರ್ದ್ರತೆ: {humidity:.0f}%\n"
+                f"ಸ್ಥಿತಿ: {status}{reason_txt}\n"
+                f"ಸೂಚನೆ: ರೇಷ್ಮೆ ಹುಳುಗಳ ಆರೋಗ್ಯ ಅಪಾಯದಲ್ಲಿದೆ! ದಯವಿಟ್ಟು ಕೂಡಲೇ ವಾತಾಯನ ಹಾಗೂ ಉಪಕರಣಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
+            )
+
+        if lang_code == "te":
+            return (
+                f"⚠️ అత్యవసర హెచ్చరిక - సేతు మైక్రోక్లైమేట్\n"
+                f"షెడ్: {shed_id}\n"
+                f"ఉష్ణోగ్రత: {temperature:.1f}°C\n"
+                f"తేమ: {humidity:.0f}%\n"
+                f"స్థితి: {status}{reason_txt}\n"
+                f"చర్య: పట్టుపురుగుల ఆరోగ్యానికి ముప్పు ఉంది! దయచేసి వెంటనే ఫ్యాన్ లేదా వెంటిలేషన్ తనిఖీ చేయండి."
+            )
+
+        # Default English
+        return (
+            f"⚠️ CRITICAL ALERT - Setu Microclimate\n"
+            f"Shed: {shed_id}\n"
+            f"Temperature: {temperature:.1f}°C\n"
+            f"Humidity: {humidity:.0f}%\n"
+            f"Status: {status}{reason_txt}\n"
+            f"Action: Silkworm health is at risk! Please check ventilation, cooling, or heating immediately."
         )
 
     def send(
@@ -83,6 +200,8 @@ class WhatsAppAlertService:
         recipient: Optional[str] = None,
         dry_run: bool = False,
         media_url: Optional[str] = None,
+        cooldown_key: Optional[str] = None,
+        cooldown_seconds: int = 0,
     ) -> Dict[str, Any]:
         target = self.normalize_whatsapp(recipient or self.default_to)
         if not target:
@@ -92,7 +211,16 @@ class WhatsAppAlertService:
                 "recipient": None,
             }
 
-        if not self.account_sid or not self.auth_token or not self.from_number:
+        # Check cooldown
+        if cooldown_key and not self.check_and_update_cooldown(cooldown_key, cooldown_seconds):
+            return {
+                "status": "throttled",
+                "message": f"Alert suppressed by cooldown ({cooldown_seconds}s).",
+                "recipient": target,
+                "preview": message,
+            }
+
+        if not self.is_configured:
             if dry_run:
                 return {
                     "status": "dry-run",
@@ -148,6 +276,37 @@ class WhatsAppAlertService:
                 "recipient": target,
                 "media_url": media_url,
             }
+
+    def dispatch_in_background(
+        self,
+        *,
+        message: str,
+        recipient: Optional[str] = None,
+        dry_run: bool = False,
+        media_url: Optional[str] = None,
+        cooldown_key: Optional[str] = None,
+        cooldown_seconds: int = 0,
+    ) -> None:
+        """Dispatches an alert in a background worker thread to prevent blocking API responses."""
+        if cooldown_key and not self.check_and_update_cooldown(cooldown_key, cooldown_seconds):
+            logger.info("Alert throttled by cooldown: %s", cooldown_key)
+            return
+
+        def _worker():
+            try:
+                self.send(
+                    message=message,
+                    recipient=recipient,
+                    dry_run=dry_run,
+                    media_url=media_url,
+                    cooldown_key=None,
+                    cooldown_seconds=0,
+                )
+            except Exception as e:
+                logger.error("Background WhatsApp send failed: %s", e)
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
 
 
 alert_service = WhatsAppAlertService()

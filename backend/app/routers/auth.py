@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request, Response
 from app.models.schemas import UserLogin, UserCreate, Token, UserOut, UserProfileUpdate, GoogleAuthRequest
+from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user_payload
 from app.services.db_service import (
     get_user_by_username,
@@ -9,6 +10,7 @@ from app.services.db_service import (
     get_user_by_id,
     create_user,
     update_user_profile,
+    set_user_whatsapp_verified,
     log_audit
 )
 from app.services.whatsapp_alerts import alert_service
@@ -221,12 +223,13 @@ def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_c
     if not whatsapp_number:
         raise HTTPException(status_code=400, detail="whatsapp_number is required")
 
-    sandbox_join_phrase = "join stay-spread"
+    sandbox_join_phrase = getattr(settings, "TWILIO_SANDBOX_JOIN_PHRASE", "join stay-spread")
     normalised_number = alert_service.normalize_whatsapp(whatsapp_number)
-    user_id = user_payload.get("user_id")
+    clean_digits = normalised_number.replace("whatsapp:", "")
+    user_id = user_payload.get("user_id") or user_payload.get("sub")
     if user_id:
         update_user_profile(user_id, {
-            "whatsapp_number": whatsapp_number,
+            "whatsapp_number": clean_digits,
             "whatsapp_verified": False,
         })
 
@@ -235,7 +238,7 @@ def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_c
         f"for alerts."
     )
 
-    dry_run = bool(payload.get("dry_run", True))
+    dry_run = bool(payload.get("dry_run", not alert_service.is_configured))
     result = alert_service.send(
         message=verification_message,
         recipient=normalised_number,
@@ -248,6 +251,34 @@ def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_c
         "sandbox_join_phrase": sandbox_join_phrase,
         "preview": verification_message,
     }
+
+@router.post("/whatsapp/confirm-verification")
+def confirm_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_current_user_payload)):
+    """Confirm WhatsApp verification status for the authenticated user."""
+    user_id = user_payload.get("user_id") or user_payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User context missing")
+    verified = bool(payload.get("verified", True))
+    set_user_whatsapp_verified(user_id, verified=verified)
+    return {"status": "success", "whatsapp_verified": verified}
+
+@router.post("/whatsapp/webhook")
+async def twilio_whatsapp_webhook(request: Request):
+    """Inbound webhook called by Twilio when farmer replies in WhatsApp sandbox."""
+    try:
+        form_data = await request.form()
+        from_number = form_data.get("From", "")
+        body = form_data.get("Body", "").strip()
+
+        if from_number:
+            clean_number = from_number.replace("whatsapp:", "").strip()
+            set_user_whatsapp_verified(clean_number, verified=True)
+            log_audit("twilio_webhook", "WHATSAPP_VERIFIED", f"WhatsApp verified for {clean_number} (Body: {body[:30]})")
+
+        twiml_resp = '<?xml version="1.0" encoding="UTF-8"?><Response><Message>Your SeriCare WhatsApp alerts are now active!</Message></Response>'
+        return Response(content=twiml_resp, media_type="application/xml")
+    except Exception as exc:
+        return {"status": "error", "detail": str(exc)}
 
 @router.get("/check-farmer")
 def check_farmer(identifier: str):
@@ -291,6 +322,8 @@ def get_current_user(payload: dict = Depends(get_current_user_payload)):
         username=user["username"],
         full_name=user["full_name"],
         phone=user["phone"],
+        whatsapp_number=user.get("whatsapp_number"),
+        whatsapp_verified=bool(user.get("whatsapp_verified", False)),
         preferred_language=user["preferred_language"],
         role=user["role"],
         farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
@@ -321,6 +354,8 @@ def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_curre
         username=updated_dict["username"],
         full_name=updated_dict["full_name"],
         phone=updated_dict["phone"],
+        whatsapp_number=updated_dict.get("whatsapp_number"),
+        whatsapp_verified=bool(updated_dict.get("whatsapp_verified", False)),
         preferred_language=updated_dict["preferred_language"],
         role=updated_dict["role"],
         farm_name=updated_dict.get("farm_name", "Green Valley Sericulture Farm"),

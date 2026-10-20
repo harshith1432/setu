@@ -303,3 +303,22 @@ async def test_admin_stage_thresholds_and_software_level_controls(async_client):
     reset_res = await async_client.post("/api/v1/admin/stages/reset", headers=admin_headers)
     assert reset_res.status_code == 200
     assert STAGE_THRESHOLDS[1]["temp_min"] == 27.0
+
+@pytest.mark.anyio
+async def test_admin_sheds_list_endpoint(async_client):
+    admin_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin"}
+    )
+    admin_token = admin_login.json()["access_token"]
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    res = await async_client.get("/api/v1/admin/sheds", headers=admin_headers)
+    assert res.status_code == 200
+    sheds = res.json()
+    assert isinstance(sheds, list)
+    assert len(sheds) >= 1
+    # Check that shed_01 is present with display name
+    shed_ids = [s["shed_id"] for s in sheds]
+    assert "shed_01" in shed_ids
+    assert "display_name" in sheds[0]

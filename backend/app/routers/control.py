@@ -88,6 +88,11 @@ def test_alert_dispatch(
     message = payload.get("message") or "Setu WhatsApp alert test message."
     dry_run = bool(payload.get("dry_run", True))
     recipient = payload.get("recipient")
+    if not recipient:
+        from app.services.db_service import get_farmer_by_shed_id
+        farmer = get_farmer_by_shed_id(shed_id)
+        if farmer:
+            recipient = farmer.get("whatsapp_number") or farmer.get("phone")
     media_url = payload.get("media_url")
     return alert_service.send(message=message, recipient=recipient, dry_run=dry_run, media_url=media_url)
 

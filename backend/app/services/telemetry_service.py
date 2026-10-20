@@ -50,7 +50,7 @@ class TelemetryService:
         self.sheds: Dict[str, Dict[str, Any]] = {
             "shed_01": {
                 "farm_name": "Green Valley Farm",
-                "region": "Sericulture Shed",
+                "region": "Mysuru Silk Belt, KA",
                 "current_stage": 3,
                 "is_auto_mode": True,
                 "temp_target": 26.0,
@@ -66,6 +66,44 @@ class TelemetryService:
                 "outside_hum": 58.0,
                 "actuators": ActuatorStates(cooler=True, fan=False, heater=False, light=True, light_brightness=35),
                 "last_updated": datetime.now(timezone.utc)
+            },
+            "shed_02": {
+                "farm_name": "Sri Lakshmi Silk Farm",
+                "region": "Kolar Silk Belt, KA",
+                "current_stage": 2,
+                "is_auto_mode": True,
+                "temp_target": 27.0,
+                "humidity_target": 80.0,
+                "air_quality_target": 80.0,
+                "light_lux_target": 20.0,
+                "current_temp": 26.8,
+                "current_hum": 81.0,
+                "current_air_quality": 92.0,
+                "current_light_lux": 18.0,
+                "photoperiod_mode": "DAY",
+                "outside_temp": 31.0,
+                "outside_hum": 62.0,
+                "actuators": ActuatorStates(cooler=False, fan=False, heater=False, light=True, light_brightness=20),
+                "last_updated": datetime.now(timezone.utc)
+            },
+            "shed_03": {
+                "farm_name": "Kolar Silk Fields",
+                "region": "Ramanagara Silk Hub, KA",
+                "current_stage": 4,
+                "is_auto_mode": True,
+                "temp_target": 24.5,
+                "humidity_target": 70.0,
+                "air_quality_target": 80.0,
+                "light_lux_target": 30.0,
+                "current_temp": 24.2,
+                "current_hum": 69.5,
+                "current_air_quality": 85.0,
+                "current_light_lux": 28.0,
+                "photoperiod_mode": "DAY",
+                "outside_temp": 29.5,
+                "outside_hum": 65.0,
+                "actuators": ActuatorStates(cooler=False, fan=True, heater=False, light=True, light_brightness=40),
+                "last_updated": datetime.now(timezone.utc)
             }
         }
         
@@ -73,6 +111,52 @@ class TelemetryService:
         self.history: deque = deque(maxlen=1000)
         self.ws_manager = ConnectionManager()
         self._populate_sample_history("shed_01")
+        self._populate_sample_history("shed_02")
+        self._populate_sample_history("shed_03")
+
+    def _get_or_create_shed(self, shed_id: str) -> Dict[str, Any]:
+        if shed_id not in self.sheds:
+            farm_name = f"Shed {shed_id.upper()}"
+            region = "Sericulture Shed"
+            try:
+                from app.services.db_service import get_db_cursor
+                with get_db_cursor(dict_cursor=True) as cursor:
+                    cursor.execute("""
+                        SELECT farm_name, region FROM users 
+                        WHERE shed_id = %s OR id = %s OR username = %s 
+                        LIMIT 1
+                    """, (shed_id, shed_id, shed_id))
+                    row = cursor.fetchone()
+                    if row:
+                        if row.get("farm_name"):
+                            farm_name = row["farm_name"]
+                        if row.get("region"):
+                            region = row["region"]
+            except Exception:
+                pass
+
+            self.sheds[shed_id] = {
+                "farm_name": farm_name,
+                "region": region,
+                "current_stage": 3,
+                "is_auto_mode": True,
+                "temp_target": 26.0,
+                "humidity_target": 75.0,
+                "air_quality_target": 80.0,
+                "light_lux_target": 25.0,
+                "current_temp": 26.0,
+                "current_hum": 75.0,
+                "current_air_quality": 88.0,
+                "current_light_lux": 22.0,
+                "photoperiod_mode": "DAY",
+                "outside_temp": 32.0,
+                "outside_hum": 55.0,
+                "actuators": ActuatorStates(cooler=False, fan=False, heater=False, light=True, light_brightness=35),
+                "last_updated": datetime.now(timezone.utc)
+            }
+            self._populate_sample_history(shed_id)
+
+        return self.sheds[shed_id]
 
     def _populate_sample_history(self, shed_id: str):
         now = datetime.now(timezone.utc)
@@ -198,9 +282,7 @@ class TelemetryService:
         lon: Optional[float] = None,
         region_override: Optional[str] = None
     ) -> ShedOverview:
-        shed = self.sheds.get(shed_id)
-        if not shed:
-            shed = self.sheds["shed_01"]
+        shed = self._get_or_create_shed(shed_id)
 
         # Fetch real-time weather dynamically from Open-Meteo
         lookup_region = region_override
@@ -278,7 +360,7 @@ class TelemetryService:
         light_lux_target: Optional[float] = None,
         light_brightness: Optional[int] = None
     ) -> ShedOverview:
-        shed = self.sheds.get(shed_id, self.sheds["shed_01"])
+        shed = self._get_or_create_shed(shed_id)
         shed["is_auto_mode"] = is_auto
         shed["temp_target"] = temp_target
         shed["humidity_target"] = hum_target
@@ -298,7 +380,7 @@ class TelemetryService:
         state: bool,
         value: Optional[int] = None
     ) -> ShedOverview:
-        shed = self.sheds.get(shed_id, self.sheds["shed_01"])
+        shed = self._get_or_create_shed(shed_id)
         shed["is_auto_mode"] = False
 
         # Enforce safety interlock
@@ -354,7 +436,7 @@ class TelemetryService:
         return self.get_shed_overview(shed_id)
 
     def set_growth_stage(self, shed_id: str, stage: int) -> ShedOverview:
-        shed = self.sheds.get(shed_id, self.sheds["shed_01"])
+        shed = self._get_or_create_shed(shed_id)
         if 1 <= stage <= 5:
             shed["current_stage"] = stage
         return self.get_shed_overview(shed_id)

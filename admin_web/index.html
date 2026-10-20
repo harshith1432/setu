@@ -1015,30 +1015,36 @@
               <input type="text" id="enrollFarmName" required placeholder="e.g. Gowda Silk Farm Shed 2">
             </div>
             <div class="form-group">
-              <label for="enrollRegion">Region / Location</label>
-              <input type="text" id="enrollRegion" placeholder="e.g. Mysuru, Karnataka or Tokyo">
+              <label for="enrollShedId">Shed ID (Optional)</label>
+              <input type="text" id="enrollShedId" placeholder="e.g. shed_04 (auto-assigned if blank)">
             </div>
           </div>
 
           <div class="form-grid-2">
             <div class="form-group">
+              <label for="enrollRegion">Region / Location</label>
+              <input type="text" id="enrollRegion" placeholder="e.g. Mysuru, Karnataka or Tokyo">
+            </div>
+            <div class="form-group">
               <label for="enrollBatchId">Initial Batch ID</label>
               <input type="text" id="enrollBatchId" value="SERI-2026-M06">
             </div>
+          </div>
+
+          <div class="form-grid-2">
             <div class="form-group">
               <label for="enrollDfl">DFL Capacity</label>
               <input type="text" id="enrollDfl" value="250 DFL">
             </div>
-          </div>
-
-          <div class="form-group">
-            <label for="enrollBreed">Silkworm Breed</label>
-            <select id="enrollBreed" onchange="handleBreedSelectionChange(this.value)">
-              <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
-              <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
-              <option value="Pure Mysore">Pure Mysore</option>
-              <option value="Other">Other (Specify Custom Breed)</option>
-            </select>
+            <div class="form-group">
+              <label for="enrollBreed">Silkworm Breed</label>
+              <select id="enrollBreed" onchange="handleBreedSelectionChange(this.value)">
+                <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
+                <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
+                <option value="Pure Mysore">Pure Mysore</option>
+                <option value="Other">Other (Specify Custom Breed)</option>
+              </select>
+            </div>
           </div>
 
           <div id="enrollBreedOtherWrap" class="form-group hidden">

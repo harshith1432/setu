@@ -42,6 +42,12 @@ def get_admin_dashboard_stats(admin_user: dict = Depends(require_superadmin)):
     # Calculate total capacity
     total_dfl = sum([int(f.get("dfl_capacity", "0").split()[0]) for f in farmers if f.get("dfl_capacity", "0").split()[0].isdigit()])
     
+    # Unique sheds count across network
+    unique_sheds = set(telemetry_service.sheds.keys())
+    for f in farmers:
+        if f.get("shed_id"):
+            unique_sheds.add(f["shed_id"])
+
     # Live IoT Shed summaries
     shed_overview = telemetry_service.get_shed_overview("shed_01")
     
@@ -49,11 +55,68 @@ def get_admin_dashboard_stats(admin_user: dict = Depends(require_superadmin)):
         "total_farmers": len(farmers),
         "active_farmers": len(active_farmers),
         "total_dfl_capacity": f"{total_dfl} DFL",
-        "active_sheds_monitored": len(telemetry_service.sheds),
+        "active_sheds_monitored": len(unique_sheds),
         "system_health": "100% Operational",
         "active_relays_count": (1 if shed_overview.actuators.cooler else 0) + (1 if shed_overview.actuators.fan else 0) + (1 if shed_overview.actuators.heater else 0),
         "cluster_region": "Global Sericulture Network"
     }
+
+@router.get("/sheds")
+def list_monitored_sheds(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:
+    """
+    Returns list of all active sheds across the sericulture network.
+    """
+    farmers = get_all_farmers()
+    sheds_map = {}
+
+    # 1. Gather all sheds from enrolled farmers
+    for f in farmers:
+        s_id = f.get("shed_id") or "shed_01"
+        if s_id not in sheds_map:
+            farm_name = f.get("farm_name") or "Rearing Shed"
+            farmer_name = f.get("full_name") or f.get("username")
+            label_prefix = s_id.replace('_', ' ').title()
+            display = f"{label_prefix} — {farm_name} ({farmer_name})" if farmer_name else f"{label_prefix} — {farm_name}"
+            sheds_map[s_id] = {
+                "shed_id": s_id,
+                "farm_name": farm_name,
+                "farmer_name": farmer_name,
+                "region": f.get("region", "Global Network"),
+                "batch_id": f.get("batch_id", "SERI-2026"),
+                "display_name": display,
+                "is_active": bool(f.get("is_active", True))
+            }
+
+    # 2. Add in-memory sheds known to telemetry_service
+    for s_id, s_data in telemetry_service.sheds.items():
+        if s_id not in sheds_map:
+            farm_name = s_data.get("farm_name", f"Shed {s_id}")
+            label_prefix = s_id.replace('_', ' ').title()
+            sheds_map[s_id] = {
+                "shed_id": s_id,
+                "farm_name": farm_name,
+                "farmer_name": None,
+                "region": s_data.get("region", "Sericulture Shed"),
+                "batch_id": "SERI-2026",
+                "display_name": f"{label_prefix} — {farm_name}",
+                "is_active": True
+            }
+
+    # Ensure baseline shed_01 is always present
+    if not sheds_map:
+        sheds_map["shed_01"] = {
+            "shed_id": "shed_01",
+            "farm_name": "Green Valley Farm",
+            "farmer_name": "Ramesh Gowda",
+            "region": "Mysuru Silk Belt, KA",
+            "batch_id": "SERI-2026-M04",
+            "display_name": "Shed 01 — Green Valley Farm (Ramesh Gowda)",
+            "is_active": True
+        }
+
+    # Sort stably: shed_01, shed_02, shed_03...
+    sorted_sheds = sorted(sheds_map.values(), key=lambda s: s["shed_id"])
+    return sorted_sheds
 
 @router.get("/farmers")
 def list_enrolled_farmers(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:

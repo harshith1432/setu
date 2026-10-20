@@ -52,6 +52,9 @@ class Settings(BaseModel):
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
     TWILIO_WHATSAPP_FROM: str = os.getenv("TWILIO_WHATSAPP_FROM", "")
     TWILIO_WHATSAPP_TO: str = os.getenv("TWILIO_WHATSAPP_TO", "")
+    TWILIO_SANDBOX_JOIN_PHRASE: str = os.getenv("TWILIO_SANDBOX_JOIN_PHRASE", "join stay-spread")
+    WHATSAPP_ALERT_COOLDOWN_SECONDS: int = int(os.getenv("WHATSAPP_ALERT_COOLDOWN_SECONDS", "300"))
+    WHATSAPP_CRITICAL_COOLDOWN_SECONDS: int = int(os.getenv("WHATSAPP_CRITICAL_COOLDOWN_SECONDS", "900"))
 
     # Regional defaults (Global Worldwide Dynamic Geocoding)
     DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "Global Sericulture Network")
@@ -59,4 +62,3 @@ class Settings(BaseModel):
     DEFAULT_LONGITUDE: float = float(os.getenv("DEFAULT_LONGITUDE", "0.0"))
 
 settings = Settings()
-

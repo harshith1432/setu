@@ -410,6 +410,7 @@ async function syncAllRealtimeData() {
   try {
     await Promise.all([
       fetchStats(),
+      fetchSheds(),
       fetchLiveTelemetry(),
       fetchStages(),
       fetchFarmers(),
@@ -644,10 +645,89 @@ async function sendPwmDutyCycle(val) {
   }
 }
 
+let monitoredSheds = [];
+
+async function fetchSheds() {
+  try {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/sheds`);
+    if (!res.ok) throw new Error('Shed list retrieval failed');
+    monitoredSheds = await res.json();
+    renderShedSelector(monitoredSheds);
+  } catch (err) {
+    console.debug('Failed to fetch /admin/sheds, falling back to farmer sheds:', err);
+    buildShedsFromFarmers();
+  }
+}
+
+function buildShedsFromFarmers() {
+  const shedsMap = new Map();
+  if (Array.isArray(enrolledFarmers) && enrolledFarmers.length > 0) {
+    enrolledFarmers.forEach((f, idx) => {
+      const sId = f.shed_id || `shed_${String(idx + 1).padStart(2, '0')}`;
+      if (!shedsMap.has(sId)) {
+        const farmName = f.farm_name || 'Rearing Shed';
+        const farmerName = f.full_name || f.username || '';
+        const labelPrefix = sId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+        const display = farmerName ? `${labelPrefix} — ${farmName} (${farmerName})` : `${labelPrefix} — ${farmName}`;
+        shedsMap.set(sId, { shed_id: sId, farm_name: farmName, farmer_name: farmerName, display_name: display });
+      }
+    });
+  }
+  if (!shedsMap.has('shed_01')) {
+    shedsMap.set('shed_01', { shed_id: 'shed_01', display_name: 'Shed 01 — Green Valley Farm (Ramesh Gowda)' });
+  }
+  monitoredSheds = Array.from(shedsMap.values());
+  renderShedSelector(monitoredSheds);
+}
+
+function renderShedSelector(sheds) {
+  const select = document.getElementById('shedSelect');
+  if (!select) return;
+
+  if (!sheds || sheds.length === 0) {
+    sheds = [
+      { shed_id: 'shed_01', display_name: 'Shed 01 — Green Valley Farm (Ramesh Gowda)' },
+      { shed_id: 'shed_02', display_name: 'Shed 02 — Sri Lakshmi Silk Farm (Venkatamma Reddy)' },
+      { shed_id: 'shed_03', display_name: 'Shed 03 — Kolar Silk Fields (Manjunath K.)' }
+    ];
+  }
+
+  const currentVal = selectedShedId || select.value || 'shed_01';
+  select.innerHTML = sheds.map(s => {
+    const sId = s.shed_id;
+    const isSelected = sId === currentVal ? 'selected' : '';
+    const label = s.display_name || `${sId.toUpperCase()} — ${s.farm_name || 'Rearing Shed'}`;
+    return `<option value="${escapeHtml(sId)}" ${isSelected}>${escapeHtml(label)}</option>`;
+  }).join('');
+
+  const hasCurrent = sheds.some(s => s.shed_id === currentVal);
+  if (!hasCurrent && sheds.length > 0) {
+    selectedShedId = sheds[0].shed_id;
+    select.value = selectedShedId;
+  } else {
+    select.value = currentVal;
+  }
+}
+
 function handleShedChange(shedId) {
   selectedShedId = shedId;
   initTelemetryWebSocket();
-  syncAllRealtimeData();
+  fetchLiveTelemetry();
+  fetchStats();
+}
+
+function switchToFarmerShed(shedId) {
+  if (!shedId) return;
+  const select = document.getElementById('shedSelect');
+  if (select) {
+    select.value = shedId;
+  }
+  selectedShedId = shedId;
+  initTelemetryWebSocket();
+  fetchLiveTelemetry();
+  fetchStats();
+  switchTab('overview');
+  showToast(`Switched active IoT monitoring to ${shedId.toUpperCase()}!`, 'info');
 }
 
 // ==========================================================================
@@ -1276,6 +1356,7 @@ async function fetchFarmers() {
     if (!res.ok) return;
     enrolledFarmers = await res.json();
     renderFarmersTable(enrolledFarmers);
+    await fetchSheds();
   } catch (err) {
     console.error('Error fetching farmers list:', err);
   }
@@ -1292,13 +1373,26 @@ function renderFarmersTable(farmers) {
 
   tbody.innerHTML = farmers.map(f => {
     const isActive = f.is_active === 1 || f.is_active === true;
+    const sId = f.shed_id || 'shed_01';
     return `
       <tr>
         <td>
           <div class="farmer-name-cell">${escapeHtml(f.full_name || f.username)}</div>
           <div class="farmer-sub-cell">@${escapeHtml(f.username)} • ${escapeHtml(f.phone || 'N/A')}</div>
         </td>
-        <td><strong>${escapeHtml(f.farm_name || 'Main Shed')}</strong></td>
+        <td>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong>${escapeHtml(f.farm_name || 'Main Shed')}</strong>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="badge" style="font-size:0.68rem; padding:1px 6px; background:var(--bg-card); border:1px solid var(--border-light); font-weight:600;">
+                ${escapeHtml(sId.toUpperCase())}
+              </span>
+              <button type="button" class="btn-text" style="font-size:0.75rem; color:var(--green-leaf); cursor:pointer; background:none; border:none; padding:0; text-decoration:underline;" onclick="switchToFarmerShed('${escapeHtml(sId)}')">
+                Monitor &rarr;
+              </button>
+            </div>
+          </div>
+        </td>
         <td>${escapeHtml(f.region || 'Local / Global')}</td>
         <td><code>${escapeHtml(f.batch_id || 'BATCH-2026')}</code></td>
         <td><strong>${escapeHtml(f.dfl_capacity || 'N/A')}</strong></td>
@@ -1311,6 +1405,9 @@ function renderFarmersTable(farmers) {
         </td>
         <td>
           <div class="action-buttons-wrap">
+            <button class="btn-icon" title="Monitor Shed Telemetry" onclick="switchToFarmerShed('${escapeHtml(sId)}')">
+              <i data-lucide="radio"></i>
+            </button>
             <button class="btn-icon" title="${isActive ? 'Suspend Farmer Account' : 'Activate Farmer Account'}" onclick="toggleFarmerStatus('${f.username}', ${!isActive})">
               <i data-lucide="${isActive ? 'user-x' : 'user-check'}"></i>
             </button>
@@ -1388,6 +1485,8 @@ function openEnrollFarmerModal() {
     customInput.value = '';
     customInput.required = false;
   }
+  const shedIdInput = document.getElementById('enrollShedId');
+  if (shedIdInput) shedIdInput.value = '';
   if (window.lucide) lucide.createIcons();
 }
 
@@ -1425,12 +1524,14 @@ async function handleEnrollFarmer(event) {
     finalBreed = customBreed || 'Other';
   }
 
+  const shedIdVal = (document.getElementById('enrollShedId')?.value || '').trim();
   const payload = {
     username: document.getElementById('enrollUsername').value.trim(),
     full_name: document.getElementById('enrollFullName').value.trim(),
     password: document.getElementById('enrollPassword').value,
     phone: document.getElementById('enrollPhone').value.trim(),
     farm_name: document.getElementById('enrollFarmName').value.trim(),
+    shed_id: shedIdVal || undefined,
     region: document.getElementById('enrollRegion').value.trim(),
     batch_id: document.getElementById('enrollBatchId').value.trim(),
     dfl_capacity: document.getElementById('enrollDfl').value.trim(),
@@ -1451,6 +1552,7 @@ async function handleEnrollFarmer(event) {
     closeEnrollModal();
     showToast(`Farmer "${payload.full_name}" registered and activated successfully!`, 'success');
     await fetchFarmers();
+    await fetchSheds();
     await fetchStats();
     await fetchAuditLogs();
 

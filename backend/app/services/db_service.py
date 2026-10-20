@@ -299,6 +299,33 @@ def init_db():
                     now_dt
                 ))
 
+        # Auto-heal unique shed_ids for all registered farmers
+        try:
+            cursor.execute("SELECT id, username, shed_id FROM users WHERE role != 'superadmin' ORDER BY created_at ASC")
+            all_farmers_rows = cursor.fetchall()
+            seen_sheds = set()
+            next_shed_num = 1
+            for row in all_farmers_rows:
+                u_id = row[0] if isinstance(row, tuple) else row["id"]
+                u_name = row[1] if isinstance(row, tuple) else row["username"]
+                u_shed = row[2] if isinstance(row, tuple) else row["shed_id"]
+
+                if u_name == "ramesh_farmer":
+                    u_shed = "shed_01"
+                elif u_name == "venkatamma_farmer":
+                    u_shed = "shed_02"
+                elif u_name == "manjunath_kolar":
+                    u_shed = "shed_03"
+                elif not u_shed or u_shed in seen_sheds:
+                    while f"shed_{next_shed_num:02d}" in seen_sheds or next_shed_num <= 3:
+                        next_shed_num += 1
+                    u_shed = f"shed_{next_shed_num:02d}"
+
+                cursor.execute("UPDATE users SET shed_id = %s WHERE id = %s", (u_shed, u_id))
+                seen_sheds.add(u_shed)
+        except Exception as e:
+            logger.debug(f"Shed ID auto-heal skipped: {e}")
+
 # Initialize DB on module import safely
 try:
     init_db()
@@ -347,7 +374,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
 def get_all_farmers() -> List[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
-            SELECT id, username, full_name, phone, preferred_language, role, 
+            SELECT id, username, full_name, phone, whatsapp_number, whatsapp_verified, preferred_language, role, 
                    farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at 
             FROM users 
             WHERE role != 'superadmin' 
@@ -362,6 +389,46 @@ def get_all_farmers() -> List[Dict[str, Any]]:
             result.append(d)
         return result
 
+def get_farmer_by_shed_id(shed_id: str) -> Optional[Dict[str, Any]]:
+    clean_shed_id = shed_id.strip()
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("""
+            SELECT * FROM users 
+            WHERE shed_id = %s AND role != 'superadmin' AND is_active = TRUE 
+            ORDER BY created_at ASC 
+            LIMIT 1
+        """, (clean_shed_id,))
+        row = cursor.fetchone()
+        if row:
+            d = dict(row)
+            if isinstance(d.get("created_at"), datetime):
+                d["created_at"] = d["created_at"].isoformat()
+            return d
+    return None
+
+def set_user_whatsapp_verified(user_id_or_username: str, verified: bool = True) -> bool:
+    clean_id = user_id_or_username.strip()
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+            UPDATE users 
+            SET whatsapp_verified = %s 
+            WHERE id = %s OR username = %s OR phone = %s OR whatsapp_number = %s
+        """, (verified, clean_id, clean_id, clean_id, clean_id))
+    return True
+
+def get_next_available_shed_id() -> str:
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("SELECT DISTINCT shed_id FROM users WHERE shed_id IS NOT NULL")
+            rows = cursor.fetchall()
+            existing_sheds = {r["shed_id"] if isinstance(r, dict) else r[0] for r in rows}
+            num = 1
+            while f"shed_{num:02d}" in existing_sheds:
+                num += 1
+            return f"shed_{num:02d}"
+    except Exception:
+        return "shed_01"
+
 def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
     created_at_val = user_data.get("created_at")
     if isinstance(created_at_val, str):
@@ -373,6 +440,12 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         created_at_dt = created_at_val
     else:
         created_at_dt = datetime.now(timezone.utc)
+
+    # Assign distinct shed_id for new farmers if not specified or defaulting
+    assigned_shed = user_data.get("shed_id")
+    if not assigned_shed or (assigned_shed == "shed_01" and user_data.get("username") != "ramesh_farmer"):
+        assigned_shed = get_next_available_shed_id()
+    user_data["shed_id"] = assigned_shed
 
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("""
@@ -396,7 +469,7 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             user_data.get("region", "Local Rearing Shed"),
             user_data.get("latitude"),
             user_data.get("longitude"),
-            user_data.get("shed_id", "shed_01"),
+            user_data.get("shed_id", assigned_shed),
             user_data.get("batch_id", "SERI-2026-M04"),
             user_data.get("dfl_capacity", "200 DFL"),
             user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
