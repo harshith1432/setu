@@ -53,3 +53,12 @@ curl -sS -X POST "http://localhost:8000/api/v1/control/shed_01/alerts/test" \
     "recipient": "whatsapp:+916361606828"
   }'
 
+curl -sS -X POST "http://localhost:8000/api/v1/control/shed_01/alerts/test" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Setu alert: cooling required in shed_01",
+    "media_url": "https://sypxajiivlibqgnyplkc.supabase.co/storage/v1/object/public/setu/ElevenLabs_2026-10-20T14_59_15_Mani%20-%20Rich,%20Deep%20Kannada%20Conversation_pvc_sp100_s50_sb75_v4.mp3",
+    "dry_run": false,
+    "recipient": "whatsapp:+916361606828"
+  }'

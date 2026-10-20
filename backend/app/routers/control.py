@@ -88,5 +88,6 @@ def test_alert_dispatch(
     message = payload.get("message") or "Setu WhatsApp alert test message."
     dry_run = bool(payload.get("dry_run", True))
     recipient = payload.get("recipient")
-    return alert_service.send(message=message, recipient=recipient, dry_run=dry_run)
+    media_url = payload.get("media_url")
+    return alert_service.send(message=message, recipient=recipient, dry_run=dry_run, media_url=media_url)
 

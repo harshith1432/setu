@@ -77,6 +77,7 @@ class WhatsAppAlertService:
         message: str,
         recipient: Optional[str] = None,
         dry_run: bool = False,
+        media_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         target = self.normalize_whatsapp(recipient or self.default_to)
         if not target:
@@ -93,6 +94,7 @@ class WhatsAppAlertService:
                     "message": f"Setu dry run: would send to {target} -> {message}",
                     "recipient": target,
                     "preview": message,
+                    "media_url": media_url,
                 }
             return {
                 "status": "disabled",
@@ -106,6 +108,7 @@ class WhatsAppAlertService:
                 "message": f"Setu dry run: would send to {target} -> {message}",
                 "recipient": target,
                 "preview": message,
+                "media_url": media_url,
             }
 
         if self._client is None:
@@ -116,23 +119,29 @@ class WhatsAppAlertService:
             }
 
         try:
-            twilio_message = self._client.messages.create(
-                body=message,
-                from_=self.normalize_whatsapp(self.from_number),
-                to=target,
-            )
+            payload = {
+                "body": message,
+                "from_": self.normalize_whatsapp(self.from_number),
+                "to": target,
+            }
+            if media_url:
+                payload["media_url"] = [media_url]
+
+            twilio_message = self._client.messages.create(**payload)
             return {
                 "status": "sent",
                 "message": "WhatsApp alert sent successfully.",
                 "recipient": target,
                 "sid": twilio_message.sid,
                 "preview": message,
+                "media_url": media_url,
             }
         except Exception as exc:  # pragma: no cover - network layer
             return {
                 "status": "error",
                 "message": f"Twilio WhatsApp send failed: {exc}",
                 "recipient": target,
+                "media_url": media_url,
             }
 
 
