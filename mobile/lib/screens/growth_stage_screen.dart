@@ -13,8 +13,13 @@ class GrowthStageScreen extends StatelessWidget {
     final currentInfo = provider.currentStageInfo;
     final l10n = AppLocalizations.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+    return RefreshIndicator(
+      color: const Color(0xFF2E7D32),
+      backgroundColor: Colors.white,
+      onRefresh: () => provider.refreshAllData(userInitiated: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -204,6 +209,7 @@ class GrowthStageScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

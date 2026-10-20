@@ -35,6 +35,13 @@ class SetuProvider with ChangeNotifier {
   double _lightLuxSetPoint = 25.0;
   int _lightBrightness = 35;
 
+  // Auto-refresh & telemetry polling state (2-5s interval)
+  Timer? _telemetryPollTimer;
+  bool _isFetchingLiveShed = false;
+  bool _isPullRefreshing = false;
+  DateTime? _lastUserActionTime;
+  DateTime? _lastSyncTime;
+
   // Session & Auth state
   bool _isLoggedIn = false;
   bool _isInitialized = false;
@@ -117,6 +124,9 @@ class SetuProvider with ChangeNotifier {
   ShedData get shedData => _shedData;
   AIAdvice get aiAdvice => _aiAdvice;
   GrowthStageModel get currentStageInfo => GrowthStageModel.allStages[_currentGrowthStage - 1];
+
+  bool get isPullRefreshing => _isPullRefreshing;
+  DateTime? get lastSyncTime => _lastSyncTime;
 
 
   bool get isLoggedIn => _isLoggedIn;
@@ -223,6 +233,8 @@ class SetuProvider with ChangeNotifier {
       notifyListeners();
       // Fetch live real-time ambient weather for the saved location
       refreshLiveWeather();
+      // Start real-time background sync (every 3 seconds)
+      startAutoRefresh(interval: const Duration(seconds: 3));
     }
   }
 
@@ -564,6 +576,7 @@ class SetuProvider with ChangeNotifier {
       _pendingGoogleUser = null;
 
       await _saveSessionToPreferences(token: _authToken!, userMap: userMap);
+      startAutoRefresh(interval: const Duration(seconds: 3));
       notifyListeners();
       return (success: true, message: 'Welcome $_userName! Farm successfully registered.');
     }
@@ -618,11 +631,19 @@ class SetuProvider with ChangeNotifier {
             lon: _longitude,
             region: _region,
           );
-          _shedData = serverShed.copyWith(
-            outsideTemp: weather.temperature,
-            outsideHumidity: weather.humidity,
-            region: weather.locationName,
-          );
+          if (serverShed != null) {
+            _shedData = serverShed.copyWith(
+              outsideTemp: weather.temperature,
+              outsideHumidity: weather.humidity,
+              region: weather.locationName,
+            );
+          } else {
+            _shedData = _shedData.copyWith(
+              outsideTemp: weather.temperature,
+              outsideHumidity: weather.humidity,
+              region: weather.locationName,
+            );
+          }
         } catch (_) {
           _shedData = _shedData.copyWith(
             outsideTemp: weather.temperature,
@@ -823,6 +844,7 @@ class SetuProvider with ChangeNotifier {
       }
       
       await _saveSessionToPreferences(token: _authToken!, userMap: user);
+      startAutoRefresh(interval: const Duration(seconds: 3));
       notifyListeners();
       return true;
     }
@@ -906,6 +928,7 @@ class SetuProvider with ChangeNotifier {
     await prefs.remove('is_logged_in');
     await prefs.remove('auth_token');
     await prefs.remove('registered_farmers_cache');
+    stopAutoRefresh();
     notifyListeners();
   }
 
@@ -1121,6 +1144,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void setAutoMode(bool auto) {
+    markUserAction();
     _isAutoMode = auto;
     if (auto) {
       _applySimpleStagePreset();
@@ -1140,6 +1164,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void adjustTempSetPoint(double delta) {
+    markUserAction();
     _tempSetPoint = (_tempSetPoint + delta).clamp(18.0, 35.0);
     _tempSetPoint = double.parse(_tempSetPoint.toStringAsFixed(1));
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
@@ -1148,6 +1173,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void adjustHumSetPoint(double delta) {
+    markUserAction();
     _humSetPoint = (_humSetPoint + delta).clamp(40.0, 95.0);
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(_shedData.shedId, _isAutoMode, _tempSetPoint, _humSetPoint);
@@ -1155,18 +1181,21 @@ class SetuProvider with ChangeNotifier {
   }
 
   void adjustAirflowSetPoint(int delta) {
+    markUserAction();
     _airflowSetPoint = (_airflowSetPoint + delta).clamp(10, 100);
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     notifyListeners();
   }
 
   void adjustLightSetPoint(int delta) {
+    markUserAction();
     _lightSetPoint = (_lightSetPoint + delta).clamp(0, 100);
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     notifyListeners();
   }
 
   void adjustAirQualitySetPoint(double delta) {
+    markUserAction();
     _airQualitySetPoint = (_airQualitySetPoint + delta).clamp(50.0, 95.0);
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(
@@ -1180,6 +1209,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void adjustLightLuxSetPoint(double delta) {
+    markUserAction();
     _lightLuxSetPoint = (_lightLuxSetPoint + delta).clamp(5.0, 80.0);
     _syncTargetsIntoShedData(isAutoMode: _isAutoMode);
     _apiService.updateSetpoints(
@@ -1193,6 +1223,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void setLightBrightness(int brightness) {
+    markUserAction();
     _lightBrightness = brightness.clamp(0, 100);
     final isLit = _lightBrightness > 0;
     _syncTargetsIntoShedData(
@@ -1215,6 +1246,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void setGrowthStage(int stage) {
+    markUserAction();
     if (stage >= 1 && stage <= GrowthStageModel.allStages.length) {
       _currentGrowthStage = stage;
       if (_isAutoMode) {
@@ -1245,6 +1277,7 @@ class SetuProvider with ChangeNotifier {
   }
 
   void toggleActuator(String actuator) {
+    markUserAction();
     if (_isAutoMode) return;
 
     bool nextCooler = _shedData.actuators.cooler;
@@ -1288,6 +1321,118 @@ class SetuProvider with ChangeNotifier {
     _apiService.manualActuatorOverride(_shedData.shedId, actuator, nextState);
     _syncTelemetryToBackend();
     notifyListeners();
+  }
+
+  void markUserAction() {
+    _lastUserActionTime = DateTime.now();
+  }
+
+  void startAutoRefresh({Duration interval = const Duration(seconds: 3)}) {
+    _telemetryPollTimer?.cancel();
+    _telemetryPollTimer = Timer.periodic(interval, (_) async {
+      await fetchLiveShedData(silent: true);
+    });
+  }
+
+  void stopAutoRefresh() {
+    _telemetryPollTimer?.cancel();
+    _telemetryPollTimer = null;
+  }
+
+  /// Pull-to-refresh handler called by RefreshIndicator on UI screens
+  Future<void> refreshAllData({bool userInitiated = true}) async {
+    await fetchLiveShedData(silent: false, refreshGps: userInitiated);
+  }
+
+  /// Fetches live telemetry, actuator states, setpoints, and status from backend.
+  /// Runs periodically (every 3 seconds) or on pull-to-refresh.
+  Future<void> fetchLiveShedData({bool silent = true, bool refreshGps = false}) async {
+    if (_isFetchingLiveShed) return;
+    _isFetchingLiveShed = true;
+    if (!silent) {
+      _isPullRefreshing = true;
+      notifyListeners();
+    }
+
+    try {
+      if (refreshGps) {
+        await refreshLiveWeather(requestGps: true);
+      }
+
+      final serverShed = await _apiService.getShedStatus(
+        _shedData.shedId,
+        lat: _latitude,
+        lon: _longitude,
+        region: _region,
+      );
+
+      if (serverShed != null) {
+        final outTemp = _liveWeather?.temperature ?? serverShed.outsideTemp;
+        final outHum = _liveWeather?.humidity ?? serverShed.outsideHumidity;
+        final reg = (_region.isNotEmpty && _region != 'My Rearing Shed') ? _region : serverShed.region;
+
+        final isRecentAction = _lastUserActionTime != null &&
+            DateTime.now().difference(_lastUserActionTime!) < const Duration(seconds: 4);
+
+        if (!isRecentAction) {
+          _currentGrowthStage = serverShed.currentStage;
+          _isAutoMode = serverShed.isAutoMode;
+          _tempSetPoint = serverShed.tempTarget;
+          _humSetPoint = serverShed.humidityTarget;
+          _airflowSetPoint = serverShed.airflowTarget.toInt();
+          _lightSetPoint = serverShed.lightTarget.toInt();
+          _airQualitySetPoint = serverShed.airQualityTarget;
+          _lightLuxSetPoint = serverShed.lightLuxTarget;
+          _lightBrightness = serverShed.actuators.lightBrightness;
+
+          _shedData = serverShed.copyWith(
+            outsideTemp: outTemp,
+            outsideHumidity: outHum,
+            region: reg,
+            lastUpdated: DateTime.now(),
+          );
+        } else {
+          _shedData = serverShed.copyWith(
+            outsideTemp: outTemp,
+            outsideHumidity: outHum,
+            region: reg,
+            tempTarget: _tempSetPoint,
+            humidityTarget: _humSetPoint,
+            airflowTarget: _airflowSetPoint.toDouble(),
+            lightTarget: _lightSetPoint.toDouble(),
+            airQualityTarget: _airQualitySetPoint,
+            lightLuxTarget: _lightLuxSetPoint,
+            isAutoMode: _isAutoMode,
+            currentStage: _currentGrowthStage,
+            actuators: _shedData.actuators,
+            lastUpdated: DateTime.now(),
+          );
+        }
+
+        _lastSyncTime = DateTime.now();
+      }
+
+      if (!silent) {
+        try {
+          final advice = await _apiService.getAIExplanation(_shedData.shedId, _locale.languageCode);
+          if (advice.currentAction.isNotEmpty) {
+            _aiAdvice = advice;
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('fetchLiveShedData error: $e');
+    } finally {
+      _isFetchingLiveShed = false;
+      _isPullRefreshing = false;
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    stopAutoRefresh();
+    super.dispose();
   }
 
   void applyScenario(String scenario) {

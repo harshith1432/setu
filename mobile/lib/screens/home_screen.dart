@@ -21,7 +21,6 @@ class HomeScreen extends StatelessWidget {
     final provider = Provider.of<SetuProvider>(context);
     final shed = provider.shedData;
     final l10n = AppLocalizations.of(context);
-    final stage = provider.currentStageInfo;
 
     Color heroCardBg = const Color(0xFFE8F5E9);
     Color heroCardBorder = const Color(0xFFA5D6A7);
@@ -40,8 +39,13 @@ class HomeScreen extends StatelessWidget {
       heroIconColor = const Color(0xFF0288D1);
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+    return RefreshIndicator(
+      color: const Color(0xFF2E7D32),
+      backgroundColor: Colors.white,
+      onRefresh: () => provider.refreshAllData(userInitiated: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -115,14 +119,22 @@ class HomeScreen extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.circle, color: Color(0xFF2E7D32), size: 8),
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF2E7D32),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                           const SizedBox(width: 5),
-                          Text(
-                            l10n.translate('shedNo'),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                          const Text(
+                            'LIVE (3s)',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
                               color: Color(0xFF1B5E20),
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ],
@@ -480,6 +492,7 @@ class HomeScreen extends StatelessWidget {
           ),
 
         ],
+      ),
       ),
     );
   }

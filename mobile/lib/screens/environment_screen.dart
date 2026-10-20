@@ -24,8 +24,13 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
     final l10n = AppLocalizations.of(context);
     final stage = provider.currentStageInfo;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+    return RefreshIndicator(
+      color: const Color(0xFF2E7D32),
+      backgroundColor: Colors.white,
+      onRefresh: () => provider.refreshAllData(userInitiated: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -272,6 +277,7 @@ class _EnvironmentScreenState extends State<EnvironmentScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

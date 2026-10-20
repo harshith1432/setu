@@ -291,7 +291,7 @@ class ApiService {
     return null;
   }
 
-  Future<ShedData> getShedStatus(
+  Future<ShedData?> getShedStatus(
     String shedId, {
     double? lat,
     double? lon,
@@ -308,35 +308,13 @@ class ApiService {
         final res = await http.get(uri, headers: _headers)
             .timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) {
+          _workingBaseUrl = base;
           return ShedData.fromJson(jsonDecode(res.body));
         }
       } catch (_) {}
     }
-    
-    // Offline / Mock fallback
-    return ShedData(
-      shedId: shedId,
-      farmName: 'Green Valley Farm',
-      region: region ?? 'My Sericulture Shed',
-      overallStatus: 'IDEAL',
-      statusHeadline: 'Ideal for Silkworms',
-      statusSubline: 'Everything is comfortable inside the shed. No action required.',
-      currentStage: 4,
-      stageName: 'III Instar',
-      indoorTemp: 26.2,
-      indoorHumidity: 80.0,
-      outsideTemp: 28.5,
-      outsideHumidity: 55.0,
-      actuators: ActuatorStates(cooler: true, fan: true, heater: false, light: true),
-      isAutoMode: true,
-      tempTarget: 26.0,
-      humidityTarget: 80.0,
-      airflowTarget: 50.0,
-      lightTarget: 35.0,
-      lastUpdated: DateTime.now(),
-    );
+    return null;
   }
-
   Future<AIAdvice> getAIExplanation(String shedId, String lang) async {
     for (final base in candidateUrls) {
       try {
@@ -388,6 +366,7 @@ class ApiService {
           body: jsonEncode(payload),
         ).timeout(const Duration(seconds: 4));
         if (res.statusCode == 200) {
+          _workingBaseUrl = base;
           return ShedData.fromJson(jsonDecode(res.body));
         }
       } catch (_) {}
@@ -414,7 +393,10 @@ class ApiService {
           headers: _headers,
           body: jsonEncode(payload),
         ).timeout(const Duration(seconds: 4));
-        if (res.statusCode == 200) return true;
+        if (res.statusCode == 200) {
+          _workingBaseUrl = base;
+          return true;
+        }
       } catch (_) {}
     }
     return false;

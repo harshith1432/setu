@@ -25,8 +25,13 @@ class _AiGuidanceScreenState extends State<AiGuidanceScreen> {
     final advice = provider.aiAdvice;
     final l10n = AppLocalizations.of(context);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+    return RefreshIndicator(
+      color: const Color(0xFF7B1FA2),
+      backgroundColor: Colors.white,
+      onRefresh: () => provider.refreshAllData(userInitiated: true),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -238,6 +243,7 @@ class _AiGuidanceScreenState extends State<AiGuidanceScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
