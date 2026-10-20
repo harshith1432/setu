@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.models.schemas import SetpointsUpdate, ManualActuatorOverride, ShedOverview
 from app.services.telemetry_service import telemetry_service
 from app.services.db_service import get_user_by_username
+from app.services.whatsapp_alerts import alert_service
 from app.core.security import get_current_user_payload
 
 router = APIRouter(prefix="/control", tags=["Control & Automation"])
@@ -67,11 +68,26 @@ def manual_actuator_override(
             status_code=400,
             detail=f"Invalid actuator '{payload.actuator}'. Must be one of {valid_actuators}"
         )
-    
-    return telemetry_service.manual_override_actuator(
+
+    result = telemetry_service.manual_override_actuator(
         shed_id=shed_id,
         actuator=payload.actuator,
         state=payload.state,
         value=payload.value
     )
+    return result
+
+
+@router.post("/{shed_id}/alerts/test")
+def test_alert_dispatch(
+    shed_id: str,
+    payload: dict,
+    user_payload: dict = Depends(verify_shed_control_access)
+):
+    """Dry-run or real alert path for testing WhatsApp notifications without hardware."""
+    message = payload.get("message") or "Setu WhatsApp alert test message."
+    dry_run = bool(payload.get("dry_run", True))
+    recipient = payload.get("recipient")
+    media_url = payload.get("media_url")
+    return alert_service.send(message=message, recipient=recipient, dry_run=dry_run, media_url=media_url)
 

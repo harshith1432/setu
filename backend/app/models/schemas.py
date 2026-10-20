@@ -12,6 +12,8 @@ class UserCreate(BaseModel):
     password: str
     full_name: str
     phone: str
+    whatsapp_number: Optional[str] = None
+    whatsapp_verified: bool = False
     preferred_language: str = "kn"  # "en", "kn", "te"
     farm_name: Optional[str] = None
     region: Optional[str] = None
@@ -38,6 +40,8 @@ class GoogleAuthRequest(BaseModel):
 class UserProfileUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    whatsapp_verified: Optional[bool] = None
     farm_name: Optional[str] = None
     region: Optional[str] = None
     latitude: Optional[float] = None
@@ -52,6 +56,8 @@ class UserOut(BaseModel):
     username: str
     full_name: str
     phone: str
+    whatsapp_number: Optional[str] = None
+    whatsapp_verified: bool = False
     preferred_language: str
     role: str
     farm_name: Optional[str] = "Green Valley Sericulture Farm"
