@@ -1408,10 +1408,11 @@ function renderFarmersTable(farmers) {
     seenShedIds.add(sId);
   });
 
-  tbody.innerHTML = farmers.map(f => {
+  tbody.innerHTML = farmers.map((f, idx) => {
     const isActive = f.is_active === 1 || f.is_active === true;
     const sId = f.shed_id || 'shed_01';
     const fId = f.username || f.id;
+    const menuId = `farmer-act-${idx}`;
     return `
       <tr>
         <td>
@@ -1447,22 +1448,33 @@ function renderFarmersTable(farmers) {
           </span>
         </td>
         <td>
-          <div class="action-buttons-wrap">
-            <button class="btn-icon" title="View Complete Data & History" style="color:var(--green-leaf);" onclick="openFarmerDetailsModal('${escapeHtml(fId)}')">
-              <i data-lucide="eye"></i>
+          <div class="action-dropdown-wrap">
+            <button type="button" class="action-dots-btn" title="Actions" onclick="toggleFarmerActionMenu(event, '${menuId}')">
+              <i data-lucide="more-vertical"></i>
             </button>
-            <button class="btn-icon" title="Edit Personal & Farm Info" style="color:#0288D1;" onclick="openEditFarmerModal('${escapeHtml(fId)}')">
-              <i data-lucide="edit-3"></i>
-            </button>
-            <button class="btn-icon" title="Monitor Shed Telemetry" onclick="switchToFarmerShed('${escapeHtml(sId)}')">
-              <i data-lucide="radio"></i>
-            </button>
-            <button class="btn-icon" title="${isActive ? 'Suspend Farmer Account' : 'Activate Farmer Account'}" onclick="toggleFarmerStatus('${f.username}', ${!isActive})">
-              <i data-lucide="${isActive ? 'user-x' : 'user-check'}"></i>
-            </button>
-            <button class="btn-icon danger" title="Remove Farmer Record" onclick="confirmDeleteFarmer('${f.username}')">
-              <i data-lucide="trash-2"></i>
-            </button>
+            <div id="${menuId}" class="farmer-action-dropdown hidden">
+              <button type="button" class="action-menu-item" onclick="openFarmerDetailsModal('${escapeHtml(fId)}'); closeAllActionMenus();">
+                <i data-lucide="eye" style="color:var(--green-leaf);"></i>
+                <span>View Full Data & History</span>
+              </button>
+              <button type="button" class="action-menu-item" onclick="openEditFarmerModal('${escapeHtml(fId)}'); closeAllActionMenus();">
+                <i data-lucide="edit-3" style="color:#0288D1;"></i>
+                <span>Edit Profile & Farm Info</span>
+              </button>
+              <button type="button" class="action-menu-item" onclick="switchToFarmerShed('${escapeHtml(sId)}'); closeAllActionMenus();">
+                <i data-lucide="radio" style="color:#E65100;"></i>
+                <span>Monitor Live Shed</span>
+              </button>
+              <div class="action-menu-divider"></div>
+              <button type="button" class="action-menu-item" onclick="toggleFarmerStatus('${f.username}', ${!isActive}); closeAllActionMenus();">
+                <i data-lucide="${isActive ? 'user-x' : 'user-check'}" style="color:${isActive ? '#C62828' : 'var(--green-leaf)'};"></i>
+                <span>${isActive ? 'Suspend Farmer Account' : 'Activate Farmer Account'}</span>
+              </button>
+              <button type="button" class="action-menu-item danger" onclick="confirmDeleteFarmer('${f.username}'); closeAllActionMenus();">
+                <i data-lucide="trash-2" style="color:#dc2626;"></i>
+                <span>Remove Farmer Record</span>
+              </button>
+            </div>
           </div>
         </td>
       </tr>
@@ -1471,6 +1483,55 @@ function renderFarmersTable(farmers) {
 
   if (window.lucide) lucide.createIcons();
 }
+
+function toggleFarmerActionMenu(event, menuId) {
+  event.stopPropagation();
+  const menu = document.getElementById(menuId);
+  if (!menu) return;
+
+  const isAlreadyOpen = !menu.classList.contains('hidden') && menu.style.display === 'flex';
+
+  closeAllActionMenus();
+
+  if (!isAlreadyOpen) {
+    const btn = event.currentTarget;
+    const rect = btn.getBoundingClientRect();
+
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 6}px`;
+
+    const menuWidth = 240;
+    const leftPos = Math.max(10, Math.min(window.innerWidth - menuWidth - 16, rect.right - menuWidth));
+    menu.style.left = `${leftPos}px`;
+    menu.style.zIndex = '99999';
+    menu.style.display = 'flex';
+    menu.classList.remove('hidden');
+
+    // Flip above trigger button if overflowing window bottom
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.bottom > window.innerHeight - 10) {
+      menu.style.top = `${Math.max(10, rect.top - menuRect.height - 6)}px`;
+    }
+
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+function closeAllActionMenus() {
+  document.querySelectorAll('.farmer-action-dropdown').forEach(m => {
+    m.classList.add('hidden');
+    m.style.display = 'none';
+  });
+}
+
+// Global outside click & scroll handlers for action menus
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.farmer-action-dropdown') && !e.target.closest('.action-dots-btn')) {
+    closeAllActionMenus();
+  }
+});
+window.addEventListener('resize', closeAllActionMenus);
+window.addEventListener('scroll', closeAllActionMenus, true);
 
 function handleFarmerSearch() {
   const query = (document.getElementById('farmerSearchInput').value || '').toLowerCase();
