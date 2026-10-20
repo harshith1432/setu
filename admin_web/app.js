@@ -1887,7 +1887,7 @@ function openEditFarmerModal(farmerId) {
 
   const f = enrolledFarmers.find(item => item.username === farmerId || item.id === farmerId) || currentViewingFarmer || {};
 
-  document.getElementById('editFarmerId').value = farmerId;
+  document.getElementById('editFarmerId').value = f.id || f.username || farmerId;
   document.getElementById('editFullName').value = f.full_name || '';
   document.getElementById('editPhone').value = f.phone || '';
   document.getElementById('editFarmName').value = f.farm_name || '';
