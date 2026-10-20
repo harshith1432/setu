@@ -39,7 +39,7 @@ class Settings(BaseModel):
         origin.strip()
         for origin in os.getenv(
             "ALLOWED_ORIGINS",
-            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173"
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000,http://localhost:5173,http://127.0.0.1:5173,https://setu-adminweb.vercel.app,https://setu-8vh9.onrender.com"
         ).split(",")
         if origin.strip()
     ]
