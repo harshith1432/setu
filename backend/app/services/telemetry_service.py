@@ -348,28 +348,21 @@ class TelemetryService:
         user_stage = None
 
         try:
-            from app.services.db_service import get_db_cursor
-            with get_db_cursor(dict_cursor=True) as cursor:
-                cursor.execute("""
-                    SELECT id, username, full_name, farm_name, region, latitude, longitude, shed_id 
-                    FROM users 
-                    WHERE shed_id = %s OR id = %s OR username = %s OR ('shed_' || id) = %s
-                    ORDER BY (role = 'farmer') DESC 
-                    LIMIT 1
-                """, (shed_id, shed_id, shed_id, shed_id))
-                user = cursor.fetchone()
-                if user:
-                    if user.get("farm_name"):
-                        farm_name = user["farm_name"]
-                    if user.get("region") and not user_region:
-                        user_region = user["region"]
-                    if farmer_lat is None and user.get("latitude") is not None:
-                        farmer_lat = float(user["latitude"])
-                    if farmer_lon is None and user.get("longitude") is not None:
-                        farmer_lon = float(user["longitude"])
+            from app.services.db_service import get_farmer_by_shed_id, get_db_cursor
+            user = get_farmer_by_shed_id(shed_id)
+            if user:
+                if user.get("farm_name"):
+                    farm_name = user["farm_name"]
+                if user.get("region") and not user_region:
+                    user_region = user["region"]
+                if farmer_lat is None and user.get("latitude") is not None:
+                    farmer_lat = float(user["latitude"])
+                if farmer_lon is None and user.get("longitude") is not None:
+                    farmer_lon = float(user["longitude"])
 
-                    # Save detected GPS coordinates from phone into DB profile if provided
-                    if lat is not None and lon is not None:
+                # Save detected GPS coordinates from phone into DB profile if provided
+                if lat is not None and lon is not None:
+                    with get_db_cursor(commit=True) as cursor:
                         cursor.execute("""
                             UPDATE users 
                             SET latitude = %s, longitude = %s, region = COALESCE(%s, region)

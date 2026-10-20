@@ -35,8 +35,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def decode_token(token: str) -> dict:
     """
-    SEC-01 & SEC-02: Cryptographic token verification.
-    Strictly validates HMAC-SHA256 signature against settings.SECRET_KEY.
+    SEC-01, SEC-02 & SEC-15: Cryptographic token verification.
+    Supports:
+    1. Centralized OIDC / Keycloak asymmetric tokens (RS256 / JWKS) with realm role mapping.
+    2. Strictly validates HMAC-SHA256 signature against settings.SECRET_KEY.
     Rejects forged tokens, expired tokens, and unverified development bypass strings.
     """
     if not token or not isinstance(token, str):
@@ -46,7 +48,20 @@ def decode_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 1. Strictly verify HMAC signature with server SECRET_KEY
+    # 1. Check for Centralized OIDC / Keycloak asymmetric tokens
+    try:
+        from app.core.oidc_auth import oidc_verifier
+        unverified_hdr = jwt.get_unverified_header(token)
+        if unverified_hdr.get("alg", "").startswith(("RS", "ES")):
+            oidc_payload = oidc_verifier.verify_token(token)
+            if oidc_payload:
+                return oidc_payload
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # 2. Strictly verify HMAC signature with server SECRET_KEY
     try:
         payload = jwt.decode(
             token,

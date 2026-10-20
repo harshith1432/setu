@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # 1. PostgreSQL 16 Primary Database
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: setu_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-setu}
+      POSTGRES_USER: ${POSTGRES_USER:-setu_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SetuProductionSecret2026!}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: >
+      postgres
+      -c max_connections=250
+      -c shared_buffers=1GB
+      -c effective_cache_size=3GB
+      -c maintenance_work_mem=256MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=16MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U setu_admin -d setu"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - setu_internal
+
+  # =========================================================================
+  # 2. PgBouncer Connection Pooler (Transaction Mode)
+  # =========================================================================
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: setu_pgbouncer
+    restart: always
+    environment:
+      DB_USER: ${POSTGRES_USER:-setu_admin}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-SetuProductionSecret2026!}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-setu}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 10000
+      DEFAULT_POOL_SIZE: 50
+      MIN_POOL_SIZE: 10
+      RESERVE_POOL_SIZE: 10
+      MAX_DB_CONNECTIONS: 200
+      SERVER_IDLE_TIMEOUT: 60
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - setu_internal
+
+  # =========================================================================
+  # 3. Redis High-Speed L2 Cache & Pub/Sub
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: setu_redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - setu_internal
+
+  # =========================================================================
+  # 4. EMQX Distributed MQTT 5 Broker
+  # =========================================================================
+  emqx:
+    image: emqx/emqx:5.6.0
+    container_name: setu_mqtt_broker
+    restart: always
+    ports:
+      - "1883:1883"      # MQTT TCP
+      - "8883:8883"      # MQTT TLS
+      - "8083:8083"      # MQTT WebSocket
+      - "18083:18083"    # EMQX Dashboard
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: admin
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: SetuMqttAdmin2026!
+      EMQX_ALLOW_ANONYMOUS: "false"
+    volumes:
+      - emqx_data:/opt/emqx/data
+    networks:
+      - setu_internal
+
+  # =========================================================================
+  # 5. Stateless FastAPI Backend Application Replicas (x4)
+  # =========================================================================
+  backend_1: &backend_template
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-setu_admin}:${POSTGRES_PASSWORD:-SetuProductionSecret2026!}@pgbouncer:5432/${POSTGRES_DB:-setu}
+      REDIS_URL: redis://redis:6379/0
+      DEVICE_API_KEY: ${DEVICE_API_KEY:-setu-iot-device-key-2026}
+      JWT_SECRET: ${JWT_SECRET:-setu_production_jwt_secret_change_me_2026}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM}
+      TWILIO_WHATSAPP_TO: ${TWILIO_WHATSAPP_TO}
+      WHATSAPP_DRY_RUN: ${WHATSAPP_DRY_RUN:-false}
+      DB_POOL_MAX: 30
+    depends_on:
+      - pgbouncer
+      - redis
+    networks:
+      - setu_internal
+
+  backend_2:
+    <<: *backend_template
+
+  backend_3:
+    <<: *backend_template
+
+  backend_4:
+    <<: *backend_template
+
+  # =========================================================================
+  # 6. Nginx L7 Load Balancer & Reverse Proxy
+  # =========================================================================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: setu_nginx_lb
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./admin_web:/var/www/admin_web:ro
+    depends_on:
+      - backend_1
+      - backend_2
+      - backend_3
+      - backend_4
+    networks:
+      - setu_internal
+
+  # =========================================================================
+  # 7. Prometheus Performance & SRE Monitoring Scraper
+  # =========================================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: setu_prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - setu_internal
+
+volumes:
+  postgres_data:
+  redis_data:
+  emqx_data:
+  prometheus_data:
+
+networks:
+  setu_internal:
+    driver: bridge

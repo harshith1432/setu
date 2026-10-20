@@ -9,6 +9,11 @@ Empirical load testing utility measuring:
 
 import sys
 import os
+
+# Enable dry-run for load test so real WhatsApp HTTP endpoints are not hammered
+os.environ["WHATSAPP_DRY_RUN"] = "1"
+os.environ["BENCHMARK_MODE"] = "1"
+
 import time
 import asyncio
 import statistics
@@ -115,6 +120,51 @@ async def run_telemetry_ingestion_bench(client: httpx.AsyncClient, concurrency: 
     return res
 
 
+async def run_telemetry_batch_bench(client: httpx.AsyncClient, concurrency: int = 50, duration: int = 5):
+    """Measures batch telemetry ingestion throughput (5 readings per request)."""
+    res = BenchmarkResult(f"Telemetry Batch Ingestion ({concurrency} workers x 5 events/req)", concurrency, duration)
+    headers = {
+        "X-Device-Key": "setu-iot-device-key-2026",
+        "Content-Type": "application/json"
+    }
+
+    stop_event = asyncio.Event()
+
+    async def worker(worker_id: int):
+        seq = 0
+        device_id = f"batch_node_{worker_id:03d}"
+        while not stop_event.is_set():
+            batch = []
+            for _ in range(5):
+                seq += 1
+                batch.append({
+                    "shed_id": f"shed_{random.randint(1, 10):02d}",
+                    "device_id": device_id,
+                    "event_id": str(uuid.uuid4()),
+                    "sequence_number": seq,
+                    "temperature": round(random.uniform(25.0, 31.0), 2),
+                    "humidity": round(random.uniform(65.0, 85.0), 2),
+                    "air_quality": round(random.uniform(80.0, 95.0), 1),
+                    "light_lux": round(random.uniform(15.0, 40.0), 1)
+                })
+            t0 = time.perf_counter()
+            try:
+                r = await client.post("/api/v1/telemetry/batch", json={"items": batch}, headers=headers)
+                t1 = time.perf_counter()
+                res.record(r.status_code, (t1 - t0) * 1000.0)
+            except Exception:
+                t1 = time.perf_counter()
+                res.record(500, (t1 - t0) * 1000.0)
+
+    start_time = time.perf_counter()
+    tasks = [asyncio.create_task(worker(i)) for i in range(concurrency)]
+    await asyncio.sleep(duration)
+    stop_event.set()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    res.duration_sec = time.perf_counter() - start_time
+    return res
+
+
 async def run_mobile_dashboard_bench(client: httpx.AsyncClient, concurrency: int = 50, duration: int = 5):
     """Measures mobile client read throughput on getShedOverview."""
     # Obtain auth token
@@ -167,9 +217,9 @@ async def main():
         b1 = await run_telemetry_ingestion_bench(client, concurrency=20, duration=5)
         b1.print_summary()
 
-        # Ingestion Benchmark at 100 concurrency
-        b2 = await run_telemetry_ingestion_bench(client, concurrency=100, duration=6)
-        b2.print_summary()
+        # Batch Ingestion Benchmark at 50 concurrency
+        b_batch = await run_telemetry_batch_bench(client, concurrency=50, duration=5)
+        b_batch.print_summary()
 
         # Mobile Reads Benchmark at 50 concurrency
         b3 = await run_mobile_dashboard_bench(client, concurrency=50, duration=5)

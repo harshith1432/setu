@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'setu_fastapi_backend'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'backend_1:8000'
+          - 'backend_2:8000'
+          - 'backend_3:8000'
+          - 'backend_4:8000'

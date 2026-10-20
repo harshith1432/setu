@@ -1,6 +1,6 @@
 import asyncio
 import json
-from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Query, status
+from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Query, status, Request
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -12,18 +12,32 @@ from app.core.config import settings
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
 
 def verify_telemetry_auth(
+    request: Request,
     x_device_key: Optional[str] = Header(None, alias="X-Device-Key"),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
     authorization: Optional[str] = Header(None)
 ):
     """
-    SEC-05: Authenticates IoT hardware nodes or authenticated users.
+    SEC-05 & SEC-14: Authenticates IoT hardware nodes or authenticated users.
     Accepts:
-    1. Pre-shared hardware device key via X-Device-Key or X-API-Key header.
-    2. Bearer JWT authorization token from authenticated operators/mobile users.
+    1. Hardware mTLS Client Certificate (ATECC608A / X.509 client certs verified at TLS edge).
+    2. Pre-shared hardware device key via X-Device-Key or X-API-Key header.
+    3. Bearer JWT authorization token from authenticated operators/mobile users.
     Rejects unauthenticated requests with HTTP 401 Unauthorized.
     """
-    # Check pre-shared device API key
+    # 1. Check Hardware mTLS Client Certificate (X.509 / ATECC608A)
+    try:
+        from app.core.mtls_auth import mtls_service
+        cert_meta = mtls_service.extract_client_cert_metadata(request)
+        if cert_meta:
+            mtls_info = mtls_service.verify_device_mtls(request)
+            return {"auth_type": "mtls_hardware", "identity": mtls_info["device_id"], "device": mtls_info["device"]}
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    # 2. Check pre-shared device API key
     if x_device_key and x_device_key == settings.DEVICE_API_KEY:
         return {"auth_type": "device", "identity": "iot_node"}
     if x_api_key and x_api_key == settings.DEVICE_API_KEY:
@@ -44,6 +58,7 @@ def verify_telemetry_auth(
         detail="Unauthorized: Valid X-Device-Key or user Bearer token required for telemetry ingestion"
     )
 
+@router.post("", response_model=ShedOverview)
 @router.post("/record", response_model=ShedOverview)
 def ingest_telemetry(
     payload: TelemetryPayload,

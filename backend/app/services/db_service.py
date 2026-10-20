@@ -222,6 +222,8 @@ def init_db():
             organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org',
             device_name VARCHAR(128),
             device_key_hash VARCHAR(255),
+            cert_fingerprint_sha256 VARCHAR(64),
+            auth_mode VARCHAR(32) DEFAULT 'API_KEY',
             firmware_version VARCHAR(32) DEFAULT '1.0.0',
             status VARCHAR(32) DEFAULT 'ONLINE',
             last_sequence_number BIGINT DEFAULT 0,
@@ -231,6 +233,19 @@ def init_db():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_shed ON devices (shed_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_org ON devices (organization_id);")
+
+        # Dynamic migration for devices columns
+        cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='devices' AND column_name='cert_fingerprint_sha256') THEN
+                ALTER TABLE devices ADD COLUMN cert_fingerprint_sha256 VARCHAR(64);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='devices' AND column_name='auth_mode') THEN
+                ALTER TABLE devices ADD COLUMN auth_mode VARCHAR(32) DEFAULT 'API_KEY';
+            END IF;
+        END $$;
+        """)
 
         # Pre-seed default hardware nodes for demo sheds
         now_dt = datetime.now(timezone.utc)
@@ -503,18 +518,39 @@ except Exception:
     pass
 
 
-# --- Database CRUD helpers ---
+# --- Database CRUD helpers with L1 In-Memory Caching ---
+_user_cache: Dict[str, tuple[float, Optional[Dict[str, Any]]]] = {}
+_farmers_by_shed_cache: Dict[str, tuple[float, List[Dict[str, Any]]]] = {}
+_user_cache_lock = threading.Lock()
+USER_CACHE_TTL = 30.0  # seconds
+
+def invalidate_user_cache():
+    with _user_cache_lock:
+        _user_cache.clear()
+        _farmers_by_shed_cache.clear()
 
 def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
+    cache_key = f"u:{username.strip().lower()}"
+    now = time.time()
+    with _user_cache_lock:
+        if cache_key in _user_cache:
+            exp, val = _user_cache[cache_key]
+            if now < exp:
+                return dict(val) if val else None
+
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         row = cursor.fetchone()
+        res = None
         if row:
             d = dict(row)
             if isinstance(d.get("created_at"), datetime):
                 d["created_at"] = d["created_at"].isoformat()
-            return d
-    return None
+            res = d
+
+        with _user_cache_lock:
+            _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
+        return dict(res) if res else None
 
 def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
     clean_id = identifier.strip()
@@ -525,6 +561,7 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
         )
         row = cursor.fetchone()
         if row:
+            invalidate_user_cache()
             d = dict(row)
             if isinstance(d.get("created_at"), datetime):
                 d["created_at"] = d["created_at"].isoformat()
@@ -532,15 +569,27 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
     return None
 
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    cache_key = f"id:{user_id.strip()}"
+    now = time.time()
+    with _user_cache_lock:
+        if cache_key in _user_cache:
+            exp, val = _user_cache[cache_key]
+            if now < exp:
+                return dict(val) if val else None
+
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
         row = cursor.fetchone()
+        res = None
         if row:
             d = dict(row)
             if isinstance(d.get("created_at"), datetime):
                 d["created_at"] = d["created_at"].isoformat()
-            return d
-    return None
+            res = d
+
+        with _user_cache_lock:
+            _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
+        return dict(res) if res else None
 
 def get_all_farmers() -> List[Dict[str, Any]]:
     ensure_unique_farmer_sheds()
@@ -563,11 +612,18 @@ def get_all_farmers() -> List[Dict[str, Any]]:
         return result
 
 def get_farmers_by_shed_id(shed_id: str) -> List[Dict[str, Any]]:
-    clean_shed_id = shed_id.strip()
+    clean_shed_id = shed_id.strip().lower()
+    now = time.time()
+    with _user_cache_lock:
+        if clean_shed_id in _farmers_by_shed_cache:
+            exp, val = _farmers_by_shed_cache[clean_shed_id]
+            if now < exp:
+                return [dict(x) for x in val]
+
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
             SELECT * FROM users 
-            WHERE LOWER(shed_id) = LOWER(%s) AND role != 'superadmin' AND is_active = TRUE 
+            WHERE LOWER(shed_id) = %s AND role != 'superadmin' AND is_active = TRUE 
             ORDER BY created_at ASC
         """, (clean_shed_id,))
         rows = cursor.fetchall()
@@ -577,7 +633,10 @@ def get_farmers_by_shed_id(shed_id: str) -> List[Dict[str, Any]]:
             if isinstance(d.get("created_at"), datetime):
                 d["created_at"] = d["created_at"].isoformat()
             result.append(d)
-        return result
+
+        with _user_cache_lock:
+            _farmers_by_shed_cache[clean_shed_id] = (now + USER_CACHE_TTL, result)
+        return [dict(x) for x in result]
 
 def get_farmer_by_shed_id(shed_id: str) -> Optional[Dict[str, Any]]:
     farmers = get_farmers_by_shed_id(shed_id)
@@ -591,6 +650,7 @@ def set_user_whatsapp_verified(user_id_or_username: str, verified: bool = True) 
             SET whatsapp_verified = %s 
             WHERE id = %s OR username = %s OR phone = %s OR whatsapp_number = %s
         """, (verified, clean_id, clean_id, clean_id, clean_id))
+    invalidate_user_cache()
     return True
 
 def get_next_available_shed_id() -> str:
@@ -652,6 +712,7 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             True,
             created_at_dt
         ))
+    invalidate_user_cache()
     return user_data
 
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -678,6 +739,7 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
         cursor.execute(query, tuple(values))
         row = cursor.fetchone()
         if row:
+            invalidate_user_cache()
             d = dict(row)
             if isinstance(d.get("created_at"), datetime):
                 d["created_at"] = d["created_at"].isoformat()
@@ -701,6 +763,18 @@ def log_audit(actor: str, action: str, details: str):
             INSERT INTO audit_logs (timestamp, actor, action, details)
             VALUES (%s, %s, %s, %s)
             """, (datetime.now(timezone.utc), actor, action, details))
+    except Exception:
+        pass
+
+    # Real-time forwarding to 24/7 SIEM & SOC Engine (CEF/ECS/Syslog/Splunk)
+    try:
+        from app.services.siem_service import siem_forwarder
+        siem_forwarder.forward_event(
+            action=action,
+            user_id=actor,
+            status="SUCCESS",
+            details={"description": details}
+        )
     except Exception:
         pass
 
@@ -1039,22 +1113,26 @@ def register_device(
     device_name: Optional[str] = None,
     device_key: Optional[str] = None,
     firmware_version: str = "1.0.0",
+    cert_fingerprint_sha256: Optional[str] = None,
+    auth_mode: str = "API_KEY",
 ) -> Dict[str, Any]:
     """Registers an IoT hardware node or updates its metadata."""
     key_hash = get_password_hash(device_key) if device_key else None
     now_dt = datetime.now(timezone.utc)
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
-        INSERT INTO devices (device_id, shed_id, organization_id, device_name, device_key_hash, firmware_version, status, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, 'ONLINE', %s)
+        INSERT INTO devices (device_id, shed_id, organization_id, device_name, device_key_hash, cert_fingerprint_sha256, auth_mode, firmware_version, status, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'ONLINE', %s)
         ON CONFLICT (device_id) DO UPDATE SET
             shed_id = EXCLUDED.shed_id,
             organization_id = EXCLUDED.organization_id,
             device_name = COALESCE(EXCLUDED.device_name, devices.device_name),
             device_key_hash = COALESCE(EXCLUDED.device_key_hash, devices.device_key_hash),
+            cert_fingerprint_sha256 = COALESCE(EXCLUDED.cert_fingerprint_sha256, devices.cert_fingerprint_sha256),
+            auth_mode = EXCLUDED.auth_mode,
             firmware_version = EXCLUDED.firmware_version
-        RETURNING device_id, shed_id, organization_id, device_name, firmware_version, status, created_at;
-        """, (device_id, shed_id, organization_id, device_name or f"Device {device_id}", key_hash, firmware_version, now_dt))
+        RETURNING device_id, shed_id, organization_id, device_name, firmware_version, status, cert_fingerprint_sha256, auth_mode, created_at;
+        """, (device_id, shed_id, organization_id, device_name or f"Device {device_id}", key_hash, cert_fingerprint_sha256, auth_mode, firmware_version, now_dt))
         row = cursor.fetchone()
         return dict(row) if row else {}
 
