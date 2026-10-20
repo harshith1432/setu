@@ -106,6 +106,7 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS shed_id VARCHAR(64) DEFAULT 'shed_01'")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(64)")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_verified BOOLEAN NOT NULL DEFAULT FALSE")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_stage INT DEFAULT 3")
 
         # Audit Logs
         cursor.execute("""
@@ -384,7 +385,8 @@ def get_all_farmers() -> List[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
             SELECT id, username, full_name, phone, whatsapp_number, whatsapp_verified, preferred_language, role, 
-                   farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at 
+                   farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at,
+                   COALESCE(current_stage, 3) as current_stage
             FROM users 
             WHERE role != 'superadmin' 
             ORDER BY created_at DESC
@@ -512,6 +514,7 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
     query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s RETURNING *"
 
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_stage INT DEFAULT 3")
         cursor.execute(query, tuple(values))
         row = cursor.fetchone()
         if row:
