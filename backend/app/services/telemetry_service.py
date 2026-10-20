@@ -182,7 +182,7 @@ class TelemetryService:
                     )
                     voice_url = voice_service.get_voice_url_for_text(voice_script, lang=farmer_lang)
 
-                    alert_service.dispatch_alert_with_voice(
+                    alert_service.dispatch_in_background(
                         message=var_msg,
                         recipient=recipient,
                         voice_url=voice_url,

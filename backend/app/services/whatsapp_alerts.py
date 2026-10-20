@@ -230,7 +230,7 @@ class WhatsAppAlertService:
 
             return (
                 f"🌾 {farmer_name} గారికి సేతు షెడ్ హెచ్చరిక\n"
-                f"📍 షెಡ್: {shed_id} ({farm_name})\n"
+                f"📍 షెడ్: {shed_id} ({farm_name})\n"
                 f"⚠️ ఉష్ణోగ్రతలో తేడా గుర్తించబడింది!\n"
                 f"• ప్రస్తుత ఉష్ణోగ్రత: {current_temp:.1f}°C\n"
                 f"• అనుకూల పరిధి: {temp_min:.1f}°C - {temp_max:.1f}°C (లక్ష్యం: {temp_target:.1f}°C)\n"
@@ -403,78 +403,43 @@ class WhatsAppAlertService:
     def dispatch_in_background(
         self,
         *,
-        message: str,
+        message: Optional[str] = None,
         recipient: Optional[str] = None,
         dry_run: bool = False,
         media_url: Optional[str] = None,
-        cooldown_key: Optional[str] = None,
-        cooldown_seconds: int = 0,
-    ) -> None:
-        """Dispatches an alert in a background worker thread to prevent blocking API responses."""
-        if cooldown_key and not self.check_and_update_cooldown(cooldown_key, cooldown_seconds):
-            logger.info("Alert throttled by cooldown: %s", cooldown_key)
-            return
-
-        def _worker():
-            try:
-                res = self.send(
-                    message=message,
-                    recipient=recipient,
-                    dry_run=dry_run,
-                    media_url=media_url,
-                    cooldown_key=None,
-                    cooldown_seconds=0,
-                )
-                if res.get("status") == "error":
-                    logger.error("WhatsApp dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
-                    if cooldown_key:
-                        self.rollback_cooldown(cooldown_key)
-                elif res.get("status") == "sent":
-                    logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
-            except Exception as e:
-                logger.error("Background WhatsApp send crashed: %s", e)
-                if cooldown_key:
-                    self.rollback_cooldown(cooldown_key)
-
-        thread = threading.Thread(target=_worker, daemon=True)
-        thread.start()
-
-    def dispatch_alert_with_voice(
-        self,
-        *,
-        message: str,
-        recipient: Optional[str] = None,
         voice_url: Optional[str] = None,
-        dry_run: bool = False,
         cooldown_key: Optional[str] = None,
         cooldown_seconds: int = 0,
     ) -> None:
-        """Dispatches rich text alert followed immediately by the voice note audio message in WhatsApp."""
+        """Dispatches an alert in a background worker thread.
+        If voice_url is provided, delivers the formatted text alert followed by the voice note audio message."""
         if cooldown_key and not self.check_and_update_cooldown(cooldown_key, cooldown_seconds):
             logger.info("Alert throttled by cooldown: %s", cooldown_key)
             return
 
         def _worker():
             try:
-                # 1. Send formatted text alert
-                res = self.send(
-                    message=message,
-                    recipient=recipient,
-                    dry_run=dry_run,
-                    cooldown_key=None,
-                    cooldown_seconds=0,
-                )
-                if res.get("status") == "error":
-                    logger.error("WhatsApp text dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
-                    if cooldown_key:
-                        self.rollback_cooldown(cooldown_key)
-                    return
+                # 1. Send text message (if present)
+                if message:
+                    res = self.send(
+                        message=message,
+                        recipient=recipient,
+                        dry_run=dry_run,
+                        media_url=media_url if not voice_url else None,
+                        cooldown_key=None,
+                        cooldown_seconds=0,
+                    )
+                    if res.get("status") == "error":
+                        logger.error("WhatsApp dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
+                        if cooldown_key:
+                            self.rollback_cooldown(cooldown_key)
+                        return
+                    elif res.get("status") == "sent":
+                        logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
 
-                logger.info("WhatsApp text alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
-
-                # 2. If voice_url is available, send the voice note
+                # 2. If voice_url is present, send voice note audio message
                 if voice_url:
-                    time.sleep(1.0)  # Brief delay so text card and voice note arrive in order
+                    time.sleep(1.0)
                     voice_res = self.send(
                         message=None,
                         media_url=voice_url,
@@ -488,12 +453,15 @@ class WhatsAppAlertService:
                     else:
                         logger.warning("WhatsApp voice note dispatch status: %s (%s)", voice_res.get("status"), voice_res.get("message"))
             except Exception as e:
-                logger.error("Background WhatsApp dispatch crashed: %s", e)
+                logger.error("Background WhatsApp send crashed: %s", e)
                 if cooldown_key:
                     self.rollback_cooldown(cooldown_key)
 
         thread = threading.Thread(target=_worker, daemon=True)
         thread.start()
+
+    # Alias for explicit clarity
+    dispatch_alert_with_voice = dispatch_in_background
 
 
 alert_service = WhatsAppAlertService()

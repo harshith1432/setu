@@ -27,3 +27,8 @@ service-account*.json
 *.log
 *.sqlite3
 *.db
+
+# Voice audio cache
+static/voice_cache/*.mp3
+static/voice_cache/*.ogg
+static/voice_cache/*.wav
