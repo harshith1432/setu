@@ -1381,7 +1381,32 @@ function openEnrollFarmerModal() {
   document.getElementById('enrollModal').classList.remove('hidden');
   document.getElementById('enrollError').classList.add('hidden');
   document.getElementById('enrollFarmerForm').reset();
+  const otherWrap = document.getElementById('enrollBreedOtherWrap');
+  if (otherWrap) otherWrap.classList.add('hidden');
+  const customInput = document.getElementById('enrollBreedCustom');
+  if (customInput) {
+    customInput.value = '';
+    customInput.required = false;
+  }
   if (window.lucide) lucide.createIcons();
+}
+
+function handleBreedSelectionChange(value) {
+  const otherWrap = document.getElementById('enrollBreedOtherWrap');
+  const customInput = document.getElementById('enrollBreedCustom');
+  if (value === 'Other') {
+    if (otherWrap) otherWrap.classList.remove('hidden');
+    if (customInput) {
+      customInput.required = true;
+      customInput.focus();
+    }
+  } else {
+    if (otherWrap) otherWrap.classList.add('hidden');
+    if (customInput) {
+      customInput.required = false;
+      customInput.value = '';
+    }
+  }
 }
 
 function closeEnrollModal() {
@@ -1393,6 +1418,13 @@ async function handleEnrollFarmer(event) {
   const errEl = document.getElementById('enrollError');
   errEl.classList.add('hidden');
 
+  const selectedBreed = document.getElementById('enrollBreed').value;
+  let finalBreed = selectedBreed;
+  if (selectedBreed === 'Other') {
+    const customBreed = (document.getElementById('enrollBreedCustom')?.value || '').trim();
+    finalBreed = customBreed || 'Other';
+  }
+
   const payload = {
     username: document.getElementById('enrollUsername').value.trim(),
     full_name: document.getElementById('enrollFullName').value.trim(),
@@ -1402,7 +1434,7 @@ async function handleEnrollFarmer(event) {
     region: document.getElementById('enrollRegion').value.trim(),
     batch_id: document.getElementById('enrollBatchId').value.trim(),
     dfl_capacity: document.getElementById('enrollDfl').value.trim(),
-    breed: document.getElementById('enrollBreed').value,
+    breed: finalBreed,
     role: 'farmer'
   };
 

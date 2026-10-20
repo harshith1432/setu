@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../models/live_weather_data.dart';
@@ -151,26 +152,98 @@ class LocationWeatherService {
     return null;
   }
 
-  /// Reverse geocodes coordinates to a live city/state name
+  /// Reverse geocodes coordinates to a live exact city/town/village name
   Future<String> reverseGeocode(double lat, double lon) async {
+    // 1. Native on-device OS Geocoder (Android Geocoder via Google Play Services)
     try {
-      final uri = Uri.parse(
-        'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=$lat&longitude=$lon&localityLanguage=en',
-      );
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final city = data['city'] ?? data['locality'] ?? data['principalSubdivision'];
-        final country = data['countryName'];
-        if (city != null && city.toString().trim().isNotEmpty) {
-          if (country != null && country != city) {
-            return '$city, $country';
-          }
-          return city.toString();
+      final placemarks = await Geocoding().placemarkFromCoordinates(lat, lon);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final local = (p.locality != null && p.locality!.trim().isNotEmpty)
+            ? p.locality!.trim()
+            : ((p.subLocality != null && p.subLocality!.trim().isNotEmpty)
+                ? p.subLocality!.trim()
+                : (p.name != null && p.name!.trim().isNotEmpty ? p.name!.trim() : null));
+
+        final broader = (p.subAdministrativeArea != null && p.subAdministrativeArea!.trim().isNotEmpty)
+            ? p.subAdministrativeArea!.trim()
+            : ((p.administrativeArea != null && p.administrativeArea!.trim().isNotEmpty)
+                ? p.administrativeArea!.trim()
+                : null);
+
+        final country = (p.country != null && p.country!.trim().isNotEmpty) ? p.country!.trim() : null;
+
+        final parts = <String>[];
+        if (local != null && local.isNotEmpty) {
+          parts.add(local);
+        }
+        if (broader != null && broader.isNotEmpty && !parts.contains(broader)) {
+          parts.add(broader);
+        }
+        if (country != null && country.isNotEmpty && !parts.contains(country)) {
+          parts.add(country);
+        }
+
+        if (parts.isNotEmpty) {
+          final resolved = parts.join(', ');
+          debugPrint('[WeatherService] Native Phone Geocoder Resolved: $resolved');
+          return resolved;
         }
       }
     } catch (e) {
-      debugPrint('[WeatherService] Reverse geocode error: $e');
+      debugPrint('[WeatherService] Native phone geocoder error: $e');
+    }
+
+    // 2. OpenStreetMap Nominatim fallback
+    try {
+      final uri = Uri.parse(
+        'https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lon&format=json',
+      );
+      final response = await http.get(uri, headers: {
+        'User-Agent': 'SetuApp/1.0 (sericare.setu)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final addr = data['address'] as Map<String, dynamic>?;
+        if (addr != null) {
+          final localPlace = addr['village'] ??
+              addr['town'] ??
+              addr['city'] ??
+              addr['suburb'] ??
+              addr['neighbourhood'] ??
+              addr['residential'] ??
+              addr['municipality'];
+
+          final broaderPlace = addr['county'] ??
+              addr['state_district'] ??
+              addr['city'] ??
+              addr['town'];
+
+          final country = addr['country'];
+
+          final parts = <String>[];
+          if (localPlace != null && localPlace.toString().trim().isNotEmpty) {
+            parts.add(localPlace.toString().trim());
+          }
+          if (broaderPlace != null && broaderPlace.toString().trim().isNotEmpty) {
+            String cleanBroader = broaderPlace.toString().trim();
+            cleanBroader = cleanBroader.replaceAll(RegExp(r'\s+taluk$', caseSensitive: false), '');
+            if (!parts.contains(cleanBroader)) {
+              parts.add(cleanBroader);
+            }
+          }
+          if (country != null && country.toString().trim().isNotEmpty) {
+            parts.add(country.toString().trim());
+          }
+
+          if (parts.isNotEmpty) {
+            return parts.join(', ');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[WeatherService] Nominatim reverse geocode error: $e');
     }
 
     return 'Lat ${lat.toStringAsFixed(2)}, Lon ${lon.toStringAsFixed(2)}';

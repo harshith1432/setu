@@ -92,6 +92,37 @@ class WeatherService:
             if now < expires:
                 return cached_val.get("formatted_region")
 
+        # 1. Try OpenStreetMap Nominatim for exact, modern local place names
+        try:
+            nom_url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+            res = self._client.get(nom_url, headers={"User-Agent": "SetuApp/1.0"}, timeout=3.5)
+            if res.status_code == 200:
+                data = res.json()
+                addr = data.get("address", {})
+                local = (
+                    addr.get("village")
+                    or addr.get("town")
+                    or addr.get("city")
+                    or addr.get("suburb")
+                    or addr.get("neighbourhood")
+                    or addr.get("residential")
+                )
+                broader = (
+                    addr.get("county")
+                    or addr.get("state_district")
+                    or addr.get("city")
+                    or addr.get("town")
+                )
+                country = addr.get("country")
+                parts = [p for p in [local, broader if broader != local else None, country] if p]
+                if parts:
+                    region_str = ", ".join(parts)
+                    self._geocode_cache[cache_key] = (now + 86400, {"formatted_region": region_str})
+                    return region_str
+        except Exception as e:
+            logger.debug(f"Nominatim reverse geocode error: {e}")
+
+        # 2. Fallback to BigDataCloud
         try:
             url = f"https://api.bigdatacloud.net/data/reverse-geocode-client?latitude={lat}&longitude={lon}&localityLanguage=en"
             res = self._client.get(url, timeout=3.0)

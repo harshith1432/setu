@@ -1033,11 +1033,17 @@
 
           <div class="form-group">
             <label for="enrollBreed">Silkworm Breed</label>
-            <select id="enrollBreed">
+            <select id="enrollBreed" onchange="handleBreedSelectionChange(this.value)">
               <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
               <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
               <option value="Pure Mysore">Pure Mysore</option>
+              <option value="Other">Other (Specify Custom Breed)</option>
             </select>
+          </div>
+
+          <div id="enrollBreedOtherWrap" class="form-group hidden">
+            <label for="enrollBreedCustom">Specify Silkworm Breed *</label>
+            <input type="text" id="enrollBreedCustom" placeholder="e.g. Swarna, Nistari, CSR2, or Local Hybrid">
           </div>
 
           <div id="enrollError" class="alert-box error hidden"></div>
