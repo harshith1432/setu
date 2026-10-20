@@ -30,15 +30,10 @@ async def get_voice_note(token_or_filename: str):
         raise HTTPException(status_code=400, detail="Invalid audio identifier")
     safe_filename = os.path.basename(clean_val)
 
-    # 1. Direct file lookup in cache directory with path containment check
-    resolved_cache = VOICE_CACHE_DIR.resolve()
-    direct_path = (resolved_cache / safe_filename).resolve()
-    try:
-        direct_path.relative_to(resolved_cache)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid audio path")
-
-    if direct_path.exists() and direct_path.is_file():
+    # 1. Direct file lookup in cache directory using dictionary lookup against existing files
+    cached_files = {f.name: f for f in VOICE_CACHE_DIR.iterdir() if f.is_file()}
+    if safe_filename in cached_files:
+        direct_path = cached_files[safe_filename]
         media_type = "audio/ogg" if safe_filename.endswith(".ogg") else "audio/mpeg"
         return FileResponse(str(direct_path), media_type=media_type, headers={"Accept-Ranges": "bytes"})
 
