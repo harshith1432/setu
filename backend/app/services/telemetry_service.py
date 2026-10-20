@@ -359,7 +359,52 @@ class TelemetryService:
         if light_brightness is not None:
             shed["actuators"].light_brightness = light_brightness
             shed["actuators"].light = light_brightness > 0
-        return self.get_shed_overview(shed_id)
+
+        overview = self.get_shed_overview(shed_id)
+
+        # Check if updated setpoints cause a microclimate variation requiring an alert
+        temp_deviation = abs(overview.indoor_temp - temp_target)
+        is_temp_varying = (
+            overview.overall_status in ["TOO_WARM", "TOO_COOL", "CRITICAL", "WARNING", "ALERT"]
+            or temp_deviation >= 2.0
+        )
+        if is_temp_varying:
+            try:
+                farmers = get_farmers_by_shed_id(shed_id)
+                cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
+                for farmer in farmers:
+                    recipient = farmer.get("whatsapp_number") or farmer.get("phone")
+                    if not recipient or recipient == "N/A":
+                        continue
+                    farmer_name = farmer.get("full_name") or farmer.get("username", "Farmer")
+                    farm_name = farmer.get("farm_name") or shed.get("farm_name", f"Shed {shed_id.upper()}")
+                    farmer_lang = farmer.get("preferred_language", "en")
+
+                    var_msg = alert_service.build_temperature_variation_alert(
+                        farmer_name=farmer_name,
+                        farm_name=farm_name,
+                        shed_id=shed_id,
+                        current_temp=overview.indoor_temp,
+                        temp_target=temp_target,
+                        temp_min=temp_target - 1.0,
+                        temp_max=temp_target + 1.0,
+                        current_hum=overview.indoor_humidity,
+                        status=overview.overall_status,
+                        headline=overview.status_headline,
+                        subline=overview.status_subline,
+                        lang=farmer_lang,
+                    )
+
+                    alert_service.dispatch_in_background(
+                        message=var_msg,
+                        recipient=recipient,
+                        cooldown_key=f"temp_var:{shed_id}:{farmer.get('id')}",
+                        cooldown_seconds=cooldown_sec,
+                    )
+            except Exception as e:
+                logger.error("Error dispatching setpoint variation alerts: %s", e)
+
+        return overview
 
     def manual_override_actuator(
         self,

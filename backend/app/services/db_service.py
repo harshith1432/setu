@@ -403,7 +403,7 @@ def get_farmers_by_shed_id(shed_id: str) -> List[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
             SELECT * FROM users 
-            WHERE shed_id = %s AND role != 'superadmin' AND is_active = TRUE 
+            WHERE LOWER(shed_id) = LOWER(%s) AND role != 'superadmin' AND is_active = TRUE 
             ORDER BY created_at ASC
         """, (clean_shed_id,))
         rows = cursor.fetchall()
