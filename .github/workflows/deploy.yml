@@ -7,6 +7,10 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # =========================================================================
   # 1. BACKEND VALIDATION & UNIT TESTS
@@ -39,6 +43,7 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install Backend Dependencies
         run: |
@@ -85,7 +90,7 @@ jobs:
     name: Trigger Automated Cloud Deployments
     needs: [test-backend, test-admin-web]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Checkout Source Code
@@ -100,7 +105,8 @@ jobs:
             if [ "$HTTP_RESPONSE" -ge 200 ] && [ "$HTTP_RESPONSE" -lt 300 ]; then
               echo "Render deploy triggered successfully!"
             else
-              echo "Warning: Render deploy hook returned HTTP $HTTP_RESPONSE. Check webhook secret."
+              echo "Error: Render deploy hook returned HTTP $HTTP_RESPONSE. Check webhook secret."
+              exit 1
             fi
           else
             echo "Notice: RENDER_DEPLOY_HOOK_URL secret not set. Render will auto-deploy via GitHub integration using render.yaml."
@@ -115,7 +121,8 @@ jobs:
             if [ "$HTTP_RESPONSE" -ge 200 ] && [ "$HTTP_RESPONSE" -lt 300 ]; then
               echo "Vercel deploy triggered successfully!"
             else
-              echo "Warning: Vercel deploy hook returned HTTP $HTTP_RESPONSE. Check webhook secret."
+              echo "Error: Vercel deploy hook returned HTTP $HTTP_RESPONSE. Check webhook secret."
+              exit 1
             fi
           else
             echo "Notice: VERCEL_DEPLOY_HOOK_URL secret not set. Vercel will auto-deploy via GitHub integration using vercel.json."

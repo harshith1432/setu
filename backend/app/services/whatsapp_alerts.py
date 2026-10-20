@@ -1,7 +1,10 @@
 import os
 from typing import Any, Dict, Optional
 
-from twilio.rest import Client
+try:
+    from twilio.rest import Client
+except ImportError:
+    Client = None
 
 from app.core.config import settings
 
@@ -21,7 +24,7 @@ class WhatsAppAlertService:
         self.default_to = os.getenv("TWILIO_WHATSAPP_TO") or getattr(settings, "TWILIO_WHATSAPP_TO", "")
 
         self._client = None
-        if self.account_sid and self.auth_token:
+        if Client is not None and self.account_sid and self.auth_token:
             try:
                 self._client = Client(self.account_sid, self.auth_token)
             except Exception:
@@ -51,19 +54,21 @@ class WhatsAppAlertService:
         humidity_text = (
             f"{outside_humidity:.0f}% humidity" if outside_humidity is not None else "humid conditions"
         )
+        current_temp_text = f"{current_temp:.1f}°C" if current_temp is not None else "optimal"
+        current_hum_text = f"{current_humidity:.0f}%" if current_humidity is not None else "optimal"
 
         if actuator == "cooler":
             return (
                 f"Setu manual alert: cooling was started for {region_name}. "
                 f"Outside temperature is {temp_text} and the shed needs cooling support. "
-                f"Current shed temp is {current_temp:.1f}°C and humidity is {current_humidity:.0f}% ."
+                f"Current shed temp is {current_temp_text} and humidity is {current_hum_text}."
             )
 
         if actuator == "heater":
             return (
                 f"Setu manual alert: heater was started for {region_name}. "
                 f"The environment is cool and wet ({humidity_text}, outside temp {temp_text}), so warming is being applied manually. "
-                f"Current shed temp is {current_temp:.1f}°C and humidity is {current_humidity:.0f}% ."
+                f"Current shed temp is {current_temp_text} and humidity is {current_hum_text}."
             )
 
         return (

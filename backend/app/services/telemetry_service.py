@@ -306,32 +306,38 @@ class TelemetryService:
             shed["actuators"].cooler = state
             if state:
                 shed["actuators"].heater = False
-                alert_service.send(
-                    message=alert_service.build_manual_alert(
-                        actuator="cooler",
-                        outside_temp=shed.get("outside_temp", 0.0),
-                        outside_humidity=shed.get("outside_hum", 0.0),
-                        region=shed.get("region"),
-                        current_temp=shed.get("current_temp", 0.0),
-                        current_humidity=shed.get("current_hum", 0.0),
-                    ),
-                    dry_run=False,
-                )
+                try:
+                    alert_service.send(
+                        message=alert_service.build_manual_alert(
+                            actuator="cooler",
+                            outside_temp=shed.get("outside_temp", 0.0),
+                            outside_humidity=shed.get("outside_hum", 0.0),
+                            region=shed.get("region"),
+                            current_temp=shed.get("current_temp", 0.0),
+                            current_humidity=shed.get("current_hum", 0.0),
+                        ),
+                        dry_run=False,
+                    )
+                except Exception:
+                    pass
         elif actuator == "heater":
             shed["actuators"].heater = state
             if state:
                 shed["actuators"].cooler = False
-                alert_service.send(
-                    message=alert_service.build_manual_alert(
-                        actuator="heater",
-                        outside_temp=shed.get("outside_temp", 0.0),
-                        outside_humidity=shed.get("outside_hum", 0.0),
-                        region=shed.get("region"),
-                        current_temp=shed.get("current_temp", 0.0),
-                        current_humidity=shed.get("current_hum", 0.0),
-                    ),
-                    dry_run=False,
-                )
+                try:
+                    alert_service.send(
+                        message=alert_service.build_manual_alert(
+                            actuator="heater",
+                            outside_temp=shed.get("outside_temp", 0.0),
+                            outside_humidity=shed.get("outside_hum", 0.0),
+                            region=shed.get("region"),
+                            current_temp=shed.get("current_temp", 0.0),
+                            current_humidity=shed.get("current_hum", 0.0),
+                        ),
+                        dry_run=False,
+                    )
+                except Exception:
+                    pass
         elif actuator == "fan":
             shed["actuators"].fan = state
         elif actuator == "light":

@@ -235,10 +235,11 @@ def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_c
         f"for alerts."
     )
 
+    dry_run = bool(payload.get("dry_run", True))
     result = alert_service.send(
         message=verification_message,
         recipient=normalised_number,
-        dry_run=True,
+        dry_run=dry_run,
     )
     return {
         "status": result.get("status", "dry-run"),
