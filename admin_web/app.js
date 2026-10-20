@@ -651,7 +651,22 @@ async function fetchSheds() {
   try {
     const res = await authenticatedFetch(`${API_BASE_URL}/admin/sheds`);
     if (!res.ok) throw new Error('Shed list retrieval failed');
-    monitoredSheds = await res.json();
+    let sheds = await res.json();
+
+    // If enrolled farmers list is available, only show sheds belonging to actual enrolled farmers
+    if (Array.isArray(enrolledFarmers) && enrolledFarmers.length > 0) {
+      const allowedShedIds = new Set(enrolledFarmers.map(f => f.shed_id || `shed_${f.id || f.username}`));
+      const allowedFarmerNames = new Set(enrolledFarmers.map(f => (f.full_name || f.username || '').toLowerCase()));
+      const filtered = sheds.filter(s => 
+        allowedShedIds.has(s.shed_id) || 
+        (s.farmer_name && allowedFarmerNames.has(s.farmer_name.toLowerCase()))
+      );
+      if (filtered.length > 0) {
+        sheds = filtered;
+      }
+    }
+
+    monitoredSheds = sheds;
     renderShedSelector(monitoredSheds);
   } catch (err) {
     console.debug('Failed to fetch /admin/sheds, falling back to farmer sheds:', err);
