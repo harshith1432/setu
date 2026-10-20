@@ -8,8 +8,12 @@ from fastapi import WebSocket
 from app.models.schemas import TelemetryPayload, ActuatorStates, ShedOverview
 from app.services.rules_engine import rules_engine, STAGE_THRESHOLDS
 from app.services.weather_service import weather_service
-from app.services.db_service import save_telemetry_reading, get_telemetry_history_from_db
+import logging
+from app.core.config import settings
+from app.services.db_service import save_telemetry_reading, get_telemetry_history_from_db, get_latest_telemetry_reading_from_db, get_farmers_by_shed_id
 from app.services.whatsapp_alerts import alert_service
+
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     """
@@ -46,180 +50,126 @@ class ConnectionManager:
 
 class TelemetryService:
     def __init__(self):
-        # In-memory live state for active sheds
-        self.sheds: Dict[str, Dict[str, Any]] = {
-            "shed_01": {
-                "farm_name": "Green Valley Farm",
-                "region": "Mysuru Silk Belt, KA",
-                "current_stage": 3,
-                "is_auto_mode": True,
-                "temp_target": 26.0,
-                "humidity_target": 75.0,
-                "air_quality_target": 80.0,
-                "light_lux_target": 25.0,
-                "current_temp": 26.2,
-                "current_hum": 80.0,
-                "current_air_quality": 88.0,
-                "current_light_lux": 22.0,
-                "photoperiod_mode": "DAY",
-                "outside_temp": 34.2,
-                "outside_hum": 58.0,
-                "actuators": ActuatorStates(cooler=True, fan=False, heater=False, light=True, light_brightness=35),
-                "last_updated": datetime.now(timezone.utc)
-            }
-        }
-        
+        # In-memory session cache for active control overrides (setpoints, manual actuators)
+        self.sheds: Dict[str, Dict[str, Any]] = {}
         # Bounded historical ring buffer (Max 1000 items in RAM to prevent OOM)
         self.history: deque = deque(maxlen=1000)
         self.ws_manager = ConnectionManager()
-        self._populate_sample_history("shed_01")
 
     def _get_or_create_shed(self, shed_id: str) -> Dict[str, Any]:
         if shed_id not in self.sheds:
-            farm_name = f"Shed {shed_id.upper()}"
-            region = "Sericulture Shed"
-            try:
-                from app.services.db_service import get_db_cursor
-                with get_db_cursor(dict_cursor=True) as cursor:
-                    cursor.execute("""
-                        SELECT farm_name, region FROM users 
-                        WHERE shed_id = %s OR id = %s OR username = %s 
-                        LIMIT 1
-                    """, (shed_id, shed_id, shed_id))
-                    row = cursor.fetchone()
-                    if row:
-                        if row.get("farm_name"):
-                            farm_name = row["farm_name"]
-                        if row.get("region"):
-                            region = row["region"]
-            except Exception:
-                pass
-
             self.sheds[shed_id] = {
-                "farm_name": farm_name,
-                "region": region,
                 "current_stage": 3,
                 "is_auto_mode": True,
                 "temp_target": 26.0,
                 "humidity_target": 75.0,
                 "air_quality_target": 80.0,
                 "light_lux_target": 25.0,
-                "current_temp": 26.0,
-                "current_hum": 75.0,
-                "current_air_quality": 88.0,
-                "current_light_lux": 22.0,
-                "photoperiod_mode": "DAY",
-                "outside_temp": 32.0,
-                "outside_hum": 55.0,
-                "actuators": ActuatorStates(cooler=False, fan=False, heater=False, light=True, light_brightness=35),
-                "last_updated": datetime.now(timezone.utc)
+                "actuators": ActuatorStates(),
             }
-            self._populate_sample_history(shed_id)
-
         return self.sheds[shed_id]
 
-    def _populate_sample_history(self, shed_id: str):
-        now = datetime.now(timezone.utc)
-        for h in range(24, 0, -2):
-            t = now - timedelta(hours=h)
-            temp = 25.0 + (1.5 if 10 <= t.hour <= 16 else -1.0)
-            hum = 75.0 - (4.0 if 10 <= t.hour <= 16 else -2.0)
-            aqi = 88.0 - (5.0 if 12 <= t.hour <= 18 else 0.0)
-            lux = 24.0 if 6 <= t.hour <= 22 else 2.0
-            record = {
-                "shed_id": shed_id,
-                "timestamp": t,
-                "indoor_temp": round(temp, 1),
-                "indoor_hum": round(hum, 1),
-                "air_quality": round(aqi, 1),
-                "light_lux": round(lux, 1),
-                "outside_temp": round(temp + 7.0, 1),
-                "outside_hum": round(hum - 15.0, 1),
-                "cooler": True if temp > 26.0 else False,
-                "heater": False,
-                "fan": True if temp > 26.5 or aqi < 80.0 else False,
-                "light": True if 6 <= t.hour <= 22 else False,
-                "light_brightness": 35 if 6 <= t.hour <= 22 else 0,
-                "mode": "AUTO"
-            }
-            self.history.append(record)
-
     def record_reading(self, payload: TelemetryPayload) -> ShedOverview:
-        shed = self.sheds.get(payload.shed_id)
-        if not shed:
-            shed = {
-                "farm_name": f"Farm for {payload.shed_id}",
-                "region": "Sericulture Shed",
-                "current_stage": 3,
-                "is_auto_mode": True,
-                "temp_target": 26.0,
-                "humidity_target": 75.0,
-                "air_quality_target": 80.0,
-                "light_lux_target": 25.0,
-                "current_temp": payload.temperature,
-                "current_hum": payload.humidity,
-                "current_air_quality": payload.air_quality if payload.air_quality is not None else 88.0,
-                "current_light_lux": payload.light_lux if payload.light_lux is not None else 22.0,
-                "photoperiod_mode": "DAY",
-                "outside_temp": payload.outside_temperature or 34.0,
-                "outside_hum": payload.outside_humidity or 55.0,
-                "actuators": ActuatorStates(),
-                "last_updated": datetime.now(timezone.utc)
-            }
-            self.sheds[payload.shed_id] = shed
+        session = self._get_or_create_shed(payload.shed_id)
+        current_stage = session.get("current_stage", 3)
+        is_auto_mode = session.get("is_auto_mode", True)
+        temp_target = session.get("temp_target", 26.0)
+        hum_target = session.get("humidity_target", 75.0)
+        air_quality_target = session.get("air_quality_target", 80.0)
+        light_lux_target = session.get("light_lux_target", 25.0)
+        current_act = session.get("actuators", ActuatorStates())
 
-        shed["current_temp"] = payload.temperature
-        shed["current_hum"] = payload.humidity
-        if payload.air_quality is not None:
-            shed["current_air_quality"] = payload.air_quality
-        if payload.light_lux is not None:
-            shed["current_light_lux"] = payload.light_lux
-        if payload.outside_temperature is not None:
-            shed["outside_temp"] = payload.outside_temperature
-        if payload.outside_humidity is not None:
-            shed["outside_hum"] = payload.outside_humidity
-        shed["last_updated"] = payload.timestamp or datetime.now(timezone.utc)
-
-        # Run automation rules
+        # Evaluate rules engine
         status, headline, subline, next_actuators, photo_mode = rules_engine.evaluate(
-            current_temp=shed["current_temp"],
-            current_hum=shed["current_hum"],
-            outside_temp=shed["outside_temp"],
-            stage=shed["current_stage"],
-            is_auto_mode=shed["is_auto_mode"],
-            current_actuators=shed["actuators"],
-            manual_temp_target=shed["temp_target"],
-            manual_hum_target=shed["humidity_target"],
-            current_air_quality=shed["current_air_quality"],
-            current_light_lux=shed["current_light_lux"],
-            air_quality_target=shed["air_quality_target"],
-            light_lux_target=shed["light_lux_target"]
+            current_temp=payload.temperature,
+            current_hum=payload.humidity,
+            outside_temp=payload.outside_temperature or 30.0,
+            stage=current_stage,
+            is_auto_mode=is_auto_mode,
+            current_actuators=current_act,
+            manual_temp_target=temp_target,
+            manual_hum_target=hum_target,
+            current_air_quality=payload.air_quality or 88.0,
+            current_light_lux=payload.light_lux or 22.0,
+            air_quality_target=air_quality_target,
+            light_lux_target=light_lux_target
         )
 
-        shed["actuators"] = next_actuators
-        shed["photoperiod_mode"] = photo_mode
-
-        # Record to memory buffer
-        record = {
+        reading_record = {
             "shed_id": payload.shed_id,
-            "timestamp": shed["last_updated"],
-            "indoor_temp": shed["current_temp"],
-            "indoor_hum": shed["current_hum"],
-            "air_quality": shed["current_air_quality"],
-            "light_lux": shed["current_light_lux"],
-            "outside_temp": shed["outside_temp"],
-            "outside_hum": shed["outside_hum"],
-            "cooler": next_actuators.cooler,
-            "heater": next_actuators.heater,
-            "fan": next_actuators.fan,
-            "light": next_actuators.light,
-            "light_brightness": next_actuators.light_brightness,
-            "mode": "AUTO" if shed["is_auto_mode"] else "MANUAL"
+            "timestamp": payload.timestamp or datetime.now(timezone.utc),
+            "indoor_temp": payload.temperature,
+            "indoor_hum": payload.humidity,
+            "air_quality": payload.air_quality if payload.air_quality is not None else 88.0,
+            "light_lux": payload.light_lux if payload.light_lux is not None else 22.0,
+            "outside_temp": payload.outside_temperature,
+            "outside_hum": payload.outside_humidity,
+            "cooler": next_actuators.cooler if is_auto_mode else current_act.cooler,
+            "heater": next_actuators.heater if is_auto_mode else current_act.heater,
+            "fan": next_actuators.fan if is_auto_mode else current_act.fan,
+            "light": next_actuators.light if is_auto_mode else current_act.light,
+            "light_brightness": next_actuators.light_brightness if is_auto_mode else current_act.light_brightness,
+            "mode": "AUTO" if is_auto_mode else "MANUAL"
         }
-        self.history.append(record)
 
-        # Persist to PostgreSQL timeseries table
-        save_telemetry_reading(record)
+        # Persist reading to database
+        self.history.append(reading_record)
+        save_telemetry_reading(reading_record)
+
+        session["actuators"] = next_actuators if is_auto_mode else current_act
+        session["photoperiod_mode"] = photo_mode
+
+        # Check for temperature variation or microclimate anomaly
+        thresholds = STAGE_THRESHOLDS.get(session.get("current_stage", 3), STAGE_THRESHOLDS[3])
+        target_temp_max = thresholds.get("temp_max", 27.0)
+        target_temp_min = thresholds.get("temp_min", 25.0)
+        temp_target = session.get("temp_target", 26.0)
+        temp_deviation = abs(payload.temperature - temp_target)
+
+        is_temp_varying = (
+            status in ["TOO_WARM", "TOO_COOL", "CRITICAL", "WARNING", "ALERT"]
+            or payload.temperature > target_temp_max
+            or payload.temperature < target_temp_min
+            or payload.temperature >= 32.0
+            or payload.temperature <= 18.0
+            or temp_deviation >= 2.0
+        )
+
+        if is_temp_varying:
+            try:
+                farmers = get_farmers_by_shed_id(payload.shed_id)
+                cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
+                for farmer in farmers:
+                    recipient = farmer.get("whatsapp_number") or farmer.get("phone")
+                    if not recipient or recipient == "N/A":
+                        continue
+                    farmer_name = farmer.get("full_name") or farmer.get("username", "Farmer")
+                    farm_name = farmer.get("farm_name") or session.get("farm_name", f"Shed {payload.shed_id.upper()}")
+                    farmer_lang = farmer.get("preferred_language", "en")
+
+                    var_msg = alert_service.build_temperature_variation_alert(
+                        farmer_name=farmer_name,
+                        farm_name=farm_name,
+                        shed_id=payload.shed_id,
+                        current_temp=payload.temperature,
+                        temp_target=temp_target,
+                        temp_min=target_temp_min,
+                        temp_max=target_temp_max,
+                        current_hum=payload.humidity,
+                        status=status,
+                        headline=headline,
+                        subline=subline,
+                        lang=farmer_lang,
+                    )
+
+                    alert_service.dispatch_in_background(
+                        message=var_msg,
+                        recipient=recipient,
+                        cooldown_key=f"temp_var:{payload.shed_id}:{farmer.get('id')}",
+                        cooldown_seconds=cooldown_sec,
+                    )
+            except Exception as e:
+                logger.error("Error dispatching temperature variation alerts: %s", e)
 
         overview = self.get_shed_overview(payload.shed_id)
 
@@ -242,96 +192,150 @@ class TelemetryService:
         lon: Optional[float] = None,
         region_override: Optional[str] = None
     ) -> ShedOverview:
-        shed = self._get_or_create_shed(shed_id)
-
-        # Refresh live farm details and GPS coordinates directly from DB for this shed
+        # 1. Resolve farmer details dynamically from PostgreSQL database
+        farm_name = None
+        user_region = region_override
         farmer_lat = lat
         farmer_lon = lon
+        user_stage = None
+
         try:
             from app.services.db_service import get_db_cursor
             with get_db_cursor(dict_cursor=True) as cursor:
                 cursor.execute("""
-                    SELECT farm_name, region, latitude, longitude 
+                    SELECT id, username, full_name, farm_name, region, latitude, longitude, shed_id 
                     FROM users 
-                    WHERE shed_id = %s OR id = %s OR username = %s 
+                    WHERE shed_id = %s OR id = %s OR username = %s OR ('shed_' || id) = %s
                     ORDER BY (role = 'farmer') DESC 
                     LIMIT 1
-                """, (shed_id, shed_id, shed_id))
-                row = cursor.fetchone()
-                if row:
-                    if row.get("farm_name"):
-                        shed["farm_name"] = row["farm_name"]
-                    if row.get("region") and not region_override:
-                        shed["region"] = row["region"]
-                    if farmer_lat is None and row.get("latitude") is not None:
-                        farmer_lat = float(row["latitude"])
-                    if farmer_lon is None and row.get("longitude") is not None:
-                        farmer_lon = float(row["longitude"])
+                """, (shed_id, shed_id, shed_id, shed_id))
+                user = cursor.fetchone()
+                if user:
+                    if user.get("farm_name"):
+                        farm_name = user["farm_name"]
+                    if user.get("region") and not user_region:
+                        user_region = user["region"]
+                    if farmer_lat is None and user.get("latitude") is not None:
+                        farmer_lat = float(user["latitude"])
+                    if farmer_lon is None and user.get("longitude") is not None:
+                        farmer_lon = float(user["longitude"])
+
+                    # Save detected GPS coordinates from phone into DB profile if provided
+                    if lat is not None and lon is not None:
+                        cursor.execute("""
+                            UPDATE users 
+                            SET latitude = %s, longitude = %s, region = COALESCE(%s, region)
+                            WHERE id = %s
+                        """, (lat, lon, region_override, user["id"]))
         except Exception:
             pass
 
-        # Fetch real-time weather dynamically from Open-Meteo
-        lookup_region = region_override or shed.get("region")
+        if not farm_name:
+            farm_name = f"Shed {shed_id.upper()}"
+        if not user_region:
+            user_region = "Sericulture Shed"
 
-        try:
-            live_weather = weather_service.get_current_weather(
-                lat=farmer_lat,
-                lon=farmer_lon,
-                region=lookup_region
+        # 2. Fetch real-time weather dynamically from Open-Meteo for this exact phone location
+        live_weather = weather_service.get_current_weather(
+            lat=farmer_lat,
+            lon=farmer_lon,
+            region=user_region
+        )
+        outside_temp = float(live_weather["outside_temperature"])
+        outside_hum = float(live_weather["outside_humidity"])
+        display_region = region_override or live_weather.get("region") or user_region
+
+        # 3. Retrieve real-time telemetry from database shed_telemetry table
+        session = self._get_or_create_shed(shed_id)
+        current_stage = session.get("current_stage") or user_stage or 3
+        temp_target = session.get("temp_target", 26.0)
+        hum_target = session.get("humidity_target", 75.0)
+        air_quality_target = session.get("air_quality_target", 80.0)
+        light_lux_target = session.get("light_lux_target", 25.0)
+        is_auto_mode = session.get("is_auto_mode", True)
+
+        latest_reading = get_latest_telemetry_reading_from_db(shed_id)
+        if latest_reading:
+            current_temp = float(latest_reading["indoor_temp"])
+            current_hum = float(latest_reading["indoor_hum"])
+            current_air_quality = float(latest_reading.get("air_quality", 88.0))
+            current_light_lux = float(latest_reading.get("light_lux", 22.0))
+            last_updated = latest_reading.get("timestamp") or datetime.now(timezone.utc)
+            if isinstance(last_updated, str):
+                try:
+                    last_updated = datetime.fromisoformat(last_updated)
+                except Exception:
+                    last_updated = datetime.now(timezone.utc)
+            db_actuators = ActuatorStates(
+                cooler=bool(latest_reading.get("cooler", False)),
+                fan=bool(latest_reading.get("fan", False)),
+                heater=bool(latest_reading.get("heater", False)),
+                light=bool(latest_reading.get("light", False)),
+                light_brightness=int(latest_reading.get("light_brightness", 35 if latest_reading.get("light") else 0))
             )
-            shed["outside_temp"] = live_weather["outside_temperature"]
-            shed["outside_hum"] = live_weather["outside_humidity"]
-            if region_override:
-                shed["region"] = region_override
-            elif live_weather.get("region"):
-                shed["region"] = live_weather["region"]
-        except Exception:
-            pass
+            actuators = session.get("actuators") or db_actuators
+            if "is_auto_mode" not in session:
+                is_auto_mode = (latest_reading.get("mode", "AUTO") == "AUTO")
+        else:
+            # When no hardware sensor has posted yet for this shed,
+            # calculate realistic indoor microclimate derived from the phone's live location ambient weather
+            current_temp = round(outside_temp * 0.35 + 26.0 * 0.65, 1)
+            current_hum = round(outside_hum * 0.4 + 75.0 * 0.6, 1)
+            current_air_quality = 88.0
+            current_light_lux = 22.0
+            last_updated = datetime.now(timezone.utc)
+            actuators = session.get("actuators") or ActuatorStates(
+                cooler=current_temp > 26.5,
+                fan=current_temp > 27.0 or current_air_quality < 80.0,
+                heater=current_temp < 23.0,
+                light=True,
+                light_brightness=35
+            )
 
+        # 4. Evaluate rules engine
         status, headline, subline, next_act, photo_mode = rules_engine.evaluate(
-            current_temp=shed["current_temp"],
-            current_hum=shed["current_hum"],
-            outside_temp=shed["outside_temp"],
-            stage=shed["current_stage"],
-            is_auto_mode=shed["is_auto_mode"],
-            current_actuators=shed["actuators"],
-            manual_temp_target=shed["temp_target"],
-            manual_hum_target=shed["humidity_target"],
-            current_air_quality=shed.get("current_air_quality", 88.0),
-            current_light_lux=shed.get("current_light_lux", 22.0),
-            air_quality_target=shed.get("air_quality_target", 80.0),
-            light_lux_target=shed.get("light_lux_target", 25.0)
+            current_temp=current_temp,
+            current_hum=current_hum,
+            outside_temp=outside_temp,
+            stage=current_stage,
+            is_auto_mode=is_auto_mode,
+            current_actuators=actuators,
+            manual_temp_target=temp_target,
+            manual_hum_target=hum_target,
+            current_air_quality=current_air_quality,
+            current_light_lux=current_light_lux,
+            air_quality_target=air_quality_target,
+            light_lux_target=light_lux_target
         )
 
-        if shed["is_auto_mode"]:
-            shed["actuators"] = next_act
-        shed["photoperiod_mode"] = photo_mode
+        if is_auto_mode:
+            actuators = next_act
 
-        stage_meta = STAGE_THRESHOLDS.get(shed["current_stage"], STAGE_THRESHOLDS[3])
+        stage_meta = STAGE_THRESHOLDS.get(current_stage, STAGE_THRESHOLDS[3])
 
         return ShedOverview(
             shed_id=shed_id,
-            farm_name=shed["farm_name"],
-            region=shed["region"],
+            farm_name=farm_name,
+            region=display_region,
             overall_status=status,
             status_headline=headline,
             status_subline=subline,
-            current_stage=shed["current_stage"],
+            current_stage=current_stage,
             stage_name=stage_meta["name"],
-            indoor_temp=shed["current_temp"],
-            indoor_humidity=shed["current_hum"],
-            indoor_air_quality=shed.get("current_air_quality", 88.0),
-            indoor_light_lux=shed.get("current_light_lux", 22.0),
-            outside_temp=shed["outside_temp"],
-            outside_humidity=shed["outside_hum"],
-            actuators=shed["actuators"],
-            is_auto_mode=shed["is_auto_mode"],
-            temp_target=shed["temp_target"],
-            humidity_target=shed["humidity_target"],
-            air_quality_target=shed.get("air_quality_target", 80.0),
-            light_lux_target=shed.get("light_lux_target", 25.0),
-            photoperiod_mode=shed.get("photoperiod_mode", "DAY"),
-            last_updated=shed["last_updated"]
+            indoor_temp=current_temp,
+            indoor_humidity=current_hum,
+            indoor_air_quality=current_air_quality,
+            indoor_light_lux=current_light_lux,
+            outside_temp=outside_temp,
+            outside_humidity=outside_hum,
+            actuators=actuators,
+            is_auto_mode=is_auto_mode,
+            temp_target=temp_target,
+            humidity_target=hum_target,
+            air_quality_target=air_quality_target,
+            light_lux_target=light_lux_target,
+            photoperiod_mode=photo_mode,
+            last_updated=last_updated
         )
 
     def update_setpoints(
@@ -373,37 +377,61 @@ class TelemetryService:
             if state:
                 shed["actuators"].heater = False
                 try:
-                    alert_service.send(
-                        message=alert_service.build_manual_alert(
+                    farmers = get_farmers_by_shed_id(shed_id)
+                    cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
+                    for farmer in farmers:
+                        recipient = farmer.get("whatsapp_number") or farmer.get("phone")
+                        if not recipient or recipient == "N/A":
+                            continue
+                        farmer_lang = farmer.get("preferred_language", "en")
+                        farm_name = farmer.get("farm_name") or shed.get("farm_name", f"Shed {shed_id.upper()}")
+                        msg = alert_service.build_manual_alert(
                             actuator="cooler",
                             outside_temp=shed.get("outside_temp", 0.0),
                             outside_humidity=shed.get("outside_hum", 0.0),
-                            region=shed.get("region"),
+                            region=farm_name,
                             current_temp=shed.get("current_temp", 0.0),
                             current_humidity=shed.get("current_hum", 0.0),
-                        ),
-                        dry_run=False,
-                    )
-                except Exception:
-                    pass
+                            lang=farmer_lang,
+                        )
+                        alert_service.dispatch_in_background(
+                            message=msg,
+                            recipient=recipient,
+                            cooldown_key=f"manual:{shed_id}:cooler:{farmer.get('id')}",
+                            cooldown_seconds=cooldown_sec,
+                        )
+                except Exception as e:
+                    logger.error("Error sending cooler alert: %s", e)
         elif actuator == "heater":
             shed["actuators"].heater = state
             if state:
                 shed["actuators"].cooler = False
                 try:
-                    alert_service.send(
-                        message=alert_service.build_manual_alert(
+                    farmers = get_farmers_by_shed_id(shed_id)
+                    cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
+                    for farmer in farmers:
+                        recipient = farmer.get("whatsapp_number") or farmer.get("phone")
+                        if not recipient or recipient == "N/A":
+                            continue
+                        farmer_lang = farmer.get("preferred_language", "en")
+                        farm_name = farmer.get("farm_name") or shed.get("farm_name", f"Shed {shed_id.upper()}")
+                        msg = alert_service.build_manual_alert(
                             actuator="heater",
                             outside_temp=shed.get("outside_temp", 0.0),
                             outside_humidity=shed.get("outside_hum", 0.0),
-                            region=shed.get("region"),
+                            region=farm_name,
                             current_temp=shed.get("current_temp", 0.0),
                             current_humidity=shed.get("current_hum", 0.0),
-                        ),
-                        dry_run=False,
-                    )
-                except Exception:
-                    pass
+                            lang=farmer_lang,
+                        )
+                        alert_service.dispatch_in_background(
+                            message=msg,
+                            recipient=recipient,
+                            cooldown_key=f"manual:{shed_id}:heater:{farmer.get('id')}",
+                            cooldown_seconds=cooldown_sec,
+                        )
+                except Exception as e:
+                    logger.error("Error sending heater alert: %s", e)
         elif actuator == "fan":
             shed["actuators"].fan = state
         elif actuator == "light":

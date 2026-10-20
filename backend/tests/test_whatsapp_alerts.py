@@ -2,7 +2,7 @@ import pytest
 import httpx
 from app.main import app
 from app.services.whatsapp_alerts import WhatsAppAlertService, alert_service
-from app.services.db_service import get_user_by_username, set_user_whatsapp_verified, get_farmer_by_shed_id
+from app.services.db_service import get_user_by_username, set_user_whatsapp_verified, get_farmer_by_shed_id, get_farmers_by_shed_id
 
 
 @pytest.fixture
@@ -212,3 +212,103 @@ async def test_whatsapp_verification_and_webhook_flow(async_client):
     )
     assert webhook_res.status_code == 200
     assert 'Response' in webhook_res.text
+
+
+def test_temperature_variation_alert_templates():
+    service = WhatsAppAlertService()
+    kn_msg = service.build_temperature_variation_alert(
+        farmer_name="ರಮೇಶ್ ಗೌಡ",
+        farm_name="ಹಸಿರು ಕಣಿವೆ ಫಾರ್ಮ್",
+        shed_id="shed_01",
+        current_temp=29.5,
+        temp_target=26.0,
+        temp_min=25.0,
+        temp_max=26.5,
+        current_hum=68.0,
+        status="TOO_WARM",
+        headline="Too Warm — Cooling Active",
+        subline="ಕೂಲಿಂಗ್ ವ್ಯವಸ್ಥೆ ಚಾಲನೆಯಲ್ಲಿದೆ.",
+        lang="kn",
+    )
+    assert "ರಮೇಶ್ ಗೌಡ" in kn_msg
+    assert "shed_01" in kn_msg
+    assert "29.5°C" in kn_msg
+    assert "ತಾಪಮಾನದಲ್ಲಿ ವ್ಯತ್ಯಾಸ" in kn_msg
+
+    te_msg = service.build_temperature_variation_alert(
+        farmer_name="వెంకటమ్మ రెడ్డి",
+        farm_name="శ్రీ లక్ష్మి సిల్క్ ఫార్మ్",
+        shed_id="shed_02",
+        current_temp=30.2,
+        temp_target=26.0,
+        temp_min=25.0,
+        temp_max=26.5,
+        current_hum=60.0,
+        status="TOO_WARM",
+        headline="Too Warm — Cooling Active",
+        subline="కూలింగ్ నడుస్తోంది.",
+        lang="te",
+    )
+    assert "వెంకటమ్మ రెడ్డి" in te_msg
+    assert "shed_02" in te_msg
+    assert "30.2°C" in te_msg
+    assert "ఉష్ణోగ్రతలో తేడా" in te_msg
+
+    en_msg = service.build_temperature_variation_alert(
+        farmer_name="Ramesh Gowda",
+        farm_name="Green Valley Farm",
+        shed_id="shed_01",
+        current_temp=29.5,
+        temp_target=26.0,
+        temp_min=25.0,
+        temp_max=26.5,
+        current_hum=68.0,
+        status="TOO_WARM",
+        headline="Too Warm — Cooling Active",
+        subline="Cooling running to prevent heat stress.",
+        lang="en",
+    )
+    assert "Ramesh Gowda" in en_msg
+    assert "Temperature Variation" in en_msg
+    assert "29.5°C" in en_msg
+
+
+def test_get_farmers_by_shed_id_db():
+    farmers = get_farmers_by_shed_id("shed_01")
+    assert isinstance(farmers, list)
+    assert len(farmers) >= 1
+    for f in farmers:
+        assert f["shed_id"] == "shed_01"
+        assert f.get("phone") or f.get("whatsapp_number")
+
+
+def test_telemetry_temperature_variation_triggers_farmer_alert():
+    from app.services.telemetry_service import telemetry_service
+    from app.models.schemas import TelemetryPayload
+
+    # Dispatched tracking
+    dispatched = []
+    original_dispatch = alert_service.dispatch_in_background
+    try:
+        def mock_dispatch(**kwargs):
+            dispatched.append(kwargs)
+        alert_service.dispatch_in_background = mock_dispatch
+
+        # Ingest a temperature reading of 30.5°C for shed_01 (above stage 3 max 26.5°C)
+        payload = TelemetryPayload(
+            shed_id="shed_01",
+            temperature=30.5,
+            humidity=65.0,
+            air_quality=85.0,
+            light_lux=25.0,
+        )
+        telemetry_service.record_reading(payload)
+
+        # Check that alert was dispatched to shed_01 farmers
+        assert len(dispatched) >= 1
+        found_shed_alert = any("shed_01" in d["message"] for d in dispatched)
+        assert found_shed_alert
+        # Verify the recipient is not empty and is a farmer's registered phone
+        assert any(d["recipient"] is not None for d in dispatched)
+    finally:
+        alert_service.dispatch_in_background = original_dispatch

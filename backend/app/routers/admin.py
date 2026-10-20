@@ -324,7 +324,7 @@ def get_live_cluster_telemetry(shed_id: str = "shed_01", admin_user: dict = Depe
     Returns real-time telemetry, stage setpoints, history for graphs, and compliance metrics.
     """
     overview = telemetry_service.get_shed_overview(shed_id)
-    history = [h for h in telemetry_service.history if h["shed_id"] == shed_id][-24:]
+    history = telemetry_service.get_history(shed_id, limit=24)
     stage_meta = STAGE_THRESHOLDS.get(overview.current_stage, STAGE_THRESHOLDS[3])
 
     # Calculate compliance (% of historical readings inside stage target boundaries)

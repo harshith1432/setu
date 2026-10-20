@@ -205,7 +205,14 @@ class SetuProvider with ChangeNotifier {
             _batchId = me['batch_id'] ?? _batchId;
             _dflCapacity = me['dfl_capacity'] ?? _dflCapacity;
             _breed = me['breed'] ?? _breed;
+            final userShed = me['shed_id'] ?? _shedData.shedId;
+            _shedData = _shedData.copyWith(
+              shedId: userShed,
+              farmName: _farmName,
+              region: _region,
+            );
             notifyListeners();
+            refreshLiveWeather();
           }
         });
       }
@@ -539,7 +546,7 @@ class SetuProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      if (requestGps) {
+      if (requestGps || _latitude == null || _longitude == null) {
         final liveLoc = await _weatherService.resolveLiveLocation();
         if (liveLoc != null) {
           _latitude = liveLoc['lat'];
@@ -559,11 +566,44 @@ class SetuProvider with ChangeNotifier {
       _longitude = weather.longitude;
       _region = weather.locationName;
       _isDeviceLocation = weather.isGps;
-      _shedData = _shedData.copyWith(
-        outsideTemp: weather.temperature,
-        outsideHumidity: weather.humidity,
-        region: weather.locationName,
-      );
+
+      // Sync detected GPS location with backend profile so Admin Web and API stay in sync
+      if (_isLoggedIn && _latitude != null && _longitude != null) {
+        _apiService.updateProfile({
+          'region': _region,
+          'latitude': _latitude,
+          'longitude': _longitude,
+        });
+      }
+
+      // Sync real-time microclimate and IoT sensor readings from backend
+      if (_isLoggedIn) {
+        try {
+          final serverShed = await _apiService.getShedStatus(
+            _shedData.shedId,
+            lat: _latitude,
+            lon: _longitude,
+            region: _region,
+          );
+          _shedData = serverShed.copyWith(
+            outsideTemp: weather.temperature,
+            outsideHumidity: weather.humidity,
+            region: weather.locationName,
+          );
+        } catch (_) {
+          _shedData = _shedData.copyWith(
+            outsideTemp: weather.temperature,
+            outsideHumidity: weather.humidity,
+            region: weather.locationName,
+          );
+        }
+      } else {
+        _shedData = _shedData.copyWith(
+          outsideTemp: weather.temperature,
+          outsideHumidity: weather.humidity,
+          region: weather.locationName,
+        );
+      }
       _updateAdviceForWeather();
     } catch (e) {
       _weatherErrorMessage = e.toString();

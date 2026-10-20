@@ -242,6 +242,39 @@ class ApiService {
     return null;
   }
 
+  Future<bool> recordTelemetry({
+    required String shedId,
+    required double temperature,
+    required double humidity,
+    double? airQuality,
+    double? lightLux,
+    double? outsideTemp,
+    double? outsideHumidity,
+  }) async {
+    for (final base in candidateUrls) {
+      try {
+        final res = await http.post(
+          Uri.parse('/telemetry/record'),
+          headers: _headers,
+          body: jsonEncode({
+            'shed_id': shedId,
+            'temperature': temperature,
+            'humidity': humidity,
+            'air_quality': airQuality ?? 88.0,
+            'light_lux': lightLux ?? 22.0,
+            'outside_temperature': outsideTemp,
+            'outside_humidity': outsideHumidity,
+            'timestamp': DateTime.now().toUtc().toIso8601String(),
+          }),
+        ).timeout(const Duration(seconds: 4));
+        if (res.statusCode == 200) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
   Future<ShedData> getShedStatus(
     String shedId, {
     double? lat,

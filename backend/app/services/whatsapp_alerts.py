@@ -150,6 +150,60 @@ class WhatsAppAlertService:
             f"Outside conditions are {temp_text} and {humidity_text}."
         )
 
+    def build_temperature_variation_alert(
+        self,
+        *,
+        farmer_name: str,
+        farm_name: str,
+        shed_id: str,
+        current_temp: float,
+        temp_target: float,
+        temp_min: float,
+        temp_max: float,
+        current_hum: float,
+        status: str,
+        headline: str,
+        subline: str,
+        lang: str = "en",
+    ) -> str:
+        """Builds a personalized shed temperature variation alert for a specific registered farmer."""
+        lang_code = (lang or "en").lower()
+        if lang_code == "kn":
+            return (
+                f"🌾 {farmer_name} ಅವರಿಗೆ ಸೇತು ಶೆಡ್ ಎಚ್ಚರಿಕೆ\n"
+                f"📍 ಶೆಡ್: {shed_id} ({farm_name})\n"
+                f"⚠️ ತಾಪಮಾನದಲ್ಲಿ ವ್ಯತ್ಯಾಸ ಕಂಡುಬಂದಿದೆ!\n"
+                f"• ಪ್ರಸ್ತುತ ತಾಪಮಾನ: {current_temp:.1f}°C\n"
+                f"• ಸೂಕ್ತ ಮಿತಿ: {temp_min:.1f}°C - {temp_max:.1f}°C (ಗುರಿ: {temp_target:.1f}°C)\n"
+                f"• ಪ್ರಸ್ತುತ ಆರ್ದ್ರತೆ: {current_hum:.0f}%\n"
+                f"• ಸ್ಥಿತಿ: {headline}\n"
+                f"👉 ಸೂಚನೆ: {subline}"
+            )
+
+        if lang_code == "te":
+            return (
+                f"🌾 {farmer_name} గారికి సేతు షెడ్ హెచ్చరిక\n"
+                f"📍 షెడ్: {shed_id} ({farm_name})\n"
+                f"⚠️ ఉష్ణోగ్రతలో తేడా గుర్తించబడింది!\n"
+                f"• ప్రస్తుత ఉష్ణోగ్రత: {current_temp:.1f}°C\n"
+                f"• అనుకూల పరిధి: {temp_min:.1f}°C - {temp_max:.1f}°C (లక్ష్యం: {temp_target:.1f}°C)\n"
+                f"• ప్రస్తుత తేమ: {current_hum:.0f}%\n"
+                f"• స్థితి: {headline}\n"
+                f"👉 చర్య: {subline}"
+            )
+
+        # Default English
+        return (
+            f"🌾 SeriCare Alert for {farmer_name}\n"
+            f"📍 Shed: {shed_id} ({farm_name})\n"
+            f"⚠️ Temperature Variation Detected!\n"
+            f"• Current Temp: {current_temp:.1f}°C\n"
+            f"• Optimal Range: {temp_min:.1f}°C - {temp_max:.1f}°C (Target: {temp_target:.1f}°C)\n"
+            f"• Current Humidity: {current_hum:.0f}%\n"
+            f"• Status: {headline}\n"
+            f"👉 Action: {subline}"
+        )
+
     def build_critical_telemetry_alert(
         self,
         *,
