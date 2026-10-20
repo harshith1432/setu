@@ -55,3 +55,26 @@ async def test_manual_alert_test_endpoint(async_client):
     data = response.json()
     assert data['status'] in {'dry-run', 'sent', 'disabled'}
     assert 'message' in data
+
+
+@pytest.mark.anyio
+async def test_whatsapp_verification_request_endpoint(async_client):
+    login_res = await async_client.post(
+        '/api/v1/auth/login',
+        json={'username': 'ramesh_farmer', 'password': 'setu2026'}
+    )
+    assert login_res.status_code == 200
+    token = login_res.json()['access_token']
+    headers = {'Authorization': f'Bearer {token}'}
+
+    response = await async_client.post(
+        '/api/v1/auth/whatsapp/send-verification',
+        json={'whatsapp_number': '+919999999999'},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert 'sandbox_join_phrase' in data
+    assert data['sandbox_join_phrase'] == 'join stay-spread'
+    assert 'status' in data
