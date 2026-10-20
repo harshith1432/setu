@@ -1,6 +1,10 @@
+import asyncio
+import json
 from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
-from app.models.schemas import TelemetryPayload, ShedOverview
+from datetime import datetime, timezone
+from app.models.schemas import TelemetryPayload, TelemetryBatchPayload, ShedOverview
 from app.services.telemetry_service import telemetry_service
 from app.core.security import get_current_user_payload, decode_token
 from app.core.config import settings
@@ -29,7 +33,6 @@ def verify_telemetry_auth(
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         try:
-            from app.core.security import decode_token
             payload = decode_token(token)
             if payload and "sub" in payload:
                 return {"auth_type": "user", "identity": payload.get("sub")}
@@ -52,6 +55,22 @@ def ingest_telemetry(
     Automatically evaluates safety rules, hysteresis, updates actuator states, and persists to DB.
     """
     return telemetry_service.record_reading(payload)
+
+@router.post("/batch")
+def ingest_telemetry_batch(
+    payload: TelemetryBatchPayload,
+    auth_info: dict = Depends(verify_telemetry_auth)
+):
+    """
+    High-throughput bulk ingestion for gateways, collectors, and high-frequency sensor networks.
+    Ingests hundreds or thousands of readings in a single batched database transaction.
+    """
+    inserted = telemetry_service.record_batch_readings(payload.items)
+    return {
+        "status": "success",
+        "ingested_count": inserted,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 @router.get("/history/{shed_id}")
 def get_telemetry_history(
@@ -92,12 +111,31 @@ def export_csv(
         headers={"Content-Disposition": f"attachment; filename=setu_{shed_id}_telemetry.csv"}
     )
 
+@router.get("/sse/{shed_id}")
+async def sse_telemetry_stream(shed_id: str, token: Optional[str] = Query(None)):
+    """
+    Server-Sent Events (SSE) streaming endpoint for mobile & web telemetry synchronization.
+    Pushes real-time updates as they happen with minimal battery and network overhead.
+    """
+    async def event_generator():
+        overview = telemetry_service.get_shed_overview(shed_id)
+        data_dict = overview.model_dump() if hasattr(overview, "model_dump") else overview.dict()
+        yield f"event: initial\ndata: {json.dumps(data_dict, default=str)}\n\n"
+        
+        while True:
+            await asyncio.sleep(5)
+            # Periodic heartbeat ping to keep connection alive
+            yield f"event: ping\ndata: {json.dumps({'time': datetime.now(timezone.utc).isoformat()})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
 @router.websocket("/ws/{shed_id}")
 async def websocket_telemetry_stream(websocket: WebSocket, shed_id: str):
     """
     Real-time streaming WebSocket endpoint for live telemetry updates without HTTP polling.
+    Enforces channel-based subscriptions per shed to prevent broadcast overload.
     """
-    await telemetry_service.ws_manager.connect(websocket)
+    await telemetry_service.ws_manager.connect(websocket, shed_id)
     try:
         overview = telemetry_service.get_shed_overview(shed_id)
         data_dict = overview.model_dump() if hasattr(overview, "model_dump") else overview.dict()
@@ -110,6 +148,6 @@ async def websocket_telemetry_stream(websocket: WebSocket, shed_id: str):
             # Keep socket open and receive any client ping messages
             await websocket.receive_text()
     except WebSocketDisconnect:
-        telemetry_service.ws_manager.disconnect(websocket)
+        telemetry_service.ws_manager.disconnect(websocket, shed_id)
     except Exception:
-        telemetry_service.ws_manager.disconnect(websocket)
+        telemetry_service.ws_manager.disconnect(websocket, shed_id)

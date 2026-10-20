@@ -77,8 +77,8 @@ class WeatherService:
                     }
                     self._geocode_cache[cache_key] = (now + 86400, result_data)  # 24 hours
                     return result_data
-        except Exception as e:
-            logger.warning(f"Geocoding failed for '{region_name}': {e}")
+        except Exception:
+            logger.warning("Geocoding service query failed")
         return None
 
     def reverse_geocode(self, lat: float, lon: float) -> Optional[str]:
@@ -120,7 +120,7 @@ class WeatherService:
                     self._geocode_cache[cache_key] = (now + 86400, {"formatted_region": region_str})
                     return region_str
         except Exception as e:
-            logger.debug(f"Nominatim reverse geocode error: {e}")
+            logger.debug("Nominatim reverse geocode error: %s", type(e).__name__)
 
         # 2. Fallback to BigDataCloud
         try:
@@ -136,8 +136,8 @@ class WeatherService:
                     region_str = ", ".join(parts)
                     self._geocode_cache[cache_key] = (now + 86400, {"formatted_region": region_str})
                     return region_str
-        except Exception as e:
-            logger.warning(f"Reverse geocode failed for {lat}, {lon}: {e}")
+        except Exception:
+            logger.warning("Reverse geocode resolution failed")
         return None
 
     def get_current_weather(
@@ -235,8 +235,8 @@ class WeatherService:
                 # Cache for 15 minutes (900 seconds)
                 self._weather_cache[cache_key] = (now + 900, weather_data)
                 return weather_data
-        except Exception as e:
-            logger.warning(f"Live Open-Meteo query failed for lat={latitude}, lon={longitude}: {e}")
+        except Exception:
+            logger.warning("Live Open-Meteo weather query failed")
 
         # Fallback graceful simulation if offline
         fallback_data = {

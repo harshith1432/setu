@@ -279,7 +279,8 @@ async def twilio_whatsapp_webhook(request: Request):
         twiml_resp = '<?xml version="1.0" encoding="UTF-8"?><Response><Message>Your SeriCare WhatsApp alerts are now active!</Message></Response>'
         return Response(content=twiml_resp, media_type="application/xml")
     except Exception as exc:
-        return {"status": "error", "detail": str(exc)}
+        logger.error("Twilio WhatsApp webhook processing failed: %s", exc)
+        return Response(content='<?xml version="1.0" encoding="UTF-8"?><Response/>', media_type="application/xml")
 
 @router.get("/check-farmer")
 def check_farmer(identifier: str):

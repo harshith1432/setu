@@ -4,9 +4,12 @@
 // IoT Actuators & Historical Analytics
 // ==========================================================================
 
-const API_BASE_URL = (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1'))
+const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isOnRenderHost = window.location.hostname === 'onrender.com' || window.location.hostname.endsWith('.onrender.com');
+
+const API_BASE_URL = isLocalHost
   ? `${window.location.origin}/api/v1`
-  : (window.location.hostname.includes('onrender.com')
+  : (isOnRenderHost
       ? `${window.location.origin}/api/v1`
       : 'https://setu-8vh9.onrender.com/api/v1');
 
@@ -175,12 +178,12 @@ function initTelemetryWebSocket() {
     telemetryWs = null;
   }
   try {
-    const wsHost = (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1'))
+    const wsHost = isLocalHost
       ? (window.location.host || 'localhost:8000')
-      : (window.location.hostname.includes('onrender.com')
+      : (isOnRenderHost
           ? window.location.host
           : 'setu-8vh9.onrender.com');
-    const wsProto = (wsHost.includes('localhost') || wsHost.includes('127.0.0.1')) ? 'ws:' : 'wss:';
+    const wsProto = isLocalHost ? 'ws:' : 'wss:';
     telemetryWs = new WebSocket(`${wsProto}//${wsHost}/api/v1/telemetry/ws/${selectedShedId}`);
     telemetryWs.onmessage = (event) => {
       try {

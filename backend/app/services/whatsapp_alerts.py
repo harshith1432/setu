@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import queue
 import threading
 import time
 from typing import Any, Dict, Optional
@@ -17,9 +18,14 @@ logger = logging.getLogger(__name__)
 _cooldown_lock = threading.Lock()
 _last_alert_timestamps: Dict[str, float] = {}
 
+# Bounded Async Queue & Worker Pool for Resilient WhatsApp Notification Dispatching
+_dispatch_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue(maxsize=10000)
+_seen_alert_hashes: set = set()
+_hash_lock = threading.Lock()
+
 
 class WhatsAppAlertService:
-    """Production-ready WhatsApp notifier for Setu. Supports dry-run, background dispatch, and cooldown throttling."""
+    """Production-ready WhatsApp notifier for Setu. Supports dry-run, bounded queue workers, and cooldown throttling."""
 
     def __init__(self):
         self.account_sid = (
@@ -38,6 +44,74 @@ class WhatsAppAlertService:
                 self._client = Client(self.account_sid, self.auth_token)
             except Exception:
                 self._client = None
+
+        self._workers_started = False
+        self._start_worker_threads()
+
+    def _start_worker_threads(self):
+        if not self._workers_started:
+            self._workers_started = True
+            for i in range(2):
+                t = threading.Thread(target=self._worker_loop, daemon=True, name=f"WhatsAppWorker-{i}")
+                t.start()
+
+    def _worker_loop(self):
+        """Worker loop processing alerts from bounded queue with rate limiting."""
+        while True:
+            try:
+                job = _dispatch_queue.get()
+                if job is None:
+                    break
+                self._process_dispatch_job(job)
+                _dispatch_queue.task_done()
+                time.sleep(0.05)  # Max 20 MPS per worker to respect Twilio rate limits
+            except Exception as e:
+                logger.error("Error in WhatsApp worker loop: %s", e)
+
+    def _process_dispatch_job(self, job: Dict[str, Any]):
+        message = job.get("message")
+        recipient = job.get("recipient")
+        dry_run = job.get("dry_run", False)
+        media_url = job.get("media_url")
+        voice_url = job.get("voice_url")
+        cooldown_key = job.get("cooldown_key")
+
+        try:
+            # 1. Send text message (if present)
+            if message:
+                res = self.send(
+                    message=message,
+                    recipient=recipient,
+                    dry_run=dry_run,
+                    media_url=media_url if not voice_url else None,
+                    cooldown_key=None,
+                    cooldown_seconds=0,
+                )
+                if res.get("status") == "error":
+                    logger.error("WhatsApp dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
+                    if cooldown_key:
+                        self.rollback_cooldown(cooldown_key)
+                    return
+                elif res.get("status") == "sent":
+                    logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
+
+            # 2. If voice_url is present, send voice note audio message
+            if voice_url:
+                time.sleep(0.5)
+                voice_res = self.send(
+                    message=None,
+                    media_url=voice_url,
+                    recipient=recipient,
+                    dry_run=dry_run,
+                    cooldown_key=None,
+                    cooldown_seconds=0,
+                )
+                if voice_res.get("status") == "sent":
+                    logger.info("WhatsApp voice note delivered to %s (SID: %s)", voice_res.get("recipient"), voice_res.get("sid"))
+        except Exception as e:
+            logger.error("Background WhatsApp dispatch crashed: %s", e)
+            if cooldown_key:
+                self.rollback_cooldown(cooldown_key)
 
     @property
     def is_configured(self) -> bool:
@@ -393,9 +467,10 @@ class WhatsAppAlertService:
                 "media_url": media_url,
             }
         except Exception as exc:  # pragma: no cover - network layer
+            logger.error("Twilio WhatsApp send failed: %s", exc)
             return {
                 "status": "error",
-                "message": f"Twilio WhatsApp send failed: {exc}",
+                "message": "Twilio WhatsApp dispatch failed due to a provider error.",
                 "recipient": target,
                 "media_url": media_url,
             }
@@ -411,54 +486,27 @@ class WhatsAppAlertService:
         cooldown_key: Optional[str] = None,
         cooldown_seconds: int = 0,
     ) -> None:
-        """Dispatches an alert in a background worker thread.
-        If voice_url is provided, delivers the formatted text alert followed by the voice note audio message."""
+        """
+        Enqueues an alert job into the resilient bounded background queue.
+        Guarantees non-blocking execution, throttled rate limiting, and bounded memory.
+        """
         if cooldown_key and not self.check_and_update_cooldown(cooldown_key, cooldown_seconds):
             logger.info("Alert throttled by cooldown: %s", cooldown_key)
             return
 
-        def _worker():
-            try:
-                # 1. Send text message (if present)
-                if message:
-                    res = self.send(
-                        message=message,
-                        recipient=recipient,
-                        dry_run=dry_run,
-                        media_url=media_url if not voice_url else None,
-                        cooldown_key=None,
-                        cooldown_seconds=0,
-                    )
-                    if res.get("status") == "error":
-                        logger.error("WhatsApp dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
-                        if cooldown_key:
-                            self.rollback_cooldown(cooldown_key)
-                        return
-                    elif res.get("status") == "sent":
-                        logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
+        job = {
+            "message": message,
+            "recipient": recipient,
+            "dry_run": dry_run,
+            "media_url": media_url,
+            "voice_url": voice_url,
+            "cooldown_key": cooldown_key,
+        }
 
-                # 2. If voice_url is present, send voice note audio message
-                if voice_url:
-                    time.sleep(1.0)
-                    voice_res = self.send(
-                        message=None,
-                        media_url=voice_url,
-                        recipient=recipient,
-                        dry_run=dry_run,
-                        cooldown_key=None,
-                        cooldown_seconds=0,
-                    )
-                    if voice_res.get("status") == "sent":
-                        logger.info("WhatsApp voice note delivered to %s (SID: %s)", voice_res.get("recipient"), voice_res.get("sid"))
-                    else:
-                        logger.warning("WhatsApp voice note dispatch status: %s (%s)", voice_res.get("status"), voice_res.get("message"))
-            except Exception as e:
-                logger.error("Background WhatsApp send crashed: %s", e)
-                if cooldown_key:
-                    self.rollback_cooldown(cooldown_key)
-
-        thread = threading.Thread(target=_worker, daemon=True)
-        thread.start()
+        try:
+            _dispatch_queue.put_nowait(job)
+        except queue.Full:
+            logger.warning("WhatsApp dispatch queue is full! Dropping non-critical job.")
 
     # Alias for explicit clarity
     dispatch_alert_with_voice = dispatch_in_background

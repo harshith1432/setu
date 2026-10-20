@@ -45,7 +45,12 @@ def decode_token(token: str) -> dict:
     try:
         claims = jwt.get_unverified_claims(token)
         issuer = str(claims.get("iss", ""))
-        if "securetoken.google.com" in issuer or "firebase" in issuer or claims.get("auth_time"):
+        is_firebase = (
+            issuer.startswith("https://securetoken.google.com/")
+            or issuer == "https://securetoken.google.com"
+            or bool(claims.get("auth_time"))
+        )
+        if is_firebase:
             from app.services.db_service import get_user_by_username_or_phone, get_user_by_id
             ident = claims.get("email") or claims.get("phone_number") or claims.get("user_id") or claims.get("sub")
             if ident:
