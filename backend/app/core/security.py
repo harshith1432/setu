@@ -34,62 +34,51 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 def decode_token(token: str) -> dict:
-    # 1. Standard HMAC verification with server SECRET_KEY
+    """
+    SEC-01 & SEC-02: Cryptographic token verification.
+    Strictly validates HMAC-SHA256 signature against settings.SECRET_KEY.
+    Rejects forged tokens, expired tokens, and unverified development bypass strings.
+    """
+    if not token or not isinstance(token, str):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or empty authorization token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 1. Strictly verify HMAC signature with server SECRET_KEY
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": True, "verify_signature": True}
+        )
+        if not payload or not isinstance(payload, dict):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Malformed token payload",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         return payload
     except JWTError:
-        pass
-
-    # 2. Support Firebase Auth tokens seamlessly if sent by mobile app
-    try:
-        claims = jwt.get_unverified_claims(token)
-        issuer = str(claims.get("iss", ""))
-        is_firebase = (
-            issuer.startswith("https://securetoken.google.com/")
-            or issuer == "https://securetoken.google.com"
-            or bool(claims.get("auth_time"))
+        # Invalid signature or expired token
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials: invalid or expired token signature",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        if is_firebase:
-            from app.services.db_service import get_user_by_username_or_phone, get_user_by_id
-            ident = claims.get("email") or claims.get("phone_number") or claims.get("user_id") or claims.get("sub")
-            if ident:
-                user = get_user_by_username_or_phone(str(ident))
-                if not user:
-                    user = get_user_by_id(str(ident))
-                if user:
-                    return {
-                        "sub": user["username"],
-                        "user_id": user["id"],
-                        "role": user.get("role", "farmer")
-                    }
-                return {
-                    "sub": claims.get("email") or claims.get("sub") or str(ident),
-                    "user_id": claims.get("user_id") or claims.get("sub") or str(ident),
-                    "role": "farmer"
-                }
-    except Exception:
-        pass
-
-    # 3. Support 'firebase_<uid>' development fallback
-    if token.startswith("firebase_"):
-        uid = token.replace("firebase_", "")
-        from app.services.db_service import get_user_by_id, get_user_by_username_or_phone
-        user = get_user_by_id(uid) or get_user_by_username_or_phone(uid)
-        if user:
-            return {
-                "sub": user["username"],
-                "user_id": user["id"],
-                "role": user.get("role", "farmer")
-            }
-        return {"sub": uid, "user_id": uid, "role": "farmer"}
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
 
 def get_current_user_payload(credentials: HTTPAuthorizationCredentials = Security(security_scheme)) -> dict:
     token = credentials.credentials
-    return decode_token(token)
+    payload = decode_token(token)
+    username = payload.get("sub")
+    if username and username != "admin":
+        from app.services.db_service import get_user_by_username
+        user = get_user_by_username(username)
+        if user and not user.get("is_active", 1):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account has been suspended or deactivated",
+            )
+    return payload

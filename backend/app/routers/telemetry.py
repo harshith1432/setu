@@ -1,6 +1,6 @@
 import asyncio
 import json
-from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Query, status
 from fastapi.responses import StreamingResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -72,13 +72,16 @@ def ingest_telemetry_batch(
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
+from app.routers.sheds import verify_shed_access
+
 @router.get("/history/{shed_id}")
 def get_telemetry_history(
     shed_id: str,
-    payload: dict = Depends(get_current_user_payload)
+    payload: dict = Depends(verify_shed_access)
 ) -> List[Dict[str, Any]]:
     """
     Get historical timeseries for chart rendering from PostgreSQL timeseries storage.
+    Protected with Broken Object-Level Authorization (BOLA / IDOR) check.
     """
     return telemetry_service.get_history(shed_id, limit=50)
 
@@ -103,7 +106,20 @@ def export_csv(
     """
     Download raw telemetry records as a formatted CSV file.
     Accepts Bearer token in header or token in query param.
+    Protected with Broken Object-Level Authorization (BOLA / IDOR) check.
     """
+    role = payload.get("role")
+    if role not in ["admin", "superadmin"]:
+        from app.services.db_service import get_user_by_username, get_user_by_id
+        username = payload.get("sub") or payload.get("user_id")
+        user = get_user_by_username(username) or get_user_by_id(username) if username else None
+        user_shed = (user.get("shed_id") if user else "shed_01") or "shed_01"
+        if user_shed.lower() != shed_id.lower() and user.get("id", "").lower() != shed_id.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Forbidden: You do not have authorization to export data for shed '{shed_id}'"
+            )
+
     csv_data = telemetry_service.generate_csv_export(shed_id)
     return Response(
         content=csv_data,
@@ -112,11 +128,38 @@ def export_csv(
     )
 
 @router.get("/sse/{shed_id}")
-async def sse_telemetry_stream(shed_id: str, token: Optional[str] = Query(None)):
+async def sse_telemetry_stream(
+    shed_id: str,
+    token: Optional[str] = Query(None),
+    authorization: Optional[str] = Header(None)
+):
     """
     Server-Sent Events (SSE) streaming endpoint for mobile & web telemetry synchronization.
-    Pushes real-time updates as they happen with minimal battery and network overhead.
+    Protected with token authentication and shed tenancy verification (SEC-06).
     """
+    raw_token = None
+    if authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split("Bearer ")[1].strip()
+    elif token:
+        raw_token = token
+
+    if not raw_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication token required for SSE stream")
+
+    try:
+        user_payload = decode_token(raw_token)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token for SSE stream")
+
+    role = user_payload.get("role")
+    if role not in ["admin", "superadmin"]:
+        from app.services.db_service import get_user_by_username, get_user_by_id
+        username = user_payload.get("sub") or user_payload.get("user_id")
+        user = get_user_by_username(username) or get_user_by_id(username) if username else None
+        user_shed = (user.get("shed_id") if user else "shed_01") or "shed_01"
+        if user_shed.lower() != shed_id.lower() and user.get("id", "").lower() != shed_id.lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden: Unauthorized shed stream access")
+
     async def event_generator():
         overview = telemetry_service.get_shed_overview(shed_id)
         data_dict = overview.model_dump() if hasattr(overview, "model_dump") else overview.dict()
@@ -124,17 +167,46 @@ async def sse_telemetry_stream(shed_id: str, token: Optional[str] = Query(None))
         
         while True:
             await asyncio.sleep(5)
-            # Periodic heartbeat ping to keep connection alive
             yield f"event: ping\ndata: {json.dumps({'time': datetime.now(timezone.utc).isoformat()})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.websocket("/ws/{shed_id}")
-async def websocket_telemetry_stream(websocket: WebSocket, shed_id: str):
+async def websocket_telemetry_stream(
+    websocket: WebSocket,
+    shed_id: str,
+    token: Optional[str] = Query(None)
+):
     """
-    Real-time streaming WebSocket endpoint for live telemetry updates without HTTP polling.
-    Enforces channel-based subscriptions per shed to prevent broadcast overload.
+    Real-time streaming WebSocket endpoint for live telemetry updates.
+    Enforces authentication and tenant isolation during handshake (VULN-06).
     """
+    raw_token = token
+    if not raw_token:
+        auth_h = websocket.headers.get("authorization")
+        if auth_h and auth_h.startswith("Bearer "):
+            raw_token = auth_h.split("Bearer ")[1].strip()
+
+    if not raw_token:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication token required")
+        return
+
+    try:
+        payload = decode_token(raw_token)
+    except Exception:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid credentials")
+        return
+
+    role = payload.get("role")
+    if role not in ["admin", "superadmin"]:
+        from app.services.db_service import get_user_by_username, get_user_by_id
+        username = payload.get("sub") or payload.get("user_id")
+        user = get_user_by_username(username) or get_user_by_id(username) if username else None
+        user_shed = (user.get("shed_id") if user else "shed_01") or "shed_01"
+        if user_shed.lower() != shed_id.lower() and user.get("id", "").lower() != shed_id.lower():
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Forbidden: Unauthorized shed stream")
+            return
+
     await telemetry_service.ws_manager.connect(websocket, shed_id)
     try:
         overview = telemetry_service.get_shed_overview(shed_id)
@@ -145,7 +217,6 @@ async def websocket_telemetry_stream(websocket: WebSocket, shed_id: str):
             "data": data_dict
         })
         while True:
-            # Keep socket open and receive any client ping messages
             await websocket.receive_text()
     except WebSocketDisconnect:
         telemetry_service.ws_manager.disconnect(websocket, shed_id)

@@ -269,7 +269,11 @@ class SetuProvider with ChangeNotifier {
     String? preferredName,
     String? preferredPhone,
   }) async {
-    final token = await user.getIdToken().catchError((_) => null) ?? 'firebase_${user.uid}';
+    final token = await user.getIdToken().catchError((_) => null);
+    if (token == null || token.isEmpty) {
+      debugPrint('[Auth] Firebase token acquisition failed; user needs to re-authenticate.');
+      return;
+    }
     _isLoggedIn = true;
     _authToken = token;
     _apiService.setToken(_authToken);

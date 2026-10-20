@@ -120,6 +120,14 @@ def google_sync(req: GoogleAuthRequest):
         existing = get_user_by_username_or_phone(req.phone.replace(" ", ""))
 
     if existing:
+        # SEC-03: Prevent Account Takeover (ATO).
+        # Reject hijacking of password-authenticated accounts or admin accounts via unverified Google sync requests.
+        if existing.get("role") in ["admin", "superadmin"] or not existing.get("hashed_password", "").startswith("oauth_google_"):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Account requires password authentication. Direct OAuth linking not permitted without credentials."
+            )
+
         updates = {}
         if req.full_name and req.full_name.strip():
             updates["full_name"] = req.full_name.strip()
@@ -284,6 +292,11 @@ async def twilio_whatsapp_webhook(request: Request):
 
 @router.get("/check-farmer")
 def check_farmer(identifier: str):
+    """
+    SEC-07: Public account presence verification without PII leakage.
+    Returns presence and profile readiness booleans without disclosing phone numbers,
+    farm names, or personal identities to unauthenticated callers.
+    """
     clean = identifier.strip().lower()
     user = get_user_by_username_or_phone(clean)
     if not user:
@@ -299,17 +312,7 @@ def check_farmer(identifier: str):
         return {
             "exists": True,
             "has_profile": bool(has_real_profile),
-            "user": {
-                "id": user["id"],
-                "username": user["username"],
-                "full_name": user["full_name"],
-                "phone": user.get("phone"),
-                "farm_name": user.get("farm_name"),
-                "batch_id": user.get("batch_id"),
-                "dfl_capacity": user.get("dfl_capacity"),
-                "region": user.get("region"),
-                "breed": user.get("breed"),
-            }
+            "username": user["username"]
         }
     return {"exists": False, "has_profile": False}
 

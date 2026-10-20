@@ -675,7 +675,6 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
     query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s RETURNING *"
 
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_stage INT DEFAULT 3")
         cursor.execute(query, tuple(values))
         row = cursor.fetchone()
         if row:

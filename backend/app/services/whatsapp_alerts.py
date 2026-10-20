@@ -71,7 +71,7 @@ class WhatsAppAlertService:
     def _process_dispatch_job(self, job: Dict[str, Any]):
         message = job.get("message")
         recipient = job.get("recipient")
-        dry_run = job.get("dry_run", False)
+        dry_run = job.get("dry_run", False) or os.getenv("WHATSAPP_DRY_RUN", "").lower() in ("1", "true", "yes")
         media_url = job.get("media_url")
         voice_url = job.get("voice_url")
         cooldown_key = job.get("cooldown_key")

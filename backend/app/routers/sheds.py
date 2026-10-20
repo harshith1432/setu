@@ -1,11 +1,39 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from app.models.schemas import ShedOverview
 from app.services.telemetry_service import telemetry_service
-from app.services.db_service import get_user_by_username, update_user_profile
+from app.services.db_service import get_user_by_username, get_user_by_id, update_user_profile
 from app.core.security import get_current_user_payload
 
 router = APIRouter(prefix="/sheds", tags=["Sheds"])
+
+def verify_shed_access(
+    shed_id: str,
+    payload: dict = Depends(get_current_user_payload)
+) -> dict:
+    """
+    SEC-06 & BOLA/IDOR Protection:
+    Ensures that regular farmers can only view and control their own assigned rearing shed.
+    Superadmins and cluster operators are permitted across all sheds.
+    """
+    role = payload.get("role")
+    if role in ["admin", "superadmin"]:
+        return payload
+
+    username = payload.get("sub") or payload.get("user_id")
+    if username:
+        user = get_user_by_username(username) or get_user_by_id(username)
+        if user:
+            user_shed = (user.get("shed_id") or "shed_01").lower()
+            target_shed = shed_id.strip().lower()
+            # Allow if user shed matches target, or user id matches
+            if user_shed == target_shed or user.get("id", "").lower() == target_shed or f"shed_{user.get('id', '').lower()}" == target_shed:
+                return payload
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"Forbidden: You do not have authorization to access data for shed '{shed_id}'"
+    )
 
 @router.get("/{shed_id}", response_model=ShedOverview)
 def get_shed_status(
@@ -13,11 +41,12 @@ def get_shed_status(
     lat: Optional[float] = None,
     lon: Optional[float] = None,
     region: Optional[str] = None,
-    payload: dict = Depends(get_current_user_payload)
+    payload: dict = Depends(verify_shed_access)
 ):
     """
     Get live shed conditions, status headline, current stage, and equipment states.
     Uses real-time weather for the user's GPS coordinates or custom region.
+    Protected with Broken Object-Level Authorization (BOLA / IDOR) check.
     """
     user_lat = lat
     user_lon = lon
@@ -40,9 +69,14 @@ def get_shed_status(
     )
 
 @router.post("/{shed_id}/stage/{stage_num}", response_model=ShedOverview)
-def set_rearing_stage(shed_id: str, stage_num: int, payload: dict = Depends(get_current_user_payload)):
+def set_rearing_stage(
+    shed_id: str,
+    stage_num: int,
+    payload: dict = Depends(verify_shed_access)
+):
     """
     Update silkworm growth stage (1 to 5). Automates environment targets.
+    Protected with Broken Object-Level Authorization (BOLA / IDOR) check.
     """
     if stage_num < 1 or stage_num > 5:
         raise HTTPException(status_code=400, detail="Stage must be between 1 and 5 (Instars)")

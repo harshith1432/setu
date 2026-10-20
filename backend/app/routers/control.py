@@ -83,6 +83,8 @@ def submit_device_command(
     caller = user_payload.get("sub") or "operator"
     # Derive shed from device or caller
     shed_id = f"shed_{cmd.device_id.split('_')[-1]}" if "_" in cmd.device_id else "shed_01"
+    # SEC-06 & BOLA Protection: Verify caller has access to control this shed
+    verify_shed_control_access(shed_id, user_payload)
     command_record = create_device_command(
         device_id=cmd.device_id,
         shed_id=shed_id,

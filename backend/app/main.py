@@ -6,7 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import auth, sheds, telemetry, control, ai, admin, weather, voice
 
+from collections import defaultdict
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
 _server_start_time = time.time()
+_rate_limits = defaultdict(list)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -15,6 +20,46 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# SEC-09: Enterprise HTTP Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; "
+            "connect-src 'self' https: wss:;"
+        )
+        return response
+
+# SEC-10: Abuse & Brute-Force Rate Limiting Middleware
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/api/v1/auth/login") or path.startswith("/api/v1/auth/register"):
+            client_ip = request.client.host if request.client else "unknown"
+            now = time.time()
+            window_start = now - 60.0
+            
+            # Prune timestamps older than 60 seconds
+            _rate_limits[client_ip] = [ts for ts in _rate_limits[client_ip] if ts > window_start]
+            if len(_rate_limits[client_ip]) >= 30:  # 30 auth requests per minute limit
+                return Response(
+                    content='{"detail": "Too many requests. Please slow down and try again later."}',
+                    status_code=429,
+                    media_type="application/json",
+                    headers={"Retry-After": "60"}
+                )
+            _rate_limits[client_ip].append(now)
+
+        return await call_next(request)
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # SEC-07: Secure CORS Configuration (Restricting wildcard origins with credentials)
 app.add_middleware(

@@ -1,10 +1,13 @@
-import sys
-import os
+import pytest
+import httpx
+from app.main import app
 
-# Automatically add the backend directory to sys.path so 'app' is always discoverable
-backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
+@pytest.fixture
+def anyio_backend():
+    return 'asyncio'
 
-# Ensure sample farmers are available for unit test assertions
-os.environ["SEED_DEMO_FARMERS"] = "true"
+@pytest.fixture
+async def async_client():
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+        yield client

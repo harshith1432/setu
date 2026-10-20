@@ -36,6 +36,7 @@ class WeatherService:
         self.default_region = default_region
         self._weather_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._geocode_cache: Dict[str, tuple[float, Dict[str, Any]]] = {}
+        self._ip_geo_cache: Optional[tuple[float, float, str]] = None
         self._client = httpx.Client(timeout=4.0, headers={"User-Agent": "Setu-Global/1.0"})
 
     def geocode_region(self, region_name: str) -> Optional[Dict[str, Any]]:
@@ -56,6 +57,16 @@ class WeatherService:
             expires, cached_val = self._geocode_cache[cache_key]
             if now < expires:
                 return cached_val
+
+        # Quick bypass for non-geographical generic shed labels
+        if clean_name.lower() in ["sericulture shed", "shed", "rearing shed", "global sericulture network"]:
+            default_geo = {
+                "latitude": 12.97,
+                "longitude": 77.59,
+                "formatted_region": "Ramanagara / Bengaluru Silk Hub"
+            }
+            self._geocode_cache[cache_key] = (now + 86400, default_geo)
+            return default_geo
 
         try:
             geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={clean_name}&count=1&language=en&format=json"
@@ -79,6 +90,8 @@ class WeatherService:
                     return result_data
         except Exception:
             logger.warning("Geocoding service query failed")
+
+        self._geocode_cache[cache_key] = (now + 600, None)
         return None
 
     def reverse_geocode(self, lat: float, lon: float) -> Optional[str]:
@@ -170,23 +183,33 @@ class WeatherService:
             else:
                 display_region = self.default_region
 
-        # If still missing coordinates, resolve via secure IP geolocation (HTTPS)
+        # If still missing coordinates, resolve via secure IP geolocation (HTTPS) or cached IP geo
         if latitude is None or longitude is None:
-            try:
-                ip_res = self._client.get("https://ipapi.co/json/", timeout=3.0)
-                if ip_res.status_code == 200:
-                    ip_data = ip_res.json()
-                    latitude = float(ip_data.get("latitude", 0.0))
-                    longitude = float(ip_data.get("longitude", 0.0))
-                    if not region:
+            if self._ip_geo_cache is not None:
+                latitude, longitude, cached_geo_region = self._ip_geo_cache
+                if not region and cached_geo_region:
+                    display_region = cached_geo_region
+            else:
+                try:
+                    ip_res = self._client.get("https://ipapi.co/json/", timeout=2.0)
+                    if ip_res.status_code == 200:
+                        ip_data = ip_res.json()
+                        latitude = float(ip_data.get("latitude", 12.97))
+                        longitude = float(ip_data.get("longitude", 77.59))
                         city = ip_data.get("city", "")
                         reg = ip_data.get("region", "")
                         parts = [p for p in [city, reg] if p]
-                        display_region = ", ".join(parts) if parts else "Live Location"
-            except Exception as e:
-                logger.warning(f"Live IP geolocation failed: {e}")
-                latitude = latitude or 13.08
-                longitude = longitude or 77.58
+                        geo_name = ", ".join(parts) if parts else "Bengaluru / Ramanagara Silk Hub"
+                        self._ip_geo_cache = (latitude, longitude, geo_name)
+                        if not region:
+                            display_region = geo_name
+                except Exception as e:
+                    logger.warning(f"Live IP geolocation failed: {e}")
+                    latitude = 12.97
+                    longitude = 77.59
+                    self._ip_geo_cache = (12.97, 77.59, "Ramanagara / Bengaluru Silk Hub")
+                    if not region:
+                        display_region = "Ramanagara / Bengaluru Silk Hub"
 
         # Check weather cache by coordinate bucket (0.01 deg ~= 1.1 km)
         cache_key = f"weather:{round(latitude or 0.0, 2)}:{round(longitude or 0.0, 2)}"
