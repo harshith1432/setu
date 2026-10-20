@@ -748,7 +748,7 @@ function switchToFarmerShed(shedId) {
   initTelemetryWebSocket();
   fetchLiveTelemetry();
   fetchStats();
-  switchTab('overview');
+  switchView('overview');
   showToast(`Switched active IoT monitoring to ${shedId.toUpperCase()}!`, 'info');
 }
 
@@ -1454,13 +1454,10 @@ function renderFarmersTable(farmers) {
         <td>
           <div style="display:flex; flex-direction:column; gap:4px;">
             <strong>${escapeHtml(f.farm_name || 'Main Shed')}</strong>
-            <div style="display:flex; align-items:center; gap:6px;">
-              <span class="badge" style="font-size:0.68rem; padding:1px 6px; background:var(--bg-card); border:1px solid var(--border-light); font-weight:600;">
+            <div>
+              <span class="badge" style="font-size:0.68rem; padding:2px 8px; background:var(--bg-card); border:1px solid var(--border-light); font-weight:600;">
                 ${escapeHtml(sId.toUpperCase())}
               </span>
-              <button type="button" class="btn-text" style="font-size:0.75rem; color:var(--green-leaf); cursor:pointer; background:none; border:none; padding:0; text-decoration:underline;" onclick="switchToFarmerShed('${escapeHtml(sId)}')">
-                Monitor &rarr;
-              </button>
             </div>
           </div>
         </td>
@@ -1487,10 +1484,6 @@ function renderFarmersTable(farmers) {
               <button type="button" class="action-menu-item" onclick="openEditFarmerModal('${escapeHtml(fId)}'); closeAllActionMenus();">
                 <i data-lucide="edit-3" style="color:#0288D1;"></i>
                 <span>Edit Profile & Farm Info</span>
-              </button>
-              <button type="button" class="action-menu-item" onclick="switchToFarmerShed('${escapeHtml(sId)}'); closeAllActionMenus();">
-                <i data-lucide="radio" style="color:#E65100;"></i>
-                <span>Monitor Live Shed</span>
               </button>
               <div class="action-menu-divider"></div>
               <button type="button" class="action-menu-item" onclick="toggleFarmerStatus('${f.username}', ${!isActive}); closeAllActionMenus();">
