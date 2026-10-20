@@ -133,7 +133,7 @@ class WhatsAppAlertService:
             if actuator == "heater":
                 return (
                     f"సేతు హెచ్చరిక: {region_name} షెడ్ కోసం హీటర్ ప్రారంభించబడింది. "
-                    f"వెలుపలి తేమ {humidity_text}, ప్రస్తుత షెడ్ ఉష్ಣోగ్రత {current_temp_text} మరియు తేమ {current_hum_text}."
+                    f"వెలుపలి తేమ {humidity_text}, ప్రస్తుత షెడ్ ఉష్ణోగ్రత {current_temp_text} మరియు తేమ {current_hum_text}."
                 )
             return f"సేతు హెచ్చరిక: {region_name} షెడ్‌లో {actuator} మాన్యువల్‌గా నియంత్రించబడింది."
 
@@ -171,11 +171,35 @@ class WhatsAppAlertService:
         status: str,
         headline: str,
         subline: str,
+        cooler_active: Optional[bool] = None,
+        heater_active: Optional[bool] = None,
+        fan_active: Optional[bool] = None,
         lang: str = "en",
     ) -> str:
-        """Builds a personalized shed temperature variation alert for a specific registered farmer."""
+        """Builds a rich, personalized shed temperature variation alert showing live data,
+        active system controls, and a concise 1-line explanation of what SeriCare is doing."""
         lang_code = (lang or "en").lower()
+
+        # Determine actuator states if not explicitly passed
+        if cooler_active is None:
+            cooler_active = ("COOL" in headline.upper()) or (status == "TOO_WARM") or (current_temp > temp_target)
+        if heater_active is None:
+            heater_active = ("HEAT" in headline.upper()) or (status == "TOO_COOL") or (current_temp < temp_target)
+        if fan_active is None:
+            fan_active = cooler_active or ("FAN" in headline.upper())
+
         if lang_code == "kn":
+            cooler_str = "ಚಾಲನೆಯಲ್ಲಿದೆ (ON) ❄️" if cooler_active else "ಆಫ್ (OFF)"
+            fan_str = "ಚಾಲನೆಯಲ್ಲಿದೆ (ON) 💨" if fan_active else "ಆಫ್ (OFF)"
+            heater_str = "ಚಾಲನೆಯಲ್ಲಿದೆ (ON) 🔥" if heater_active else "ಆಫ್ (OFF)"
+
+            if cooler_active or current_temp > temp_target:
+                action_expl = f"ಶೆಡ್ ತಾಪಮಾನವನ್ನು {current_temp:.1f}°C ನಿಂದ ಸೂಕ್ತ {temp_target:.1f}°C ಗೆ ತಗ್ಗಿಸಲು ಕೂಲರ್ ಮತ್ತು ಫ್ಯಾನ್ ಚಾಲನೆ ಮಾಡಲಾಗುತ್ತಿದೆ."
+            elif heater_active or current_temp < temp_target:
+                action_expl = f"ಶೆಡ್ ತಾಪಮಾನವನ್ನು {current_temp:.1f}°C ನಿಂದ ಸೂಕ್ತ {temp_target:.1f}°C ಗೆ ಏರಿಸಲು ಹೀಟರ್ ಚಾಲನೆ ಮಾಡಲಾಗುತ್ತಿದೆ."
+            else:
+                action_expl = f"ಶೆಡ್ ತಾಪಮಾನ ಮತ್ತು ಆರ್ದ್ರತೆಯನ್ನು ಸೂಕ್ತ ಮಟ್ಟದಲ್ಲಿಡಲು ಸ್ವಯಂಚಾಲಿತ ನಿಯಂತ್ರಣ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದೆ."
+
             return (
                 f"🌾 {farmer_name} ಅವರಿಗೆ ಸೇತು ಶೆಡ್ ಎಚ್ಚರಿಕೆ\n"
                 f"📍 ಶೆಡ್: {shed_id} ({farm_name})\n"
@@ -183,23 +207,55 @@ class WhatsAppAlertService:
                 f"• ಪ್ರಸ್ತುತ ತಾಪಮಾನ: {current_temp:.1f}°C\n"
                 f"• ಸೂಕ್ತ ಮಿತಿ: {temp_min:.1f}°C - {temp_max:.1f}°C (ಗುರಿ: {temp_target:.1f}°C)\n"
                 f"• ಪ್ರಸ್ತುತ ಆರ್ದ್ರತೆ: {current_hum:.0f}%\n"
-                f"• ಸ್ಥಿತಿ: {headline}\n"
+                f"• ಸ್ಥಿತಿ: {headline}\n\n"
+                f"⚙️ ಸಕ್ರಿಯ ನಿಯಂತ್ರಣಗಳು:\n"
+                f"• ಕೂಲರ್: {cooler_str}\n"
+                f"• ಎಕ್ಸಾಸ್ಟ್ ಫ್ಯಾನ್: {fan_str}\n"
+                f"• ಹೀಟರ್: {heater_str}\n\n"
+                f"💡 ಸೇತು ಕೈಗೊಂಡ ಕ್ರಮ: {action_expl}\n"
                 f"👉 ಸೂಚನೆ: {subline}"
             )
 
         if lang_code == "te":
+            cooler_str = "ఆన్ (ON) ❄️" if cooler_active else "ఆఫ్ (OFF)"
+            fan_str = "ఆన్ (ON) 💨" if fan_active else "ఆఫ్ (OFF)"
+            heater_str = "ఆన్ (ON) 🔥" if heater_active else "ఆఫ్ (OFF)"
+
+            if cooler_active or current_temp > temp_target:
+                action_expl = f"షెడ్ ఉష్ణోగ్రతను {current_temp:.1f}°C నుండి సరైన {temp_target:.1f}°C కి తగ్గించడానికి కూలర్ మరియు ఫ్యాన్ ఆన్ చేయబడ్డాయి."
+            elif heater_active or current_temp < temp_target:
+                action_expl = f"షెడ్ ఉష్ణోగ్రతను {current_temp:.1f}°C నుండి సరైన {temp_target:.1f}°C కి పెంచడానికి హీటర్ ఆన్ చేయబడింది."
+            else:
+                action_expl = f"షెడ్ ఉష్ణోగ్రతను సరైన స్థాయిలో ఉంచడానికి ఆటోమేషన్ పనిచేస్తోంది."
+
             return (
                 f"🌾 {farmer_name} గారికి సేతు షెడ్ హెచ్చరిక\n"
-                f"📍 షెడ్: {shed_id} ({farm_name})\n"
+                f"📍 షెಡ್: {shed_id} ({farm_name})\n"
                 f"⚠️ ఉష్ణోగ్రతలో తేడా గుర్తించబడింది!\n"
                 f"• ప్రస్తుత ఉష్ణోగ్రత: {current_temp:.1f}°C\n"
                 f"• అనుకూల పరిధి: {temp_min:.1f}°C - {temp_max:.1f}°C (లక్ష్యం: {temp_target:.1f}°C)\n"
                 f"• ప్రస్తుత తేమ: {current_hum:.0f}%\n"
-                f"• స్థితి: {headline}\n"
+                f"• స్థితి: {headline}\n\n"
+                f"⚙️ సిస్టమ్ కంట్రోల్స్:\n"
+                f"• కూలర్: {cooler_str}\n"
+                f"• ఎగ్జాస్ట్ ఫ్యాన్: {fan_str}\n"
+                f"• హీటర్: {heater_str}\n\n"
+                f"💡 సేతు చేపట్టిన చర్య: {action_expl}\n"
                 f"👉 చర్య: {subline}"
             )
 
         # Default English
+        cooler_str = "ON ❄️" if cooler_active else "OFF"
+        fan_str = "ON 💨" if fan_active else "OFF"
+        heater_str = "ON 🔥" if heater_active else "OFF"
+
+        if cooler_active or current_temp > temp_target:
+            action_expl = f"Cooling and ventilation fans are actively running to safely lower temperature from {current_temp:.1f}°C to optimal {temp_target:.1f}°C."
+        elif heater_active or current_temp < temp_target:
+            action_expl = f"Heating system is actively running to safely raise temperature from {current_temp:.1f}°C to optimal {temp_target:.1f}°C."
+        else:
+            action_expl = f"Automated climate control is actively maintaining optimal shed environment."
+
         return (
             f"🌾 SeriCare Alert for {farmer_name}\n"
             f"📍 Shed: {shed_id} ({farm_name})\n"
@@ -207,7 +263,12 @@ class WhatsAppAlertService:
             f"• Current Temp: {current_temp:.1f}°C\n"
             f"• Optimal Range: {temp_min:.1f}°C - {temp_max:.1f}°C (Target: {temp_target:.1f}°C)\n"
             f"• Current Humidity: {current_hum:.0f}%\n"
-            f"• Status: {headline}\n"
+            f"• Status: {headline}\n\n"
+            f"⚙️ System Controls Active:\n"
+            f"• Cooler: {cooler_str}\n"
+            f"• Exhaust Fan: {fan_str}\n"
+            f"• Heater: {heater_str}\n\n"
+            f"💡 What SeriCare Is Doing: {action_expl}\n"
             f"👉 Action: {subline}"
         )
 
@@ -257,7 +318,7 @@ class WhatsAppAlertService:
     def send(
         self,
         *,
-        message: str,
+        message: Optional[str] = None,
         recipient: Optional[str] = None,
         dry_run: bool = False,
         media_url: Optional[str] = None,
@@ -285,7 +346,7 @@ class WhatsAppAlertService:
             if dry_run:
                 return {
                     "status": "dry-run",
-                    "message": f"Setu dry run: would send to {target} -> {message}",
+                    "message": f"Setu dry run: would send to {target} -> {message or media_url}",
                     "recipient": target,
                     "preview": message,
                     "media_url": media_url,
@@ -299,7 +360,7 @@ class WhatsAppAlertService:
         if dry_run:
             return {
                 "status": "dry-run",
-                "message": f"Setu dry run: would send to {target} -> {message}",
+                "message": f"Setu dry run: would send to {target} -> {message or media_url}",
                 "recipient": target,
                 "preview": message,
                 "media_url": media_url,
@@ -314,17 +375,18 @@ class WhatsAppAlertService:
 
         try:
             payload = {
-                "body": message,
                 "from_": self.normalize_whatsapp(self.from_number),
                 "to": target,
             }
+            if message:
+                payload["body"] = message
             if media_url:
-                payload["media_url"] = [media_url]
+                payload["media_url"] = [media_url] if isinstance(media_url, str) else media_url
 
             twilio_message = self._client.messages.create(**payload)
             return {
                 "status": "sent",
-                "message": "WhatsApp alert sent successfully.",
+                "message": "WhatsApp message sent successfully.",
                 "recipient": target,
                 "sid": twilio_message.sid,
                 "preview": message,
@@ -371,6 +433,62 @@ class WhatsAppAlertService:
                     logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
             except Exception as e:
                 logger.error("Background WhatsApp send crashed: %s", e)
+                if cooldown_key:
+                    self.rollback_cooldown(cooldown_key)
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
+
+    def dispatch_alert_with_voice(
+        self,
+        *,
+        message: str,
+        recipient: Optional[str] = None,
+        voice_url: Optional[str] = None,
+        dry_run: bool = False,
+        cooldown_key: Optional[str] = None,
+        cooldown_seconds: int = 0,
+    ) -> None:
+        """Dispatches rich text alert followed immediately by the voice note audio message in WhatsApp."""
+        if cooldown_key and not self.check_and_update_cooldown(cooldown_key, cooldown_seconds):
+            logger.info("Alert throttled by cooldown: %s", cooldown_key)
+            return
+
+        def _worker():
+            try:
+                # 1. Send formatted text alert
+                res = self.send(
+                    message=message,
+                    recipient=recipient,
+                    dry_run=dry_run,
+                    cooldown_key=None,
+                    cooldown_seconds=0,
+                )
+                if res.get("status") == "error":
+                    logger.error("WhatsApp text dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
+                    if cooldown_key:
+                        self.rollback_cooldown(cooldown_key)
+                    return
+
+                logger.info("WhatsApp text alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
+
+                # 2. If voice_url is available, send the voice note
+                if voice_url:
+                    time.sleep(1.0)  # Brief delay so text card and voice note arrive in order
+                    voice_res = self.send(
+                        message=None,
+                        media_url=voice_url,
+                        recipient=recipient,
+                        dry_run=dry_run,
+                        cooldown_key=None,
+                        cooldown_seconds=0,
+                    )
+                    if voice_res.get("status") == "sent":
+                        logger.info("WhatsApp voice note delivered to %s (SID: %s)", voice_res.get("recipient"), voice_res.get("sid"))
+                    else:
+                        logger.warning("WhatsApp voice note dispatch status: %s (%s)", voice_res.get("status"), voice_res.get("message"))
+            except Exception as e:
+                logger.error("Background WhatsApp dispatch crashed: %s", e)
                 if cooldown_key:
                     self.rollback_cooldown(cooldown_key)
 

@@ -345,3 +345,30 @@ async def test_admin_sheds_list_endpoint(async_client):
     shed_ids = [s["shed_id"] for s in sheds]
     assert "shed_01" in shed_ids
     assert "display_name" in sheds[0]
+
+@pytest.mark.anyio
+async def test_telemetry_csv_export(async_client):
+    admin_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "admin"}
+    )
+    admin_token = admin_login.json()["access_token"]
+
+    # 1. Test CSV export with Bearer Header
+    res_header = await async_client.get(
+        "/api/v1/telemetry/export/csv/shed_01",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert res_header.status_code == 200
+    assert "text/csv" in res_header.headers["content-type"]
+    assert "Timestamp_UTC" in res_header.text
+    assert "Indoor_Temp_C" in res_header.text
+
+    # 2. Test CSV export with query parameter token
+    res_query = await async_client.get(
+        f"/api/v1/telemetry/export/csv/shed_01?token={admin_token}"
+    )
+    assert res_query.status_code == 200
+    assert "text/csv" in res_query.headers["content-type"]
+    assert "Timestamp_UTC" in res_query.text
+

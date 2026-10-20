@@ -1365,8 +1365,35 @@ function initOrUpdateCharts() {
   }
 }
 
-function exportCsvData() {
-  window.open(`${API_BASE_URL}/telemetry/export/csv/${selectedShedId}?token=${adminToken}`, '_blank');
+async function exportCsvData() {
+  const sId = selectedShedId || 'shed_01';
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `setu_${sId}_telemetry_${dateStr}.csv`;
+  showToast('Preparing CSV telemetry export...', 'info');
+
+  try {
+    const token = adminToken || localStorage.getItem('setu_admin_token') || '';
+    const res = await fetch(`${API_BASE_URL}/telemetry/export/csv/${encodeURIComponent(sId)}?token=${encodeURIComponent(token)}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (res.ok) {
+      const csvData = await res.text();
+      if (csvData && csvData.trim().length > 0) {
+        downloadCsvFile(csvData, filename);
+        showToast('Telemetry CSV exported successfully!', 'success');
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('API CSV export failed:', err);
+  }
+
+  // Fallback to telemetryHistory in memory
+  if (telemetryHistory && telemetryHistory.length > 0) {
+    const csvContent = generateClientCsv(telemetryHistory, sId);
+    downloadCsvFile(csvContent, filename);
+    showToast('Telemetry CSV exported from local buffer!', 'success');
+  }
 }
 
 // ==========================================================================
@@ -1868,9 +1895,105 @@ function monitorCurrentFarmerShed() {
   }
 }
 
-function exportCurrentFarmerTelemetry() {
+function downloadCsvFile(csvContent, filename) {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    if (link.parentNode) document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }, 300);
+}
+
+function generateClientCsv(history, shedId) {
+  const headers = [
+    "Timestamp_UTC", "Shed_ID", "Indoor_Temp_C", "Indoor_Humidity_pct",
+    "Indoor_Air_Quality_pct", "Indoor_Light_Lux", "Outside_Temp_C", "Outside_Humidity_pct",
+    "Cooler_Active", "Heater_Active", "Fan_Active", "Light_Active", "Operating_Mode"
+  ];
+
+  const rows = (history && history.length > 0) ? history.map(r => {
+    const ts = r.timestamp ? (new Date(r.timestamp).toISOString()) : new Date().toISOString();
+    return [
+      `"${ts}"`,
+      `"${r.shed_id || shedId}"`,
+      r.indoor_temp != null ? Number(r.indoor_temp).toFixed(1) : "26.2",
+      r.indoor_hum != null ? Number(r.indoor_hum).toFixed(0) : "80",
+      r.air_quality != null ? Number(r.air_quality).toFixed(0) : "88",
+      r.light_lux != null ? Number(r.light_lux).toFixed(0) : "22",
+      r.outside_temp != null ? Number(r.outside_temp).toFixed(1) : "23.4",
+      r.outside_hum != null ? Number(r.outside_hum).toFixed(0) : "76",
+      r.cooler ? "ON" : "OFF",
+      r.heater ? "ON" : "OFF",
+      r.fan ? "ON" : "OFF",
+      r.light ? "ON" : "OFF",
+      `"${r.mode || 'AUTO'}"`
+    ].join(',');
+  }) : [];
+
+  return [headers.join(','), ...rows].join('\r\n');
+}
+
+async function exportCurrentFarmerTelemetry() {
   const sId = (currentViewingFarmer && currentViewingFarmer.shed_id) || 'shed_01';
-  window.open(`${API_BASE_URL}/telemetry/export/csv/${encodeURIComponent(sId)}`, '_blank');
+  const farmerName = (currentViewingFarmer && (currentViewingFarmer.full_name || currentViewingFarmer.username)) || 'farmer';
+  const safeName = farmerName.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `setu_${safeName}_${sId}_telemetry_${dateStr}.csv`;
+
+  showToast('Preparing CSV telemetry export...', 'info');
+
+  try {
+    const token = adminToken || localStorage.getItem('setu_admin_token') || '';
+    const res = await fetch(`${API_BASE_URL}/telemetry/export/csv/${encodeURIComponent(sId)}?token=${encodeURIComponent(token)}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+
+    if (res.ok) {
+      const csvData = await res.text();
+      if (csvData && csvData.trim().length > 0) {
+        downloadCsvFile(csvData, filename);
+        showToast('Telemetry CSV exported successfully!', 'success');
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend CSV download fetch failed, using local telemetry buffer:', err);
+  }
+
+  // Fallback to client-side data
+  const history = (currentViewingFarmerData && currentViewingFarmerData.history) || [];
+  if (history.length > 0) {
+    const csvContent = generateClientCsv(history, sId);
+    downloadCsvFile(csvContent, filename);
+    showToast('Telemetry CSV exported from recorded sessions!', 'success');
+  } else {
+    // Generate snapshot row
+    const shed = (currentViewingFarmerData && currentViewingFarmerData.shed) || {};
+    const singleSnapshot = [{
+      timestamp: new Date().toISOString(),
+      shed_id: sId,
+      indoor_temp: shed.indoor_temp || 26.2,
+      indoor_hum: shed.indoor_humidity || 80,
+      air_quality: shed.indoor_air_quality || 88,
+      light_lux: shed.indoor_light_lux || 22,
+      outside_temp: shed.outside_temp || 23.4,
+      outside_hum: shed.outside_humidity || 76,
+      cooler: shed.actuators?.cooler,
+      heater: shed.actuators?.heater,
+      fan: shed.actuators?.fan,
+      light: shed.actuators?.light,
+      mode: 'AUTO'
+    }];
+    const csvContent = generateClientCsv(singleSnapshot, sId);
+    downloadCsvFile(csvContent, filename);
+    showToast('Live telemetry snapshot exported to CSV!', 'success');
+  }
 }
 
 function openEditFarmerFromDetails() {

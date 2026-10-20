@@ -61,4 +61,11 @@ class Settings(BaseModel):
     DEFAULT_LATITUDE: float = float(os.getenv("DEFAULT_LATITUDE", "0.0"))
     DEFAULT_LONGITUDE: float = float(os.getenv("DEFAULT_LONGITUDE", "0.0"))
 
+    # Public server host for webhooks and WhatsApp media (voice notes)
+    SERVER_PUBLIC_URL: str = (
+        os.getenv("SERVER_PUBLIC_URL")
+        or os.getenv("RENDER_EXTERNAL_URL")
+        or "https://setu-8vh9.onrender.com"
+    )
+
 settings = Settings()

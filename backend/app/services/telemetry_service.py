@@ -12,6 +12,7 @@ import logging
 from app.core.config import settings
 from app.services.db_service import save_telemetry_reading, get_telemetry_history_from_db, get_latest_telemetry_reading_from_db, get_farmers_by_shed_id
 from app.services.whatsapp_alerts import alert_service
+from app.services.voice_service import voice_service
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +140,10 @@ class TelemetryService:
             try:
                 farmers = get_farmers_by_shed_id(payload.shed_id)
                 cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
+                is_cooler_on = getattr(next_actuators, "cooler", False)
+                is_heater_on = getattr(next_actuators, "heater", False)
+                is_fan_on = getattr(next_actuators, "fan", False)
+
                 for farmer in farmers:
                     recipient = farmer.get("whatsapp_number") or farmer.get("phone")
                     if not recipient or recipient == "N/A":
@@ -159,12 +164,28 @@ class TelemetryService:
                         status=status,
                         headline=headline,
                         subline=subline,
+                        cooler_active=is_cooler_on,
+                        heater_active=is_heater_on,
+                        fan_active=is_fan_on,
                         lang=farmer_lang,
                     )
 
-                    alert_service.dispatch_in_background(
+                    voice_script = voice_service.build_voice_script(
+                        farmer_name=farmer_name,
+                        shed_id=payload.shed_id,
+                        current_temp=payload.temperature,
+                        temp_target=temp_target,
+                        is_cooler_on=is_cooler_on,
+                        is_heater_on=is_heater_on,
+                        is_fan_on=is_fan_on,
+                        lang=farmer_lang,
+                    )
+                    voice_url = voice_service.get_voice_url_for_text(voice_script, lang=farmer_lang)
+
+                    alert_service.dispatch_alert_with_voice(
                         message=var_msg,
                         recipient=recipient,
+                        voice_url=voice_url,
                         cooldown_key=f"temp_var:{payload.shed_id}:{farmer.get('id')}",
                         cooldown_seconds=cooldown_sec,
                     )
@@ -535,6 +556,23 @@ class TelemetryService:
         ])
         
         records = self.get_history(shed_id, limit=200)
+        if not records:
+            overview = self.get_shed_overview(shed_id)
+            records = [{
+                "timestamp": datetime.now(timezone.utc),
+                "shed_id": shed_id,
+                "indoor_temp": overview.indoor_temp,
+                "indoor_hum": overview.indoor_humidity,
+                "air_quality": overview.indoor_air_quality,
+                "light_lux": overview.indoor_light_lux,
+                "outside_temp": overview.outside_temp,
+                "outside_hum": overview.outside_humidity,
+                "cooler": overview.actuators.cooler,
+                "heater": overview.actuators.heater,
+                "fan": overview.actuators.fan,
+                "light": overview.actuators.light,
+                "light_brightness": overview.actuators.light_brightness
+            }]
 
         for r in records:
             ts = r["timestamp"]

@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Response, Header, HTTPException, WebSocket, WebSocketDisconnect, Query
 from typing import List, Dict, Any, Optional
 from app.models.schemas import TelemetryPayload, ShedOverview
 from app.services.telemetry_service import telemetry_service
-from app.core.security import get_current_user_payload
+from app.core.security import get_current_user_payload, decode_token
 from app.core.config import settings
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
@@ -63,13 +63,27 @@ def get_telemetry_history(
     """
     return telemetry_service.get_history(shed_id, limit=50)
 
+def get_user_from_header_or_query(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None)
+) -> dict:
+    raw_token = None
+    if authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split("Bearer ")[1].strip()
+    elif token:
+        raw_token = token
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Authentication token required")
+    return decode_token(raw_token)
+
 @router.get("/export/csv/{shed_id}")
 def export_csv(
     shed_id: str,
-    payload: dict = Depends(get_current_user_payload)
+    payload: dict = Depends(get_user_from_header_or_query)
 ):
     """
     Download raw telemetry records as a formatted CSV file.
+    Accepts Bearer token in header or token in query param.
     """
     csv_data = telemetry_service.generate_csv_export(shed_id)
     return Response(
