@@ -185,12 +185,12 @@ async def test_whatsapp_verification_and_webhook_flow(async_client):
     assert 'sandbox_join_phrase' in verify_data
     assert verify_data['recipient'] == 'whatsapp:+919876543210'
 
-    # Check user profile updated with unverified number
+    # Check user profile updated with direct verified number
     me_res = await async_client.get('/api/v1/auth/me', headers=headers)
     assert me_res.status_code == 200
     user_data = me_res.json()
     assert user_data['whatsapp_number'] == '+919876543210'
-    assert user_data['whatsapp_verified'] is False
+    assert user_data['whatsapp_verified'] is True
 
     # 2. Confirm verification endpoint
     confirm_res = await async_client.post(

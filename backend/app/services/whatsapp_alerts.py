@@ -84,6 +84,13 @@ class WhatsAppAlertService:
             _last_alert_timestamps[cooldown_key] = now
             return True
 
+    def rollback_cooldown(self, cooldown_key: Optional[str]) -> None:
+        """Rolls back a cooldown lock if dispatch fails, allowing future retries."""
+        if not cooldown_key:
+            return
+        with _cooldown_lock:
+            _last_alert_timestamps.pop(cooldown_key, None)
+
     def build_manual_alert(
         self,
         *,
@@ -358,10 +365,14 @@ class WhatsAppAlertService:
                 )
                 if res.get("status") == "error":
                     logger.error("WhatsApp dispatch failed: %s (Recipient: %s)", res.get("message"), res.get("recipient"))
+                    if cooldown_key:
+                        self.rollback_cooldown(cooldown_key)
                 elif res.get("status") == "sent":
                     logger.info("WhatsApp alert delivered to %s (SID: %s)", res.get("recipient"), res.get("sid"))
             except Exception as e:
                 logger.error("Background WhatsApp send crashed: %s", e)
+                if cooldown_key:
+                    self.rollback_cooldown(cooldown_key)
 
         thread = threading.Thread(target=_worker, daemon=True)
         thread.start()

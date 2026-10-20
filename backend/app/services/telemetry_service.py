@@ -346,7 +346,8 @@ class TelemetryService:
         hum_target: float,
         air_quality_target: Optional[float] = None,
         light_lux_target: Optional[float] = None,
-        light_brightness: Optional[int] = None
+        light_brightness: Optional[int] = None,
+        caller_user: Optional[str] = None
     ) -> ShedOverview:
         shed = self._get_or_create_shed(shed_id)
         shed["is_auto_mode"] = is_auto
@@ -371,6 +372,12 @@ class TelemetryService:
         if is_temp_varying:
             try:
                 farmers = get_farmers_by_shed_id(shed_id)
+                if caller_user:
+                    from app.services.db_service import get_user_by_username, get_user_by_id
+                    caller = get_user_by_username(caller_user) or get_user_by_id(caller_user)
+                    if caller and caller.get("id") not in [f.get("id") for f in farmers]:
+                        farmers.append(caller)
+
                 cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
                 for farmer in farmers:
                     recipient = farmer.get("whatsapp_number") or farmer.get("phone")
@@ -411,7 +418,8 @@ class TelemetryService:
         shed_id: str,
         actuator: str,
         state: bool,
-        value: Optional[int] = None
+        value: Optional[int] = None,
+        caller_user: Optional[str] = None
     ) -> ShedOverview:
         shed = self._get_or_create_shed(shed_id)
         shed["is_auto_mode"] = False
@@ -423,6 +431,11 @@ class TelemetryService:
                 shed["actuators"].heater = False
                 try:
                     farmers = get_farmers_by_shed_id(shed_id)
+                    if caller_user:
+                        from app.services.db_service import get_user_by_username, get_user_by_id
+                        caller = get_user_by_username(caller_user) or get_user_by_id(caller_user)
+                        if caller and caller.get("id") not in [f.get("id") for f in farmers]:
+                            farmers.append(caller)
                     cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
                     for farmer in farmers:
                         recipient = farmer.get("whatsapp_number") or farmer.get("phone")
@@ -453,6 +466,11 @@ class TelemetryService:
                 shed["actuators"].cooler = False
                 try:
                     farmers = get_farmers_by_shed_id(shed_id)
+                    if caller_user:
+                        from app.services.db_service import get_user_by_username, get_user_by_id
+                        caller = get_user_by_username(caller_user) or get_user_by_id(caller_user)
+                        if caller and caller.get("id") not in [f.get("id") for f in farmers]:
+                            farmers.append(caller)
                     cooldown_sec = getattr(settings, "WHATSAPP_ALERT_COOLDOWN_SECONDS", 300)
                     for farmer in farmers:
                         recipient = farmer.get("whatsapp_number") or farmer.get("phone")

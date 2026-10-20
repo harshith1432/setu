@@ -43,6 +43,7 @@ def update_setpoints(
     Update target setpoints (temperature, humidity, air quality, light lux, bulb brightness, and auto/manual toggle).
     Enforces object-level authorization (SEC-06).
     """
+    caller_identifier = user_payload.get("sub") or user_payload.get("user_id")
     return telemetry_service.update_setpoints(
         shed_id=shed_id,
         is_auto=payload.is_auto_mode,
@@ -50,7 +51,8 @@ def update_setpoints(
         hum_target=payload.humidity_target,
         air_quality_target=payload.air_quality_target,
         light_lux_target=payload.light_lux_target,
-        light_brightness=payload.light_brightness
+        light_brightness=payload.light_brightness,
+        caller_user=caller_identifier
     )
 
 @router.post("/{shed_id}/override", response_model=ShedOverview)
@@ -70,11 +72,13 @@ def manual_actuator_override(
             detail=f"Invalid actuator '{payload.actuator}'. Must be one of {valid_actuators}"
         )
 
+    caller_identifier = user_payload.get("sub") or user_payload.get("user_id")
     result = telemetry_service.manual_override_actuator(
         shed_id=shed_id,
         actuator=payload.actuator,
         state=payload.state,
-        value=payload.value
+        value=payload.value,
+        caller_user=caller_identifier
     )
     return result
 

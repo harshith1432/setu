@@ -71,7 +71,7 @@ def register(user_in: UserCreate):
         "full_name": user_in.full_name,
         "phone": user_in.phone,
         "whatsapp_number": user_in.whatsapp_number or user_in.phone,
-        "whatsapp_verified": bool(user_in.whatsapp_verified),
+        "whatsapp_verified": True,
         "preferred_language": user_in.preferred_language,
         "role": "farmer",
         "farm_name": user_in.farm_name or "Green Valley Sericulture Farm",
@@ -218,7 +218,7 @@ def google_sync(req: GoogleAuthRequest):
 
 @router.post("/whatsapp/send-verification")
 def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_current_user_payload)):
-    """Send a WhatsApp sandbox verification prompt for a user-specific number."""
+    """Directly dispatch WhatsApp alerts to a user-specific number without manual sandbox gating."""
     whatsapp_number = (payload.get("whatsapp_number") or payload.get("phone") or "").strip()
     if not whatsapp_number:
         raise HTTPException(status_code=400, detail="whatsapp_number is required")
@@ -230,26 +230,27 @@ def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_c
     if user_id:
         update_user_profile(user_id, {
             "whatsapp_number": clean_digits,
-            "whatsapp_verified": False,
+            "whatsapp_verified": True,
         })
 
-    verification_message = (
-        f"Setu verification: reply with '{sandbox_join_phrase}' to confirm your WhatsApp number "
-        f"for alerts."
+    welcome_message = (
+        "🌾 SeriCare WhatsApp alerts are active! "
+        "Automated microclimate and temperature variation alerts will be delivered directly to your device."
     )
 
     dry_run = bool(payload.get("dry_run", not alert_service.is_configured))
     result = alert_service.send(
-        message=verification_message,
+        message=welcome_message,
         recipient=normalised_number,
         dry_run=dry_run,
     )
     return {
-        "status": result.get("status", "dry-run"),
-        "message": verification_message,
+        "status": result.get("status", "sent" if not dry_run else "dry-run"),
+        "message": result.get("message") or "WhatsApp alert service active.",
         "recipient": normalised_number,
         "sandbox_join_phrase": sandbox_join_phrase,
-        "preview": verification_message,
+        "preview": welcome_message,
+        "whatsapp_verified": True,
     }
 
 @router.post("/whatsapp/confirm-verification")

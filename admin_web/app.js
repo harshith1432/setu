@@ -1411,11 +1411,17 @@ function renderFarmersTable(farmers) {
   tbody.innerHTML = farmers.map(f => {
     const isActive = f.is_active === 1 || f.is_active === true;
     const sId = f.shed_id || 'shed_01';
+    const fId = f.username || f.id;
     return `
       <tr>
         <td>
-          <div class="farmer-name-cell">${escapeHtml(f.full_name || f.username)}</div>
-          <div class="farmer-sub-cell">@${escapeHtml(f.username)} • ${escapeHtml(f.phone || 'N/A')}</div>
+          <div style="cursor:pointer;" onclick="openFarmerDetailsModal('${escapeHtml(fId)}')" title="Click to view complete data & history">
+            <div class="farmer-name-cell" style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight:800; color:var(--green-deep);">${escapeHtml(f.full_name || f.username)}</span>
+              <span class="badge" style="font-size:0.65rem; padding:1px 5px; background:rgba(46,125,50,0.1); color:var(--green-leaf);">View Data</span>
+            </div>
+            <div class="farmer-sub-cell">@${escapeHtml(f.username)} &bull; ${escapeHtml(f.phone || 'N/A')}</div>
+          </div>
         </td>
         <td>
           <div style="display:flex; flex-direction:column; gap:4px;">
@@ -1442,6 +1448,12 @@ function renderFarmersTable(farmers) {
         </td>
         <td>
           <div class="action-buttons-wrap">
+            <button class="btn-icon" title="View Complete Data & History" style="color:var(--green-leaf);" onclick="openFarmerDetailsModal('${escapeHtml(fId)}')">
+              <i data-lucide="eye"></i>
+            </button>
+            <button class="btn-icon" title="Edit Personal & Farm Info" style="color:#0288D1;" onclick="openEditFarmerModal('${escapeHtml(fId)}')">
+              <i data-lucide="edit-3"></i>
+            </button>
             <button class="btn-icon" title="Monitor Shed Telemetry" onclick="switchToFarmerShed('${escapeHtml(sId)}')">
               <i data-lucide="radio"></i>
             </button>
@@ -1600,6 +1612,315 @@ async function handleEnrollFarmer(event) {
 }
 
 // ==========================================================================
+
+// ==========================================================================
+// FARMER COMPLETE DATA, HISTORY & EDIT MODALS
+// ==========================================================================
+let currentViewingFarmer = null;
+let currentViewingFarmerData = null;
+let currentEditingFarmerId = null;
+
+async function openFarmerDetailsModal(farmerId) {
+  const modal = document.getElementById('farmerDetailsModal');
+  if (!modal) return;
+
+  let localFarmer = enrolledFarmers.find(f => f.username === farmerId || f.id === farmerId);
+  currentViewingFarmer = localFarmer;
+  currentViewingFarmerData = null;
+
+  modal.classList.remove('hidden');
+  switchFarmerTab('personal');
+
+  const name = localFarmer ? (localFarmer.full_name || localFarmer.username) : farmerId;
+  const username = localFarmer ? localFarmer.username : farmerId;
+  const sId = localFarmer ? (localFarmer.shed_id || 'shed_01') : 'shed_01';
+  const farmName = localFarmer ? (localFarmer.farm_name || 'Main Farm') : 'Main Farm';
+  const region = localFarmer ? (localFarmer.region || 'Local / Global') : 'Local';
+
+  document.getElementById('fdFullName').textContent = name;
+  document.getElementById('fdAvatar').textContent = name.substring(0, 2).toUpperCase();
+  document.getElementById('fdSubline').innerHTML = `@${escapeHtml(username)} &bull; Farm: <strong>${escapeHtml(farmName)}</strong> &bull; Region: ${escapeHtml(region)}`;
+  document.getElementById('fdShedBadge').textContent = sId.toUpperCase();
+
+  const isActive = localFarmer ? (localFarmer.is_active === 1 || localFarmer.is_active === true) : true;
+  const statusBadge = document.getElementById('fdStatusBadge');
+  statusBadge.className = `badge-status ${isActive ? 'active' : 'inactive'}`;
+  statusBadge.innerHTML = `<span class="pulse-dot" style="width:6px;height:6px;background:${isActive ? 'var(--green-leaf)':'#9E9284'}"></span> ${isActive ? 'Active Rearing' : 'Suspended'}`;
+
+  // Reset defaults while fetching
+  document.getElementById('fdStageVal').textContent = 'Loading...';
+  document.getElementById('fdClimateVal').textContent = '--';
+  document.getElementById('fdOutdoorVal').textContent = '--';
+  document.getElementById('fdBatchVal').textContent = localFarmer?.dfl_capacity || '--';
+  document.getElementById('fdBatchId').textContent = localFarmer?.batch_id || '--';
+
+  try {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/farmers/${encodeURIComponent(farmerId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      currentViewingFarmerData = data;
+      const f = data.farmer || localFarmer || {};
+      const shed = data.shed || {};
+      const history = data.history || [];
+      currentViewingFarmer = f;
+
+      document.getElementById('fdFullName').textContent = f.full_name || f.username;
+      document.getElementById('fdAvatar').textContent = (f.full_name || f.username).substring(0, 2).toUpperCase();
+      document.getElementById('fdSubline').innerHTML = `@${escapeHtml(f.username)} &bull; Farm: <strong>${escapeHtml(f.farm_name || 'Main Farm')}</strong> &bull; Region: ${escapeHtml(f.region || 'Local / Global')}`;
+      document.getElementById('fdShedBadge').textContent = (f.shed_id || sId).toUpperCase();
+
+      const stages = ['I Instar (Chawki 1)', 'II Instar (Chawki 2)', 'III Instar (Late 3)', 'IV Instar (Late 4)', 'V Instar (Cocooning)'];
+      const stNum = f.current_stage || shed.current_stage || 3;
+      document.getElementById('fdStageVal').textContent = stages[stNum - 1] || `Instar ${stNum}`;
+      document.getElementById('fdStageSub').textContent = `Target: ${shed.temp_target || 26.0}°C • ${shed.humidity_target || 80}% RH`;
+
+      const indoorT = shed.indoor_temp != null ? Number(shed.indoor_temp).toFixed(1) : '26.2';
+      const indoorH = shed.indoor_humidity != null ? Number(shed.indoor_humidity).toFixed(0) : '80';
+      document.getElementById('fdClimateVal').textContent = `${indoorT}°C • ${indoorH}% RH`;
+      document.getElementById('fdClimateStatus').textContent = shed.status_headline || 'Ideal for Silkworms';
+
+      const outT = shed.outside_temp != null ? Number(shed.outside_temp).toFixed(1) : '30.5';
+      const outH = shed.outside_humidity != null ? Number(shed.outside_humidity).toFixed(0) : '58';
+      document.getElementById('fdOutdoorVal').textContent = `${outT}°C • ${outH}% RH`;
+      document.getElementById('fdWeatherLoc').textContent = f.region || shed.region || 'Local Shed Ambient';
+
+      document.getElementById('fdBatchVal').textContent = f.dfl_capacity || '200 DFL';
+      document.getElementById('fdBatchId').textContent = f.batch_id || 'SERI-2026-B01';
+
+      // Tab 1: Personal
+      document.getElementById('fdDetFullName').textContent = f.full_name || 'N/A';
+      document.getElementById('fdDetUsername').textContent = `@${f.username || 'N/A'}`;
+      document.getElementById('fdDetRole').textContent = (f.role || 'farmer').toUpperCase();
+      document.getElementById('fdDetCreatedAt').textContent = f.created_at ? new Date(f.created_at).toLocaleString() : 'Registered';
+      document.getElementById('fdDetPhone').innerHTML = f.phone ? `<a href="tel:${escapeHtml(f.phone)}" style="color:var(--green-leaf); font-weight:700;">${escapeHtml(f.phone)}</a>` : 'N/A';
+      document.getElementById('fdDetLang').textContent = f.preferred_language === 'kn' ? 'Kannada (ಕನ್ನಡ)' : (f.preferred_language === 'te' ? 'Telugu (తెలుగు)' : 'English (en)');
+
+      // Tab 2: Farm
+      document.getElementById('fdDetFarmName').textContent = f.farm_name || 'N/A';
+      document.getElementById('fdDetShedId').textContent = (f.shed_id || sId).toUpperCase();
+      document.getElementById('fdDetRegion').textContent = f.region || 'Local Shed';
+      if (f.latitude && f.longitude) {
+        document.getElementById('fdDetCoordinates').textContent = `${Number(f.latitude).toFixed(4)}° N, ${Number(f.longitude).toFixed(4)}° E (GPS Verified)`;
+      } else {
+        document.getElementById('fdDetCoordinates').textContent = 'Device GPS / Cluster Region';
+      }
+      document.getElementById('fdDetBatchId').textContent = f.batch_id || 'SERI-2026-B01';
+      document.getElementById('fdDetBreed').textContent = f.breed || 'Double Hybrid (FC1 x FC2)';
+      document.getElementById('fdDetDfl').textContent = f.dfl_capacity || '200 DFL';
+      document.getElementById('fdDetGrowthStage').textContent = stages[stNum - 1] || `Instar ${stNum}`;
+
+      // Tab 3: Live Climate
+      document.getElementById('fdLiveTemp').textContent = indoorT;
+      document.getElementById('fdLiveHum').textContent = indoorH;
+      document.getElementById('fdLiveAqi').textContent = shed.indoor_air_quality != null ? Number(shed.indoor_air_quality).toFixed(0) : '88';
+      document.getElementById('fdLiveLux').textContent = shed.indoor_light_lux != null ? Number(shed.indoor_light_lux).toFixed(0) : '25';
+      document.getElementById('fdLiveTempBadge').textContent = `Target: ${shed.temp_target || 26.0}°C`;
+      document.getElementById('fdLiveHumBadge').textContent = `Target: ${shed.humidity_target || 80}% RH`;
+
+      const act = shed.actuators || {};
+      setActuatorPill('fdActCooler', act.cooler);
+      setActuatorPill('fdActHeater', act.heater);
+      setActuatorPill('fdActFan', act.fan);
+      setActuatorPill('fdActLight', act.light, act.light_brightness);
+
+      // Tab 4: History Table
+      renderFarmerHistoryTable(history);
+
+      document.getElementById('fdLastUpdated').textContent = `Last server sync: ${new Date().toLocaleTimeString()}`;
+    }
+  } catch (err) {
+    console.error('Error fetching farmer full details:', err);
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function setActuatorPill(elementId, isOn, extraVal) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  const stateEl = el.querySelector('.act-state');
+  if (isOn) {
+    el.classList.add('on');
+    stateEl.textContent = extraVal ? `ON (${extraVal}%)` : 'ACTIVE / ON';
+  } else {
+    el.classList.remove('on');
+    stateEl.textContent = 'STANDBY / OFF';
+  }
+}
+
+function renderFarmerHistoryTable(history) {
+  const tbody = document.getElementById('fdHistoryTableBody');
+  if (!tbody) return;
+
+  if (!history || history.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px;">No historical telemetry recorded yet for this shed.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = history.slice(0, 30).map(row => {
+    const timeStr = row.timestamp ? new Date(row.timestamp).toLocaleTimeString() : 'Recent';
+    const temp = row.indoor_temp != null ? `${Number(row.indoor_temp).toFixed(1)}°C` : '-';
+    const hum = row.indoor_hum != null ? `${Number(row.indoor_hum).toFixed(0)}%` : '-';
+    const aqi = row.air_quality != null ? `${Number(row.air_quality).toFixed(0)}%` : '-';
+    const lux = row.light_lux != null ? `${Number(row.light_lux).toFixed(0)} lx` : '-';
+    const cooler = row.cooler ? '<span style="color:#2E7D32;font-weight:700;">ON</span>' : '<span style="color:#9E9284;">OFF</span>';
+    const heater = row.heater ? '<span style="color:#E65100;font-weight:700;">ON</span>' : '<span style="color:#9E9284;">OFF</span>';
+    const fan = row.fan ? '<span style="color:#0288D1;font-weight:700;">ON</span>' : '<span style="color:#9E9284;">OFF</span>';
+    const mode = row.mode || 'AUTO';
+
+    return `
+      <tr>
+        <td>${escapeHtml(timeStr)}</td>
+        <td><strong>${temp}</strong></td>
+        <td><strong>${hum}</strong></td>
+        <td>${aqi}</td>
+        <td>${lux}</td>
+        <td>${cooler}</td>
+        <td>${heater}</td>
+        <td>${fan}</td>
+        <td><span class="badge" style="font-size:0.68rem;">${escapeHtml(mode)}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function switchFarmerTab(tabName) {
+  const tabs = ['personal', 'farm', 'climate', 'history'];
+  tabs.forEach(t => {
+    const btn = document.getElementById(`btnTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    const content = document.getElementById(`fdTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+    if (btn) btn.classList.toggle('active', t === tabName);
+    if (content) content.classList.toggle('hidden', t !== tabName);
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeFarmerDetailsModal() {
+  const modal = document.getElementById('farmerDetailsModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function monitorCurrentFarmerShed() {
+  if (currentViewingFarmer && currentViewingFarmer.shed_id) {
+    closeFarmerDetailsModal();
+    switchToFarmerShed(currentViewingFarmer.shed_id);
+  }
+}
+
+function exportCurrentFarmerTelemetry() {
+  const sId = (currentViewingFarmer && currentViewingFarmer.shed_id) || 'shed_01';
+  window.open(`${API_BASE_URL}/telemetry/export/csv/${encodeURIComponent(sId)}`, '_blank');
+}
+
+function openEditFarmerFromDetails() {
+  if (currentViewingFarmer) {
+    const fId = currentViewingFarmer.username || currentViewingFarmer.id;
+    openEditFarmerModal(fId);
+  }
+}
+
+function openEditFarmerModal(farmerId) {
+  currentEditingFarmerId = farmerId;
+  const modal = document.getElementById('editFarmerModal');
+  if (!modal) return;
+
+  const f = enrolledFarmers.find(item => item.username === farmerId || item.id === farmerId) || currentViewingFarmer || {};
+
+  document.getElementById('editFarmerId').value = farmerId;
+  document.getElementById('editFullName').value = f.full_name || '';
+  document.getElementById('editPhone').value = f.phone || '';
+  document.getElementById('editFarmName').value = f.farm_name || '';
+  document.getElementById('editRegion').value = f.region || '';
+  document.getElementById('editBatchId').value = f.batch_id || 'SERI-2026-B01';
+  document.getElementById('editDfl').value = f.dfl_capacity || '200 DFL';
+
+  if (f.breed) {
+    const breedSelect = document.getElementById('editBreed');
+    let matched = false;
+    for (let opt of breedSelect.options) {
+      if (opt.value === f.breed) {
+        breedSelect.value = f.breed;
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) breedSelect.value = 'Other';
+  }
+
+  if (f.current_stage) {
+    document.getElementById('editGrowthStage').value = String(f.current_stage);
+  }
+
+  if (f.preferred_language) {
+    document.getElementById('editLang').value = f.preferred_language;
+  }
+
+  document.getElementById('editFarmerError').classList.add('hidden');
+  modal.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeEditFarmerModal() {
+  const modal = document.getElementById('editFarmerModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function handleEditFarmerSubmit(e) {
+  e.preventDefault();
+  const fId = document.getElementById('editFarmerId').value || currentEditingFarmerId;
+  const errorEl = document.getElementById('editFarmerError');
+  const submitBtn = document.getElementById('editSubmitBtn');
+
+  errorEl.classList.add('hidden');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i data-lucide="loader" class="spin"></i> Saving Updates...';
+  if (window.lucide) lucide.createIcons();
+
+  const payload = {
+    full_name: document.getElementById('editFullName').value.trim(),
+    phone: document.getElementById('editPhone').value.trim(),
+    whatsapp_number: document.getElementById('editPhone').value.trim(),
+    farm_name: document.getElementById('editFarmName').value.trim(),
+    region: document.getElementById('editRegion').value.trim(),
+    batch_id: document.getElementById('editBatchId').value.trim(),
+    dfl_capacity: document.getElementById('editDfl').value.trim(),
+    breed: document.getElementById('editBreed').value,
+    current_stage: parseInt(document.getElementById('editGrowthStage').value, 10),
+    preferred_language: document.getElementById('editLang').value
+  };
+
+  try {
+    const res = await authenticatedFetch(`${API_BASE_URL}/admin/farmers/${encodeURIComponent(fId)}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || 'Failed to update farmer profile');
+    }
+
+    const data = await res.json();
+    showToast(`Farmer "${payload.full_name}" profile updated successfully!`, 'success');
+    closeEditFarmerModal();
+
+    await fetchFarmers();
+    if (document.getElementById('farmerDetailsModal') && !document.getElementById('farmerDetailsModal').classList.contains('hidden')) {
+      await openFarmerDetailsModal(fId);
+    }
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i data-lucide="save"></i> Save Changes';
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
 // AUDIT LOGS TRAIL
 // ==========================================================================
 async function fetchAuditLogs() {
