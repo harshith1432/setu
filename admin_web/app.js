@@ -408,12 +408,12 @@ async function syncAllRealtimeData() {
   if (syncIcon) syncIcon.classList.add('spinning');
   
   try {
+    await fetchFarmers();
     await Promise.all([
       fetchStats(),
       fetchSheds(),
       fetchLiveTelemetry(),
       fetchStages(),
-      fetchFarmers(),
       fetchAuditLogs()
     ]);
   } catch (err) {
