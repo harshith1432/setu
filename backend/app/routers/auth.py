@@ -11,6 +11,7 @@ from app.services.db_service import (
     update_user_profile,
     log_audit
 )
+from app.services.whatsapp_alerts import alert_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -41,6 +42,8 @@ def login(credentials: UserLogin):
         username=user["username"],
         full_name=user["full_name"],
         phone=user["phone"],
+        whatsapp_number=user.get("whatsapp_number"),
+        whatsapp_verified=bool(user.get("whatsapp_verified", False)),
         preferred_language=user["preferred_language"],
         role=user["role"],
         farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
@@ -65,6 +68,8 @@ def register(user_in: UserCreate):
         "hashed_password": get_password_hash(user_in.password),
         "full_name": user_in.full_name,
         "phone": user_in.phone,
+        "whatsapp_number": user_in.whatsapp_number or user_in.phone,
+        "whatsapp_verified": bool(user_in.whatsapp_verified),
         "preferred_language": user_in.preferred_language,
         "role": "farmer",
         "farm_name": user_in.farm_name or "Green Valley Sericulture Farm",
@@ -89,6 +94,8 @@ def register(user_in: UserCreate):
         username=new_user_data["username"],
         full_name=new_user_data["full_name"],
         phone=new_user_data["phone"],
+        whatsapp_number=new_user_data.get("whatsapp_number"),
+        whatsapp_verified=bool(new_user_data.get("whatsapp_verified", False)),
         preferred_language=new_user_data["preferred_language"],
         role="farmer",
         farm_name=new_user_data["farm_name"],
@@ -146,6 +153,8 @@ def google_sync(req: GoogleAuthRequest):
             username=existing["username"],
             full_name=existing["full_name"],
             phone=existing.get("phone", "N/A"),
+            whatsapp_number=existing.get("whatsapp_number"),
+            whatsapp_verified=bool(existing.get("whatsapp_verified", False)),
             preferred_language=existing.get("preferred_language", "en"),
             role=existing.get("role", "farmer"),
             farm_name=existing.get("farm_name", "My Sericulture Farm"),
@@ -190,6 +199,8 @@ def google_sync(req: GoogleAuthRequest):
         username=new_user_data["username"],
         full_name=new_user_data["full_name"],
         phone=new_user_data["phone"],
+        whatsapp_number=new_user_data.get("whatsapp_number"),
+        whatsapp_verified=bool(new_user_data.get("whatsapp_verified", False)),
         preferred_language=new_user_data["preferred_language"],
         role="farmer",
         farm_name=new_user_data["farm_name"],
@@ -202,6 +213,40 @@ def google_sync(req: GoogleAuthRequest):
         is_active=True
     )
     return Token(access_token=access_token, user=user_out)
+
+@router.post("/whatsapp/send-verification")
+def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_current_user_payload)):
+    """Send a WhatsApp sandbox verification prompt for a user-specific number."""
+    whatsapp_number = (payload.get("whatsapp_number") or payload.get("phone") or "").strip()
+    if not whatsapp_number:
+        raise HTTPException(status_code=400, detail="whatsapp_number is required")
+
+    sandbox_join_phrase = "join stay-spread"
+    normalised_number = alert_service.normalize_whatsapp(whatsapp_number)
+    user_id = user_payload.get("user_id")
+    if user_id:
+        update_user_profile(user_id, {
+            "whatsapp_number": whatsapp_number,
+            "whatsapp_verified": False,
+        })
+
+    verification_message = (
+        f"Setu verification: reply with '{sandbox_join_phrase}' to confirm your WhatsApp number "
+        f"for alerts."
+    )
+
+    result = alert_service.send(
+        message=verification_message,
+        recipient=normalised_number,
+        dry_run=True,
+    )
+    return {
+        "status": result.get("status", "dry-run"),
+        "message": verification_message,
+        "recipient": normalised_number,
+        "sandbox_join_phrase": sandbox_join_phrase,
+        "preview": verification_message,
+    }
 
 @router.get("/check-farmer")
 def check_farmer(identifier: str):

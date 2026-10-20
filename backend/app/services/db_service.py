@@ -101,6 +101,8 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS shed_id VARCHAR(64) DEFAULT 'shed_01'")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(64)")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_verified BOOLEAN NOT NULL DEFAULT FALSE")
 
         # Audit Logs
         cursor.execute("""
@@ -319,7 +321,10 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
 def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
     clean_id = identifier.strip()
     with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM users WHERE username = %s OR phone = %s", (clean_id, clean_id))
+        cursor.execute(
+            "SELECT * FROM users WHERE username = %s OR phone = %s OR whatsapp_number = %s",
+            (clean_id, clean_id, clean_id),
+        )
         row = cursor.fetchone()
         if row:
             d = dict(row)
@@ -371,14 +376,20 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
 
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("""
-        INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO users (
+            id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
+            preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
+            dfl_capacity, breed, is_active, created_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             user_data["id"],
             user_data["username"],
             user_data["hashed_password"],
             user_data["full_name"],
             user_data["phone"],
+            user_data.get("whatsapp_number") or user_data.get("phone"),
+            bool(user_data.get("whatsapp_verified", False)),
             user_data.get("preferred_language", "kn"),
             user_data.get("role", "farmer"),
             user_data.get("farm_name", "Green Valley Farm"),
@@ -397,7 +408,11 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     fields = []
     values = []
-    allowed = ["full_name", "phone", "preferred_language", "farm_name", "region", "latitude", "longitude", "shed_id", "batch_id", "dfl_capacity", "breed"]
+    allowed = [
+        "full_name", "phone", "whatsapp_number", "whatsapp_verified",
+        "preferred_language", "farm_name", "region", "latitude", "longitude",
+        "shed_id", "batch_id", "dfl_capacity", "breed"
+    ]
     for k in allowed:
         if k in updates and updates[k] is not None:
             fields.append(f"{k} = %s")
