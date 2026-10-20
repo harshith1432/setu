@@ -1,4 +1,5 @@
 import os
+import logging
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
@@ -7,6 +8,8 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 from app.core.config import settings
 from app.core.security import get_password_hash
+
+logger = logging.getLogger(__name__)
 
 DATABASE_URL = settings.DATABASE_URL
 
@@ -299,36 +302,39 @@ def init_db():
                     now_dt
                 ))
 
-        # Auto-heal unique shed_ids for all registered farmers
-        try:
-            cursor.execute("SELECT id, username, shed_id FROM users WHERE role != 'superadmin' ORDER BY created_at ASC")
-            all_farmers_rows = cursor.fetchall()
+def ensure_unique_farmer_sheds():
+    """
+    Ensures every farmer in the database has a distinct, dedicated shed_id.
+    Purely data-driven from the database records with zero hardcoded usernames.
+    """
+    try:
+        with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+            cursor.execute("""
+                SELECT id, shed_id 
+                FROM users 
+                WHERE role != 'superadmin' 
+                ORDER BY created_at ASC
+            """)
+            rows = cursor.fetchall()
             seen_sheds = set()
-            next_shed_num = 1
-            for row in all_farmers_rows:
-                u_id = row[0] if isinstance(row, tuple) else row["id"]
-                u_name = row[1] if isinstance(row, tuple) else row["username"]
-                u_shed = row[2] if isinstance(row, tuple) else row["shed_id"]
+            for r in rows:
+                u_id = r["id"]
+                current_shed = r.get("shed_id")
 
-                if u_name == "ramesh_farmer":
-                    u_shed = "shed_01"
-                elif u_name == "venkatamma_farmer":
-                    u_shed = "shed_02"
-                elif u_name == "manjunath_kolar":
-                    u_shed = "shed_03"
-                elif not u_shed or u_shed in seen_sheds:
-                    while f"shed_{next_shed_num:02d}" in seen_sheds or next_shed_num <= 3:
-                        next_shed_num += 1
-                    u_shed = f"shed_{next_shed_num:02d}"
-
-                cursor.execute("UPDATE users SET shed_id = %s WHERE id = %s", (u_shed, u_id))
-                seen_sheds.add(u_shed)
-        except Exception as e:
-            logger.debug(f"Shed ID auto-heal skipped: {e}")
+                # If shed_id is empty or already claimed by another farmer, assign unique shed_{u_id}
+                if not current_shed or current_shed in seen_sheds:
+                    new_shed = f"shed_{u_id}"
+                    cursor.execute("UPDATE users SET shed_id = %s WHERE id = %s", (new_shed, u_id))
+                    seen_sheds.add(new_shed)
+                else:
+                    seen_sheds.add(current_shed)
+    except Exception as e:
+        logger.debug(f"ensure_unique_farmer_sheds: {e}")
 
 # Initialize DB on module import safely
 try:
     init_db()
+    ensure_unique_farmer_sheds()
 except Exception as e:
     # Gracefully handle DB unavailability during builds / imports
     pass
@@ -372,6 +378,7 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 def get_all_farmers() -> List[Dict[str, Any]]:
+    ensure_unique_farmer_sheds()
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
             SELECT id, username, full_name, phone, whatsapp_number, whatsapp_verified, preferred_language, role, 

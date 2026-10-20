@@ -660,43 +660,32 @@ async function fetchSheds() {
 }
 
 function buildShedsFromFarmers() {
-  const shedsMap = new Map();
-  if (Array.isArray(enrolledFarmers) && enrolledFarmers.length > 0) {
-    enrolledFarmers.forEach((f, idx) => {
-      const sId = f.shed_id || `shed_${String(idx + 1).padStart(2, '0')}`;
-      if (!shedsMap.has(sId)) {
-        const farmName = f.farm_name || 'Rearing Shed';
-        const farmerName = f.full_name || f.username || '';
-        const labelPrefix = sId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-        const display = farmerName ? `${labelPrefix} — ${farmName} (${farmerName})` : `${labelPrefix} — ${farmName}`;
-        shedsMap.set(sId, { shed_id: sId, farm_name: farmName, farmer_name: farmerName, display_name: display });
-      }
-    });
-  }
-  if (!shedsMap.has('shed_01')) {
-    shedsMap.set('shed_01', { shed_id: 'shed_01', display_name: 'Shed 01 — Green Valley Farm (Ramesh Gowda)' });
-  }
-  monitoredSheds = Array.from(shedsMap.values());
+  if (!Array.isArray(enrolledFarmers) || enrolledFarmers.length === 0) return;
+  monitoredSheds = enrolledFarmers.map(f => {
+    const sId = f.shed_id || `shed_${f.id || f.username}`;
+    const farmName = f.farm_name || 'Rearing Shed';
+    const farmerName = f.full_name || f.username || '';
+    const display = farmerName ? `${farmName} (${farmerName})` : farmName;
+    return {
+      shed_id: sId,
+      farm_name: farmName,
+      farmer_name: farmerName,
+      display_name: display
+    };
+  });
   renderShedSelector(monitoredSheds);
 }
 
 function renderShedSelector(sheds) {
   const select = document.getElementById('shedSelect');
   if (!select) return;
+  if (!Array.isArray(sheds) || sheds.length === 0) return;
 
-  if (!sheds || sheds.length === 0) {
-    sheds = [
-      { shed_id: 'shed_01', display_name: 'Shed 01 — Green Valley Farm (Ramesh Gowda)' },
-      { shed_id: 'shed_02', display_name: 'Shed 02 — Sri Lakshmi Silk Farm (Venkatamma Reddy)' },
-      { shed_id: 'shed_03', display_name: 'Shed 03 — Kolar Silk Fields (Manjunath K.)' }
-    ];
-  }
-
-  const currentVal = selectedShedId || select.value || 'shed_01';
+  const currentVal = selectedShedId || select.value || (sheds[0] && sheds[0].shed_id);
   select.innerHTML = sheds.map(s => {
     const sId = s.shed_id;
     const isSelected = sId === currentVal ? 'selected' : '';
-    const label = s.display_name || `${sId.toUpperCase()} — ${s.farm_name || 'Rearing Shed'}`;
+    const label = s.display_name || s.farm_name || sId;
     return `<option value="${escapeHtml(sId)}" ${isSelected}>${escapeHtml(label)}</option>`;
   }).join('');
 
@@ -705,6 +694,7 @@ function renderShedSelector(sheds) {
     selectedShedId = sheds[0].shed_id;
     select.value = selectedShedId;
   } else {
+    selectedShedId = currentVal;
     select.value = currentVal;
   }
 }
@@ -1370,6 +1360,21 @@ function renderFarmersTable(farmers) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:32px;">No registered farmers found.</td></tr>';
     return;
   }
+
+  // Ensure every farmer row in UI has a distinct shed_id
+  const seenShedIds = new Set();
+  let nextShedIndex = 1;
+  farmers.forEach(f => {
+    let sId = f.shed_id;
+    if (!sId || seenShedIds.has(sId)) {
+      while (seenShedIds.has(`shed_${String(nextShedIndex).padStart(2, '0')}`)) {
+        nextShedIndex++;
+      }
+      sId = `shed_${String(nextShedIndex).padStart(2, '0')}`;
+      f.shed_id = sId;
+    }
+    seenShedIds.add(sId);
+  });
 
   tbody.innerHTML = farmers.map(f => {
     const isActive = f.is_active === 1 || f.is_active === true;
