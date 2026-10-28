@@ -19,7 +19,7 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="/admin/style.css" rel="stylesheet"/>
+<link href="/admin/style.css?v=3.2" rel="stylesheet"/>
 </head>
 <body>
 <!-- ================= INITIAL LOADING GATEWAY ================= -->
@@ -938,11 +938,52 @@
 <span>Rearing Shed Climate Setpoints &amp; Stage Guidelines</span>
 </div>
 <div class="table-actions">
-<span class="badge badge-success">Instars 1–5 Configured</span>
+<span class="badge badge-success"><i data-lucide="check-circle" style="width: 12px; height: 12px; margin-right: 4px;"></i> Instars 1–5 Configured</span>
+<button class="btn btn-outline btn-sm" onclick="resetStageThresholdsToDefault()" title="Reset setpoints to Central Silk Board defaults">
+<i data-lucide="rotate-ccw"></i> Reset to CSB Standards
+</button>
+<button class="btn btn-skin btn-sm" onclick="loadStageThresholds()" title="Refresh setpoints">
+<i data-lucide="refresh-cw"></i> Refresh
+</button>
 </div>
 </div>
 <div id="stageThresholdsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
 <!-- Dynamically populated from stage_thresholds database table -->
+</div>
+
+<div class="table-card" style="margin-top: 24px;">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="layers"></i>
+<span>Monitored Rearing Sheds Fleet</span>
+<span class="badge badge-neutral" id="shedsFleetBadgeCount">0 Configured</span>
+</div>
+<div class="table-actions">
+<div class="search-input-wrap">
+<i data-lucide="search"></i>
+<input id="shedsSearchInput" oninput="filterShedsFleet(this.value)" placeholder="Search sheds, farmers, regions..." type="text"/>
+</div>
+<button class="btn btn-skin btn-sm" onclick="loadShedsFleet()"><i data-lucide="refresh-cw"></i> Refresh Fleet</button>
+</div>
+</div>
+<div class="table-wrap">
+<table class="data-table" id="shedsFleetTable">
+<thead>
+<tr>
+<th>Shed ID</th>
+<th>Farm &amp; Farmer</th>
+<th>Region</th>
+<th>Batch ID</th>
+<th>Active Stage</th>
+<th>Control Mode</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="shedsFleetTableBody">
+<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);"><i data-lucide="loader" class="spin"></i> Loading rearing sheds fleet...</td></tr>
+</tbody>
+</table>
+</div>
 </div>
 </section>
 <!-- ================= 7. VIEW: IOT DEVICES ================= -->
@@ -2410,6 +2451,6 @@
 <!-- Toast Notification Container -->
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="/admin/table-manager.js"></script><script src="/admin/app.js"></script>
+<script src="/admin/table-manager.js?v=3.2"></script><script src="/admin/app.js?v=3.2" charset="UTF-8"></script>
 </body>
 </html>

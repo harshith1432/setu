@@ -913,7 +913,11 @@ function updateCheckoutCalculation() {
 
   if (submitBtnText) {
     const formattedTotal = `\u20B9${total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-    submitBtnText.textContent = `Place Order \u00B7 ${formattedTotal}`;
+    if (!currentAuthenticatedUser) {
+      submitBtnText.textContent = `Sign In & Place Order \u00B7 ${formattedTotal}`;
+    } else {
+      submitBtnText.textContent = `Place Order \u00B7 ${formattedTotal}`;
+    }
   }
 }
 
@@ -929,6 +933,25 @@ function selectPaymentMethod(method) {
 }
 
 function renderCheckoutAuthSection() {
+  const userBox = document.getElementById('checkoutUserStatusBox');
+  const userText = document.getElementById('checkoutLoggedInUserText');
+  
+  if (currentAuthenticatedUser) {
+    if (userBox) {
+      userBox.style.display = 'flex';
+      userBox.classList.remove('hidden');
+    }
+    if (userText) {
+      const name = currentAuthenticatedUser.full_name || currentAuthenticatedUser.username || 'Farmer';
+      const farm = currentAuthenticatedUser.farm_name ? ` ? ${currentAuthenticatedUser.farm_name}` : '';
+      userText.textContent = `Logged in as ${name}${farm}`;
+    }
+  } else {
+    if (userBox) {
+      userBox.style.display = 'none';
+      userBox.classList.add('hidden');
+    }
+  }
   updateCheckoutCalculation();
   if (window.lucide) lucide.createIcons();
 }

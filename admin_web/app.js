@@ -37,6 +37,18 @@ let currentUser = JSON.parse(TAB_STORAGE.getItem('setu_tab_user') || 'null');
 let currentTab = TAB_STORAGE.getItem('setu_tab_nav') || 'overview';
 let selectedShedId = TAB_STORAGE.getItem('setu_tab_shed') || 'shed_01';
 
+// Global safe HTML escaping utility
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 // SEC-MULTI-TAB: Purge legacy shared localStorage tokens to prevent cross-tab contamination
 try {
   localStorage.removeItem('setu_admin_token');
@@ -1143,11 +1155,21 @@ function setHealthPill(isHealthy) {
   if (isHealthy) {
     pill.style.background = 'var(--green-tint)';
     pill.style.color = 'var(--green-pill-text)';
+    pill.style.border = '1px solid rgba(16, 185, 129, 0.3)';
     text.textContent = 'SYSTEM OPERATIONAL';
   } else {
-    pill.style.background = '#FDECEA';
-    pill.style.color = '#BD3429';
-    text.textContent = 'TELEMETRY DEGRADED';
+    // If the logged-in user is a farmer without hardware connected yet
+    if (currentUser && currentUser.role === 'farmer') {
+      pill.style.background = '#FEF3C7';
+      pill.style.color = '#92400E';
+      pill.style.border = '1px solid #FDE68A';
+      text.textContent = 'AWAITING SENSORS';
+    } else {
+      pill.style.background = '#FDECEA';
+      pill.style.color = '#BD3429';
+      pill.style.border = '1px solid #FCA5A5';
+      text.textContent = 'TELEMETRY DEGRADED';
+    }
   }
 }
 
@@ -1179,8 +1201,14 @@ async function loadShedsList() {
     if (!res.ok) return;
     let sheds = await res.json();
 
-    // Resource-level scoping: restrict to assigned sheds if ASSIGNED_ONLY
-    if (currentUser && currentUser.access_scope === 'ASSIGNED_ONLY' && currentUser.assigned_resources?.sheds?.length) {
+    // Resource-level scoping: restrict to assigned sheds if ASSIGNED_ONLY or if farmer
+    if (currentUser && currentUser.role === 'farmer') {
+      const myShedId = currentUser.shed_id;
+      if (myShedId) {
+        const myOnly = sheds.filter(s => s.shed_id === myShedId);
+        if (myOnly.length) sheds = myOnly;
+      }
+    } else if (currentUser && currentUser.access_scope === 'ASSIGNED_ONLY' && currentUser.assigned_resources?.sheds?.length) {
       const allowed = currentUser.assigned_resources.sheds;
       sheds = sheds.filter(s => allowed.includes(s.shed_id));
     }
@@ -1209,6 +1237,12 @@ async function loadShedsList() {
     if (!availableSheds.some(s => s.shed_id === selectedShedId) && availableSheds.length > 0) {
       selectedShedId = availableSheds[0].shed_id;
       select.value = selectedShedId;
+    }
+
+    // If farmer has only 1 shed, clean up selector appearance
+    if (availableSheds.length === 1 && currentUser?.role === 'farmer') {
+      select.style.cursor = 'default';
+      select.title = 'Active enrolled rearing shed';
     }
   } catch (err) {
     console.error('Failed to load sheds list:', err);
@@ -5146,14 +5180,496 @@ async function loadIntegrations() {
   } catch (_) {}
 }
 
+// ------------------------------------------------------------------------------
+// REARING SHEDS CONTROL & GROWTH STAGE CLIMATE THRESHOLDS
+// ------------------------------------------------------------------------------
+let stagesData = [];
+window.stagesData = stagesData;
+
 async function loadStageThresholds() {
+  const container = document.getElementById('stageThresholdsGrid');
+  if (container) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 36px; color: var(--text-muted);">
+        <i data-lucide="loader" class="spin" style="width: 28px; height: 28px; margin-bottom: 8px;"></i>
+        <div>Loading stage climate setpoints &amp; guidelines...</div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/stages`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
-    if (!res.ok) return;
+    const res = await fetch(`${API_BASE_URL}/admin/stages`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (!res.ok) {
+      if (container) {
+        const err = await getResError(res);
+        container.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 36px; color: var(--rose);">
+            Failed to load rearing stages from server: ${escapeHtml(err)}
+          </div>
+        `;
+      }
+      return;
+    }
     const stages = await res.json();
     stagesData = stages;
-  } catch (_) {}
+    window.stagesData = stages;
+    renderStageThresholds(stages);
+  } catch (err) {
+    if (container) {
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 36px; color: var(--rose);">
+          Error loading rearing stages: ${escapeHtml(err.message)}
+        </div>
+      `;
+    }
+  }
+
+  // Also load monitored rearing sheds fleet table
+  loadShedsFleet();
 }
+window.loadStageThresholds = loadStageThresholds;
+
+function renderStageThresholds(stages) {
+  const container = document.getElementById('stageThresholdsGrid');
+  if (!container) return;
+
+  if (!stages || !stages.length) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px; background: var(--bg-surface); border: 1px dashed var(--border-color); border-radius: var(--radius-lg); color: var(--text-muted);">
+        <i data-lucide="warehouse" style="width: 40px; height: 40px; margin-bottom: 12px; opacity: 0.5;"></i>
+        <div style="font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; color: var(--text-main);">No Stage Guidelines Found</div>
+        <p style="font-size: 0.85rem; max-width: 400px; margin: 0 auto 16px;">Central Silk Board climate setpoints have not been initialized yet.</p>
+        <button class="btn btn-primary btn-sm" onclick="resetStageThresholdsToDefault()"><i data-lucide="rotate-ccw"></i> Initialize CSB Standards</button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  // Determine current active stage of selected shed
+  const shedSelect = document.getElementById('headerShedSelect');
+  const selectedShed = shedSelect ? shedSelect.value : (currentShedId || 'shed_01');
+  const activeStageId = window.currentTelemetry?.current_stage || 1;
+
+  container.innerHTML = stages.map(s => {
+    const isActive = s.stage_id === activeStageId;
+    return `
+      <div class="stage-card" style="background: var(--bg-surface); border: 1px solid ${isActive ? 'var(--brand-primary)' : 'var(--border-color)'}; border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; box-shadow: ${isActive ? '0 0 0 1px var(--brand-primary), var(--shadow-sm)' : 'var(--shadow-sm)'}; position: relative; transition: all var(--transition-fast);">
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span class="badge" style="background: var(--brand-tint); color: var(--brand-primary); font-weight: 800; font-size: 0.72rem; letter-spacing: 0.5px;">INSTAR ${s.stage_id}</span>
+              <span class="badge badge-neutral" style="font-size: 0.72rem; font-weight: 600;"><i data-lucide="calendar" style="width: 11px; height: 11px; margin-right: 3px;"></i> ${escapeHtml(s.days)}</span>
+            </div>
+            ${isActive ? `<span class="badge badge-success" style="font-size: 0.70rem; font-weight: 700; white-space: nowrap;"><i data-lucide="check-circle" style="width: 11px; height: 11px; margin-right: 3px;"></i> Active Stage</span>` : ''}
+          </div>
+
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin: 0 0 12px;">${escapeHtml(s.name)}</h3>
+
+          <!-- Setpoints Box -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <!-- Temperature Box -->
+            <div style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 700; color: #d97706;">
+                <i data-lucide="thermometer" style="width: 14px; height: 14px;"></i>
+                <span>TEMPERATURE</span>
+              </div>
+              <div style="font-size: 1.22rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">
+                ${s.temp_min}°C – ${s.temp_max}°C
+              </div>
+              <div style="font-size: 0.70rem; color: var(--text-muted);">
+                Tolerance: ±${s.hysteresis_temp || 0.5}°C
+              </div>
+            </div>
+
+            <!-- Humidity Box -->
+            <div style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 4px;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 700; color: #2563eb;">
+                <i data-lucide="droplets" style="width: 14px; height: 14px;"></i>
+                <span>HUMIDITY</span>
+              </div>
+              <div style="font-size: 1.22rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono);">
+                ${s.hum_min}% – ${s.hum_max}%
+              </div>
+              <div style="font-size: 0.70rem; color: var(--text-muted);">
+                Tolerance: ±${s.hysteresis_hum || 3.0}%
+              </div>
+            </div>
+          </div>
+
+          <!-- Ventilation Trigger -->
+          <div style="background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 0.74rem; margin-bottom: 12px;">
+            <span style="color: var(--text-muted); display: flex; align-items: center; gap: 5px;">
+              <i data-lucide="wind" style="width: 13px; height: 13px; color: var(--brand-primary);"></i>
+              Cooler / Fan Trigger:
+            </span>
+            <strong style="color: var(--text-main); font-family: var(--font-mono);">+${s.fan_trigger_offset || 1.5}°C above max</strong>
+          </div>
+
+          <!-- Description / Scientific Guidelines -->
+          <div>
+            <div style="font-size: 0.70rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; gap: 4px;">
+              <i data-lucide="info" style="width: 11px; height: 11px;"></i>
+              Silkworm Rearing Advisory
+            </div>
+            <p style="font-size: 0.80rem; color: var(--text-secondary); line-height: 1.45; margin: 0;">
+              ${escapeHtml(s.description || 'Optimal Central Silk Board standard conditions.')}
+            </p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border-subtle); margin-top: 4px;">
+          <button class="btn btn-outline btn-sm" style="flex: 1;" onclick="openEditStageModal(${s.stage_id})">
+            <i data-lucide="sliders"></i> Edit Setpoints
+          </button>
+          <button class="btn btn-primary btn-sm" style="flex: 1;" onclick="applyStageToSelectedShed(${s.stage_id})" title="Activate this instar on selected shed">
+            <i data-lucide="play"></i> Apply to Shed
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+window.renderStageThresholds = renderStageThresholds;
+
+function openEditStageModal(stageId) {
+  const stage = (stagesData || []).find(s => s.stage_id === stageId);
+  if (!stage) {
+    showNotification(`Stage ${stageId} details not found.`, 'error');
+    return;
+  }
+
+  const html = `
+    <form id="editStageForm" onsubmit="saveStageThresholds(event, ${stage.stage_id})">
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0;">
+          Configuring master climate setpoints for <strong>${escapeHtml(stage.name)}</strong> (${escapeHtml(stage.days)}).
+          Updates are saved directly to the database and reconfigure auto-mode triggers across all active rearing sheds.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="editStageTempMin">Min Temperature (°C) *</label>
+            <input type="number" step="0.1" min="10" max="45" id="editStageTempMin" class="form-input" value="${stage.temp_min}" required style="width: 100%;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editStageTempMax">Max Temperature (°C) *</label>
+            <input type="number" step="0.1" min="10" max="45" id="editStageTempMax" class="form-input" value="${stage.temp_max}" required style="width: 100%;" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="editStageHumMin">Min Humidity (%) *</label>
+            <input type="number" step="0.1" min="10" max="100" id="editStageHumMin" class="form-input" value="${stage.hum_min}" required style="width: 100%;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editStageHumMax">Max Humidity (%) *</label>
+            <input type="number" step="0.1" min="10" max="100" id="editStageHumMax" class="form-input" value="${stage.hum_max}" required style="width: 100%;" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="editStageHystTemp">Temp Hysteresis (±°C)</label>
+            <input type="number" step="0.1" min="0.1" max="5" id="editStageHystTemp" class="form-input" value="${stage.hysteresis_temp || 0.5}" style="width: 100%;" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="editStageHystHum">Humidity Hysteresis (±%)</label>
+            <input type="number" step="0.1" min="0.5" max="15" id="editStageHystHum" class="form-input" value="${stage.hysteresis_hum || 3.0}" style="width: 100%;" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="editStageFanOffset">Cooling / Fan Trigger Offset (°C above max)</label>
+          <input type="number" step="0.1" min="0" max="10" id="editStageFanOffset" class="form-input" value="${stage.fan_trigger_offset || 1.5}" style="width: 100%;" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="editStageDesc">Silkworm Rearing Guidelines &amp; Advisory</label>
+          <textarea id="editStageDesc" class="form-input" rows="3" style="width: 100%;">${escapeHtml(stage.description || '')}</textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+          <button type="button" class="btn btn-skin" onclick="closeAppModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="saveStageSubmitBtn"><i data-lucide="check"></i> Save Changes</button>
+        </div>
+      </div>
+    </form>
+  `;
+
+  openAppModal(`Configure Stage ${stage.stage_id}: ${stage.name}`, html, 'md');
+}
+window.openEditStageModal = openEditStageModal;
+
+async function saveStageThresholds(event, stageId) {
+  event.preventDefault();
+  const btn = document.getElementById('saveStageSubmitBtn');
+  if (btn) btn.disabled = true;
+
+  const tempMin = parseFloat(document.getElementById('editStageTempMin')?.value);
+  const tempMax = parseFloat(document.getElementById('editStageTempMax')?.value);
+  const humMin = parseFloat(document.getElementById('editStageHumMin')?.value);
+  const humMax = parseFloat(document.getElementById('editStageHumMax')?.value);
+  const hystTemp = parseFloat(document.getElementById('editStageHystTemp')?.value || '0.5');
+  const hystHum = parseFloat(document.getElementById('editStageHystHum')?.value || '3.0');
+  const fanOffset = parseFloat(document.getElementById('editStageFanOffset')?.value || '1.5');
+  const desc = document.getElementById('editStageDesc')?.value || '';
+
+  if (tempMin > tempMax) {
+    showNotification('Minimum temperature cannot exceed maximum temperature', 'error');
+    if (btn) btn.disabled = false;
+    return;
+  }
+  if (humMin > humMax) {
+    showNotification('Minimum humidity cannot exceed maximum humidity', 'error');
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/stages/${stageId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        temp_min: tempMin,
+        temp_max: tempMax,
+        hum_min: humMin,
+        hum_max: humMax,
+        hysteresis_temp: hystTemp,
+        hysteresis_hum: hystHum,
+        fan_trigger_offset: fanOffset,
+        description: desc
+      })
+    });
+
+    if (!res.ok) {
+      const err = await getResError(res);
+      showNotification(`Failed to update setpoints: ${err}`, 'error');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    showNotification(`Stage ${stageId} climate setpoints updated successfully!`, 'success');
+    closeAppModal();
+    await loadStageThresholds();
+  } catch (err) {
+    showNotification(`Error saving setpoints: ${err.message}`, 'error');
+    if (btn) btn.disabled = false;
+  }
+}
+window.saveStageThresholds = saveStageThresholds;
+
+async function resetStageThresholdsToDefault() {
+  if (!confirm('Are you sure you want to reset all 5 rearing stage climate setpoints to Central Silk Board (CSB) scientific standards?')) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/stages/reset`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!res.ok) {
+      const err = await getResError(res);
+      showNotification(`Failed to reset stages: ${err}`, 'error');
+      return;
+    }
+
+    showNotification('All stage setpoints successfully restored to Central Silk Board standards!', 'success');
+    await loadStageThresholds();
+  } catch (err) {
+    showNotification(`Error resetting stages: ${err.message}`, 'error');
+  }
+}
+window.resetStageThresholdsToDefault = resetStageThresholdsToDefault;
+
+async function applyStageToSelectedShed(stageId) {
+  const shedSelect = document.getElementById('headerShedSelect');
+  const shedId = shedSelect ? shedSelect.value : (currentShedId || 'shed_01');
+  const stage = (stagesData || []).find(s => s.stage_id === stageId);
+  const stageName = stage ? stage.name : `Stage ${stageId}`;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/sheds/${encodeURIComponent(shedId)}/stage`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ stage: stageId })
+    });
+
+    if (!res.ok) {
+      const err = await getResError(res);
+      showNotification(`Failed to switch shed stage: ${err}`, 'error');
+      return;
+    }
+
+    showNotification(`Shed "${shedId}" switched to ${stageName}! Microclimate targets applied.`, 'success');
+    await loadStageThresholds();
+    await loadShedsFleet();
+  } catch (err) {
+    showNotification(`Error: ${err.message}`, 'error');
+  }
+}
+window.applyStageToSelectedShed = applyStageToSelectedShed;
+
+// ------------------------------------------------------------------------------
+// MONITORED REARING SHEDS FLEET
+// ------------------------------------------------------------------------------
+let allShedsFleet = [];
+window.allShedsFleet = allShedsFleet;
+
+async function loadShedsFleet() {
+  const tbody = document.getElementById('shedsFleetTableBody');
+  const badge = document.getElementById('shedsFleetBadgeCount');
+  if (!tbody) return;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/sheds`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--rose);">Failed to load rearing sheds fleet</td></tr>`;
+      return;
+    }
+    const sheds = await res.json();
+    allShedsFleet = sheds;
+    window.allShedsFleet = sheds;
+    if (badge) badge.textContent = `${sheds.length} Configured`;
+    renderShedsFleetTable(sheds);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 24px; color: var(--text-muted);">Error: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+window.loadShedsFleet = loadShedsFleet;
+
+function renderShedsFleetTable(sheds) {
+  const tbody = document.getElementById('shedsFleetTableBody');
+  if (!tbody) return;
+
+  if (!sheds || !sheds.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 36px; color: var(--text-muted);">No rearing sheds registered yet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = sheds.map(s => {
+    return `
+      <tr>
+        <td style="font-family: var(--font-mono); font-weight: 700; color: var(--text-main);">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="warehouse" style="width: 14px; height: 14px; color: var(--brand-primary);"></i>
+            <span>${escapeHtml(s.shed_id)}</span>
+          </div>
+        </td>
+        <td>
+          <div style="font-weight: 700; color: var(--text-main);">${escapeHtml(s.farm_name || s.display_name || 'Rearing Shed')}</div>
+          <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(s.farmer_name || 'Assigned Farmer')}</div>
+        </td>
+        <td>
+          <span class="badge badge-neutral">${escapeHtml(s.region || 'Karnataka')}</span>
+        </td>
+        <td>
+          <span class="font-mono" style="font-size: 0.80rem; font-weight: 600;">${escapeHtml(s.batch_id || 'SERI-2026')}</span>
+        </td>
+        <td>
+          <span class="badge" style="background: var(--brand-tint); color: var(--brand-primary); font-weight: 700;">
+            Instar ${s.current_stage || 1}
+          </span>
+        </td>
+        <td>
+          <span class="badge badge-success" style="display: inline-flex; align-items: center; gap: 4px;">
+            <i data-lucide="cpu" style="width: 11px; height: 11px;"></i> Auto
+          </span>
+        </td>
+        <td>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-outline btn-xs" onclick="selectAndMonitorShed('${escapeHtml(s.shed_id)}')" title="View Live Telemetry">
+              <i data-lucide="activity"></i> Monitor
+            </button>
+            <button class="btn btn-skin btn-xs" onclick="promptSwitchShedStage('${escapeHtml(s.shed_id)}')" title="Switch Growth Stage">
+              <i data-lucide="git-commit"></i> Stage
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+  if (window.SetuTableManager) SetuTableManager.syncTable('shedsFleetTable');
+}
+window.renderShedsFleetTable = renderShedsFleetTable;
+
+function selectAndMonitorShed(shedId) {
+  const shedSelect = document.getElementById('headerShedSelect');
+  if (shedSelect) {
+    shedSelect.value = shedId;
+    shedSelect.dispatchEvent(new Event('change'));
+  }
+  switchNavTab('live-monitoring');
+}
+window.selectAndMonitorShed = selectAndMonitorShed;
+
+function promptSwitchShedStage(shedId) {
+  const stageNum = prompt(`Switch active growth stage for shed "${shedId}" (Enter instar 1 to 5):`, "1");
+  if (!stageNum) return;
+  const stageId = parseInt(stageNum);
+  if (isNaN(stageId) || stageId < 1 || stageId > 5) {
+    alert("Please enter a valid stage number between 1 and 5.");
+    return;
+  }
+
+  fetch(`${API_BASE_URL}/admin/sheds/${encodeURIComponent(shedId)}/stage`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${adminToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ stage: stageId })
+  })
+  .then(async res => {
+    if (!res.ok) {
+      const err = await getResError(res);
+      showNotification(`Failed to switch stage: ${err}`, 'error');
+      return;
+    }
+    showNotification(`Shed "${shedId}" set to Instar ${stageId}!`, 'success');
+    loadStageThresholds();
+  })
+  .catch(err => {
+    showNotification(`Error: ${err.message}`, 'error');
+  });
+}
+window.promptSwitchShedStage = promptSwitchShedStage;
+
+function filterShedsFleet(query) {
+  if (!window.allShedsFleet) return;
+  const q = (query || '').toLowerCase().trim();
+  const filtered = window.allShedsFleet.filter(s =>
+    (s.shed_id || '').toLowerCase().includes(q) ||
+    (s.farm_name || '').toLowerCase().includes(q) ||
+    (s.farmer_name || '').toLowerCase().includes(q) ||
+    (s.region || '').toLowerCase().includes(q) ||
+    (s.batch_id || '').toLowerCase().includes(q)
+  );
+  renderShedsFleetTable(filtered);
+}
+window.filterShedsFleet = filterShedsFleet;
 
 
 window.addEventListener("DOMContentLoaded", () => {

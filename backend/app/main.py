@@ -196,14 +196,14 @@ if os.path.exists(admin_assets_dir):
 def serve_root_style():
     style_path = os.path.join(admin_web_dir, "style.css")
     if os.path.exists(style_path):
-        return FileResponse(style_path, media_type="text/css")
+        return FileResponse(style_path, media_type="text/css; charset=utf-8")
     return Response(status_code=404)
 
 @app.get("/app.js")
 def serve_root_app_js():
     js_path = os.path.join(admin_web_dir, "app.js")
     if os.path.exists(js_path):
-        return FileResponse(js_path, media_type="application/javascript")
+        return FileResponse(js_path, media_type="application/javascript; charset=utf-8")
     return Response(status_code=404)
 
 @app.get("/health")
