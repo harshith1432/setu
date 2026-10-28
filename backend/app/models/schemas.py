@@ -317,7 +317,7 @@ class OrganizationCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255)
     code: str = Field(..., min_length=2, max_length=64)
     domain: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     address: Optional[str] = None
     subscription_tier: str = "ENTERPRISE"
@@ -327,7 +327,7 @@ class OrganizationCreate(BaseModel):
 class OrganizationUpdate(BaseModel):
     name: Optional[str] = None
     domain: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    contact_email: Optional[str] = None
     contact_phone: Optional[str] = None
     address: Optional[str] = None
     subscription_tier: Optional[str] = None

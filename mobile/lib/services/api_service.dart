@@ -403,5 +403,73 @@ class ApiService {
     }
     return false;
   }
-}
 
+  Future<List<Map<String, dynamic>>> getProducts({String? category}) async {
+    for (final base in candidateUrls) {
+      try {
+        final uri = Uri.parse('$base/products');
+        final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is List) {
+            _workingBaseUrl = base;
+            return List<Map<String, dynamic>>.from(decoded);
+          }
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> getOrders() async {
+    for (final base in candidateUrls) {
+      try {
+        final uri = Uri.parse('$base/orders');
+        final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+        if (res.statusCode == 200) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is List) {
+            _workingBaseUrl = base;
+            return List<Map<String, dynamic>>.from(decoded);
+          }
+        }
+      } catch (_) {}
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>> placeOrder({
+    required List<Map<String, dynamic>> items,
+    required String shippingAddress,
+    String paymentMethod = 'UPI',
+    String? notes,
+  }) async {
+    String? serverError;
+    for (final base in candidateUrls) {
+      try {
+        final res = await http.post(
+          Uri.parse('$base/orders'),
+          headers: _headers,
+          body: jsonEncode({
+            'items': items,
+            'shipping_address': shippingAddress,
+            'payment_method': paymentMethod,
+            if (notes != null && notes.isNotEmpty) 'notes': notes,
+          }),
+        ).timeout(const Duration(seconds: 6));
+        if (res.statusCode == 200 || res.statusCode == 201) {
+          _workingBaseUrl = base;
+          return {'success': true, 'data': jsonDecode(res.body)};
+        } else {
+          try {
+            final err = jsonDecode(res.body);
+            serverError = err['detail']?.toString() ?? 'Failed with status ${res.statusCode}';
+          } catch (_) {
+            serverError = 'Server error (${res.statusCode})';
+          }
+        }
+      } catch (_) {}
+    }
+    return {'success': false, 'error': serverError ?? 'Could not place order'};
+  }
+}

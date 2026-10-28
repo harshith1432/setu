@@ -548,60 +548,6 @@ def get_orders(
 
 
 @router.post("/orders")
-
-def place_order(
-
-    payload: CustomerOrderCreatePayload,
-
-    user: dict = Depends(get_current_user_payload)
-
-):
-
-    uid = user.get("user_id") or user.get("sub")
-
-    if not uid:
-
-        raise HTTPException(status_code=401, detail="Authentication required to place an order")
-
-    
-
-    from app.services.db_service import get_user_by_id, get_user_by_username
-
-    target_user = get_user_by_id(uid) or get_user_by_username(uid)
-
-    if not target_user:
-
-        raise HTTPException(status_code=404, detail="User account not found")
-
-
-
-    try:
-
-        order = create_customer_order(
-
-            user_id=target_user["id"],
-
-            items=[item.model_dump() for item in payload.items],
-
-            shipping_address=payload.shipping_address,
-
-            payment_method=payload.payment_method,
-
-            notes=payload.notes
-
-        )
-
-        return order
-
-    except ValueError as e:
-
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-
-
-
-@router.post("/orders")
 def place_order(
     payload: CustomerOrderCreatePayload,
     user: dict = Depends(get_current_user_payload)

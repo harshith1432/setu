@@ -15,6 +15,7 @@ import '../services/location_weather_service.dart';
 class SetuProvider with ChangeNotifier {
   static const _secureStorage = FlutterSecureStorage();
   final ApiService _apiService = ApiService();
+  ApiService get apiService => _apiService;
   final LocationWeatherService _weatherService = LocationWeatherService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: '756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com',
