@@ -23,17 +23,23 @@ def main():
         print("ERROR: Could not connect to PostgreSQL")
         sys.exit(1)
 
-    from app.services.db_service import init_db
-    from app.services.enterprise_db import init_enterprise_tables
-    from app.services.org_employee_db import init_org_employee_tables
+    import traceback
+    try:
+        from app.services.db_service import init_db
+        from app.services.enterprise_db import init_enterprise_tables
+        from app.services.org_employee_db import init_org_employee_tables
 
-    print("Initializing core database...")
-    init_db()
-    print("Initializing enterprise database...")
-    init_enterprise_tables()
-    print("Initializing org employee database...")
-    init_org_employee_tables()
-    print("All tables successfully initialized and seeded!")
+        print("Initializing core database...")
+        init_db()
+        print("Initializing enterprise database...")
+        init_enterprise_tables()
+        print("Initializing org employee database...")
+        init_org_employee_tables()
+        print("All tables successfully initialized and seeded!")
+    except Exception as e:
+        print(f"FAILED during table initialization: {e}")
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

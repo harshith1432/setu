@@ -61,7 +61,7 @@ jobs:
           DATABASE_URL: postgresql://setu_user:setu_password@127.0.0.1:5433/setu
           SEED_DEMO_FARMERS: "true"
         run: |
-          python backend/init_test_db.py
+          python -u backend/init_test_db.py
 
       - name: Execute Pytest Suite
         env:
