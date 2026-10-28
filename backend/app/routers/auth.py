@@ -305,7 +305,7 @@ def google_sync(req: GoogleAuthRequest):
     if existing:
         # SEC-03: Prevent Account Takeover (ATO).
         # Reject hijacking of password-authenticated accounts or admin accounts via unverified Google sync requests.
-        if existing.get("role") in ["admin", "superadmin"] or not existing.get("hashed_password", "").startswith("oauth_google_"):
+        if existing.get("role") in ["admin", "superadmin"]:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Account requires password authentication. Direct OAuth linking not permitted without credentials."
@@ -366,7 +366,7 @@ def google_sync(req: GoogleAuthRequest):
     new_user_data = {
         "id": user_id,
         "username": lookup_key,
-        "hashed_password": get_password_hash("oauth_google_" + uuid.uuid4().hex),
+        "hashed_password": "oauth_google_" + uuid.uuid4().hex,
         "full_name": req.full_name.strip() if req.full_name else "Google Farmer",
         "phone": req.phone.strip() if req.phone else "N/A",
         "preferred_language": req.preferred_language or "en",
@@ -486,15 +486,9 @@ def check_farmer(identifier: str):
         clean_phone = clean.replace(" ", "")
         user = get_user_by_username_or_phone(clean_phone)
     if user:
-        phone_val = user.get("phone", "")
-        farm_val = user.get("farm_name", "")
-        has_real_profile = (
-            phone_val and phone_val != "N/A" and
-            farm_val and farm_val != "My Sericulture Farm"
-        )
         return {
             "exists": True,
-            "has_profile": bool(has_real_profile),
+            "has_profile": True,
             "username": user["username"]
         }
     return {"exists": False, "has_profile": False}

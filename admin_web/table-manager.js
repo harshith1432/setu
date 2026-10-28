@@ -62,12 +62,12 @@
     },
 
     extractRowId(tr, idx) {
-      if (tr.dataset.id) return tr.dataset.id;
+      if (tr.dataset.id) return String(tr.dataset.id);
       const chk = tr.querySelector('.row-select-checkbox');
-      if (chk && chk.dataset.rowId) return chk.dataset.rowId;
+      if (chk && chk.dataset.rowId) return String(chk.dataset.rowId);
       const firstColText = tr.querySelector('td:not(.td-bulk-select)')?.textContent?.trim();
-      if (firstColText && firstColText.length > 0 && firstColText.length < 50) {
-        return firstColText.replace(/\s+/g, '_');
+      if (firstColText && firstColText.length > 0) {
+        return firstColText.replace(/\s+/g, '_').substring(0, 40);
       }
       return `row_${idx}`;
     },
@@ -146,14 +146,15 @@
           }
 
           const checkbox = checkCell.querySelector('input[type="checkbox"]');
+          const isRowSelected = state.selectedIds.has(String(rowId)) || state.selectedIds.has(rowId);
           if (checkbox) {
-            checkbox.checked = state.selectedIds.has(rowId);
+            checkbox.checked = isRowSelected;
             checkbox.onchange = (e) => {
               this.handleRowCheck(tableId, rowId, e.target);
             };
           }
 
-          if (state.selectedIds.has(rowId)) {
+          if (isRowSelected) {
             tr.classList.add('row-selected');
           } else {
             tr.classList.remove('row-selected');
@@ -269,32 +270,105 @@
         return !r.querySelector('.honest-empty-state') && !r.querySelector('td[colspan]');
       });
 
-      if (isChecked) {
-        rows.forEach((tr, idx) => {
-          const rowId = this.extractRowId(tr, idx);
-          state.selectedIds.add(rowId);
-        });
-      } else {
+      if (!isChecked) {
         state.selectedIds.clear();
       }
 
+      // DIRECT DOM UPDATE: Instant visual selection and state sync across all rows
+      rows.forEach((tr, idx) => {
+        const rowId = this.extractRowId(tr, idx);
+        tr.dataset.id = rowId;
+
+        if (isChecked) {
+          state.selectedIds.add(rowId);
+        }
+
+        const checkbox = tr.querySelector('input[type="checkbox"].row-select-checkbox, .td-bulk-select input[type="checkbox"], td:first-child input[type="checkbox"]');
+        if (checkbox) {
+          checkbox.checked = isChecked;
+        }
+
+        if (isChecked) {
+          tr.classList.add('row-selected');
+        } else {
+          tr.classList.remove('row-selected');
+        }
+      });
+
+      // Synchronize master checkbox in table header
+      const thCheckAll = table.querySelector('.bulk-select-all');
+      if (thCheckAll) {
+        thCheckAll.checked = isChecked && rows.length > 0;
+        thCheckAll.indeterminate = false;
+      }
+
+      // Update bulk action bar immediately
+      const bulkBar = this.getBulkActionBar(tableId);
+      if (bulkBar) {
+        const countEl = bulkBar.querySelector('.bulk-count');
+        if (countEl) countEl.textContent = state.selectedIds.size;
+        if (state.selectedIds.size > 0) {
+          bulkBar.classList.remove('hidden');
+        } else {
+          bulkBar.classList.add('hidden');
+        }
+      }
+
+      // Sync pagination and controls
       this.syncTable(tableId);
     },
 
     handleRowCheck(tableId, rowId, checkbox) {
+      const table = document.getElementById(tableId);
       const state = this.getState(tableId);
-      if (checkbox.checked) {
-        state.selectedIds.add(rowId);
+      const isChecked = !!(checkbox && checkbox.checked);
+
+      if (isChecked) {
+        state.selectedIds.add(String(rowId));
       } else {
-        state.selectedIds.delete(rowId);
+        state.selectedIds.delete(String(rowId));
       }
+
+      if (checkbox) {
+        const tr = checkbox.closest('tr');
+        if (tr) {
+          tr.classList.toggle('row-selected', isChecked);
+        }
+      }
+
+      // Update master checkbox header state based on rows
+      if (table) {
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+          const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+            return !r.querySelector('.honest-empty-state') && !r.querySelector('td[colspan]');
+          });
+          const totalRows = rows.length;
+          const thCheckAll = table.querySelector('.bulk-select-all');
+          if (thCheckAll) {
+            thCheckAll.checked = totalRows > 0 && state.selectedIds.size === totalRows;
+            thCheckAll.indeterminate = state.selectedIds.size > 0 && state.selectedIds.size < totalRows;
+          }
+        }
+      }
+
+      // Update bulk action bar
+      const bulkBar = this.getBulkActionBar(tableId);
+      if (bulkBar) {
+        const countEl = bulkBar.querySelector('.bulk-count');
+        if (countEl) countEl.textContent = state.selectedIds.size;
+        if (state.selectedIds.size > 0) {
+          bulkBar.classList.remove('hidden');
+        } else {
+          bulkBar.classList.add('hidden');
+        }
+      }
+
       this.syncTable(tableId);
     },
 
     clearSelection(tableId) {
-      const state = this.getState(tableId);
-      state.selectedIds.clear();
-      this.syncTable(tableId);
+      this.toggleSelectAll(tableId, false);
     },
 
     exportSelected(tableId) {
@@ -607,6 +681,29 @@
   };
 
   window.SetuTableManager = SetuTableManager;
+
+  // Universal Delegated Event Listener for all bulk-select checkboxes across the entire platform
+  document.addEventListener('change', (e) => {
+    const target = e.target;
+    if (!target) return;
+
+    // Master "Select All" checkbox in any table header
+    if (target.classList && target.classList.contains('bulk-select-all')) {
+      const table = target.closest('table');
+      if (table && table.id) {
+        SetuTableManager.toggleSelectAll(table.id, target.checked);
+      }
+    }
+    // Individual row checkbox in any table row
+    else if (target.classList && (target.classList.contains('row-select-checkbox') || target.closest('.td-bulk-select'))) {
+      const table = target.closest('table');
+      const tr = target.closest('tr');
+      if (table && table.id && tr) {
+        const rowId = tr.dataset.id || target.dataset.rowId || SetuTableManager.extractRowId(tr, 0);
+        SetuTableManager.handleRowCheck(table.id, rowId, target);
+      }
+    }
+  });
 
   // Auto-init on page load and view transitions
   if (document.readyState === 'loading') {

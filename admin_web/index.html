@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Setu | Super Admin &amp; Platform Management</title>
+<title>Setu | Super Admin & Enterprise Platform Console</title>
 <meta content="Setu Platform (SeriCare)" name="application-name"/>
 <!-- Brand Favicon -->
 <link href="assets/logo.png" rel="icon" type="image/png"/>
@@ -19,7 +19,7 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="/admin/style.css?v=4.0" rel="stylesheet"/>
+<link href="/admin/style.css?v=4.4" rel="stylesheet"/>
   <style>
     .hidden { display: none !important; }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
@@ -27,7 +27,7 @@
 </head>
 <body>
 <!-- ================= INITIAL LOADING GATEWAY ================= -->
-<div class="loading-gateway" id="loadingGateway">
+<div class="loading-gateway hidden" id="loadingGateway">
 <div class="loading-gateway-card">
 <div class="loading-logo-box">
 <img alt="Setu Logo" class="pulse" src="assets/logo.png"/>
@@ -40,7 +40,7 @@
 </div>
 </div>
 <!-- ================= AUTHENTICATION VIEW (UNIFIED OFFICIAL SETU LOGIN) ================= -->
-<div class="auth-wrapper hidden" id="authView">
+<div class="auth-wrapper" id="authView">
 <div class="auth-card">
 <div class="auth-brand-header">
 <div class="auth-logo-wrap">
@@ -210,7 +210,7 @@
 </a>
 <a class="nav-item" data-tab="orders" onclick="switchNavTab('orders')">
 <i data-lucide="shopping-cart"></i>
-<span>Sales &amp; Orders</span>
+<span id="navOrdersLabel">Sales &amp; Orders</span>
 </a>
 <a class="nav-item" data-tab="billing" onclick="switchNavTab('billing')">
 <i data-lucide="credit-card"></i>
@@ -710,6 +710,20 @@
 </section>
 <!-- ================= 3. VIEW: LIVE MONITORING ================= -->
 <section class="view-section hidden" id="section-live-monitoring">
+<div class="farmer-hardware-banner" id="farmerHardwareProcureBanner" style="display: none; background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md, 8px); padding: 12px 16px; margin-bottom: 16px; align-items: center; justify-content: space-between; gap: 12px;">
+<div style="display: flex; align-items: center; gap: 12px;">
+<div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(5,150,105,0.12); color: var(--brand-primary, #059669); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+<i data-lucide="cpu" style="width: 20px; height: 20px;"></i>
+</div>
+<div>
+<div style="font-weight: 700; font-size: 0.88rem; color: var(--text-main);">Need IoT Gateways, Foggers, or Precision Climate Probes?</div>
+<div style="font-size: 0.78rem; color: var(--text-muted);">Equip your rearing shed with certified automated climate control hardware. Free shed delivery &amp; technician calibration.</div>
+</div>
+</div>
+<button type="button" class="btn btn-primary btn-sm" onclick="switchNavTab('products')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap;">
+<i data-lucide="shopping-bag"></i> Browse Products
+</button>
+</div>
 <div class="table-toolbar">
 <div class="table-title">
 <i data-lucide="activity"></i>
@@ -1230,88 +1244,172 @@
 </div>
 </div>
 </section>
-<!-- ================= 10. VIEW: PRODUCT CATALOGUE ================= -->
+<!-- ================= 10. VIEW: PRODUCT CATALOGUE (AMAZON-STYLE STOREFRONT) ================= -->
 <section class="view-section hidden" id="section-products">
 <div class="table-card">
-<div class="table-toolbar">
-<div class="table-title">
-<i data-lucide="package"></i>
-<span>Sericulture Equipment &amp; Hardware Catalogue</span>
-</div>
-<div class="table-actions" style="display: flex; align-items: center; gap: 10px;">
-<select class="form-select" id="prodStatusFilter" onchange="filterProducts(this.value)" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 600; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); cursor: pointer;">
-<option value="ALL">All Statuses</option>
-<option value="ACTIVE">Active Only</option>
-<option value="ARCHIVED">Archived Only</option>
-</select>
-<button class="btn btn-primary btn-sm" onclick="openCreateProductModal()">
-<i data-lucide="plus"></i> New Product SKU
-                </button>
-</div>
-</div>
-<div class="table-bulk-action-bar hidden" id="productsTable_bulkActionBar">
-<div class="bulk-info">
-<i data-lucide="check-square"></i>
-<span><strong class="bulk-count">0</strong> selected</span>
-</div>
-<div class="bulk-actions-buttons">
-<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('productsTable')" type="button">
-<i data-lucide="download"></i> Export Selected
-    </button>
-<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('productsTable')" type="button">
-<i data-lucide="archive"></i> Archive / Deactivate
-    </button>
-<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('productsTable')" type="button">
-<i data-lucide="trash-2"></i> Delete Selected
-    </button>
-<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('productsTable')" type="button">
-      Deselect All
-    </button>
-</div>
-</div><div class="table-wrap">
-<table class="data-table" id="productsTable">
-<thead>
-<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('productsTable', this.checked)" type="checkbox"/></th>
-<th>SKU</th>
-<th>Product Name</th>
-<th>Category</th>
-<th>Price (INR)</th>
-<th>Stock Available</th>
-<th>Status</th>
-<th>Actions</th>
-</tr>
-</thead>
-<tbody id="productsTableBody">
-<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading catalogue...</td></tr>
-</tbody>
-</table>
-</div><div class="pagination-wrap" id="productsPaginationWrap">
-<div class="pagination-nav-group left-corner">
-<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('productsTable')" title="Previous Page" type="button">
-<i data-lucide="chevron-left"></i> Previous
-    </button>
-<span class="pagination-page-indicator">
-      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
-</span>
-<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('productsTable')" title="Next Page" type="button">
-      Next Page <i data-lucide="chevron-right"></i>
-</button>
-</div>
-<div class="pagination-info">
-<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
-</div>
-<div class="pagination-page-size">
-<label class="pagination-label">Show:</label>
-<select class="pagination-select" onchange="SetuTableManager.changePageSize('productsTable', this.value)">
-<option selected="" value="10">10 per page</option>
-<option value="20">20 per page</option>
-<option value="30">30 per page</option>
-<option value="50">50 per page</option>
-<option value="100">100 per page</option>
-<option value="all">All</option>
-</select>
-</div>
-</div>
+  <!-- Top Toolbar -->
+  <div class="table-toolbar" style="flex-wrap: wrap; gap: 12px;">
+    <div class="table-title">
+      <i data-lucide="shopping-bag"></i>
+      <span id="productsSectionTitle">Sericulture Hardware &amp; Equipment Store</span>
+    </div>
+    <div class="table-actions" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <!-- Store View Switcher Toggle -->
+      <div class="store-view-toggle">
+        <button type="button" class="btn btn-sm btn-skin active" id="btnProductViewGrid" onclick="setProductViewMode('grid')" title="Amazon Storefront Grid View">
+          <i data-lucide="layout-grid"></i> Store View
+        </button>
+        <button type="button" class="btn btn-sm btn-outline" id="btnProductViewTable" onclick="setProductViewMode('table')" title="Tabular Inventory View">
+          <i data-lucide="table"></i> Table View
+        </button>
+      </div>
+
+      <select class="form-select" id="prodStatusFilter" onchange="filterStoreProducts()" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 600; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); cursor: pointer;">
+        <option value="ALL">All Statuses</option>
+        <option value="ACTIVE" selected>Active Only</option>
+        <option value="ARCHIVED">Archived Only</option>
+      </select>
+
+      <select class="form-select" id="prodSortFilter" onchange="filterStoreProducts()" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 600; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); cursor: pointer;">
+        <option value="FEATURED">Featured</option>
+        <option value="PRICE_LOW">Price: Low to High</option>
+        <option value="PRICE_HIGH">Price: High to Low</option>
+        <option value="BEST_SELLING">Best Selling</option>
+      </select>
+
+      <button class="btn btn-primary btn-sm" id="btnNewProductSku" onclick="openCreateProductModal()">
+        <i data-lucide="plus"></i> New Product SKU
+      </button>
+      <button class="btn btn-outline btn-sm hidden" id="btnFarmerMyOrders" onclick="switchNavTab('orders')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+        <i data-lucide="shopping-cart"></i> View My Orders
+      </button>
+    </div>
+  </div>
+
+  <!-- Amazon Storefront Filter & Search Bar -->
+  <div class="store-filter-bar" id="storeFilterBar">
+    <div class="store-search-wrap">
+      <i data-lucide="search"></i>
+      <input type="text" class="store-search-input" id="storeSearchInput" placeholder="Search equipment, precision sensors, ultrasonic foggers, IoT gateways..." oninput="filterStoreProducts()">
+    </div>
+    <div class="store-category-pills" id="storeCategoryPills">
+      <button type="button" class="store-cat-pill active" onclick="setStoreCategoryFilter('ALL', this)">All Hardware</button>
+      <button type="button" class="store-cat-pill" onclick="setStoreCategoryFilter('Sensors', this)">Sensors &amp; Probes</button>
+      <button type="button" class="store-cat-pill" onclick="setStoreCategoryFilter('Gateways', this)">IoT Gateways</button>
+      <button type="button" class="store-cat-pill" onclick="setStoreCategoryFilter('Smart Rearing Shed Control', this)">Climate Automation</button>
+      <button type="button" class="store-cat-pill" onclick="setStoreCategoryFilter('Services', this)">Services</button>
+    </div>
+  </div>
+
+  <!-- 1. AMAZON STOREFRONT GRID VIEW (DEFAULT) -->
+  <div id="productsGridContainer" class="store-grid-wrapper">
+    <div class="amazon-store-grid" id="productsGrid">
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; color: var(--text-muted);">
+        <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; margin: 0 auto 12px auto; display: block;"></i>
+        Loading equipment store...
+      </div>
+    </div>
+
+    <!-- Amazon Store Grid Pagination -->
+    <div class="pagination-wrap" id="storeGridPaginationWrap">
+      <div class="pagination-nav-group left-corner">
+        <button class="btn btn-sm pagination-btn prev-btn" id="btnStorePrevPage" onclick="prevStorePage()" title="Previous Page" type="button">
+          <i data-lucide="chevron-left"></i> Previous
+        </button>
+        <span class="pagination-page-indicator">
+          Page <strong id="storeCurrentPageNum">1</strong> of <strong id="storeTotalPagesNum">1</strong>
+        </span>
+        <button class="btn btn-sm pagination-btn next-btn" id="btnStoreNextPage" onclick="nextStorePage()" title="Next Page" type="button">
+          Next Page <i data-lucide="chevron-right"></i>
+        </button>
+      </div>
+      <div class="pagination-info">
+        <span>Showing <strong id="storeShowingStart">0</strong>–<strong id="storeShowingEnd">0</strong> of <strong id="storeTotalItems">0</strong> products</span>
+      </div>
+      <div class="pagination-page-size">
+        <label class="pagination-label">Show:</label>
+        <select class="pagination-select" id="storePageSizeSelect" onchange="changeStorePageSize(this.value)">
+          <option selected value="10">10 per page</option>
+          <option value="20">20 per page</option>
+          <option value="30">30 per page</option>
+          <option value="50">50 per page</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. TABULAR INVENTORY VIEW (TOGGLEABLE) -->
+  <div id="productsTableContainer" class="hidden">
+    <div class="table-bulk-action-bar hidden" id="productsTable_bulkActionBar">
+      <div class="bulk-info">
+        <i data-lucide="check-square"></i>
+        <span><strong class="bulk-count">0</strong> selected</span>
+      </div>
+      <div class="bulk-actions-buttons">
+        <button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('productsTable')" type="button">
+          <i data-lucide="download"></i> Export Selected
+        </button>
+        <button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('productsTable')" type="button">
+          <i data-lucide="archive"></i> Archive / Deactivate
+        </button>
+        <button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('productsTable')" type="button">
+          <i data-lucide="trash-2"></i> Delete Selected
+        </button>
+        <button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('productsTable')" type="button">
+          Deselect All
+        </button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="productsTable">
+        <thead>
+          <tr>
+            <th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows">
+              <input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('productsTable', this.checked)" type="checkbox"/>
+            </th>
+            <th>SKU</th>
+            <th>Product Name</th>
+            <th>Category</th>
+            <th>Price (INR)</th>
+            <th>Stock Available</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="productsTableBody">
+          <tr><td colspan="8" style="text-align: center; padding: 24px;">Loading catalogue...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-wrap" id="productsPaginationWrap">
+      <div class="pagination-nav-group left-corner">
+        <button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('productsTable')" title="Previous Page" type="button">
+          <i data-lucide="chevron-left"></i> Previous
+        </button>
+        <span class="pagination-page-indicator">
+          Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+        </span>
+        <button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('productsTable')" title="Next Page" type="button">
+          Next Page <i data-lucide="chevron-right"></i>
+        </button>
+      </div>
+      <div class="pagination-info">
+        <span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+      </div>
+      <div class="pagination-page-size">
+        <label class="pagination-label">Show:</label>
+        <select class="pagination-select" onchange="SetuTableManager.changePageSize('productsTable', this.value)">
+          <option selected="" value="10">10 per page</option>
+          <option value="20">20 per page</option>
+          <option value="30">30 per page</option>
+          <option value="50">50 per page</option>
+          <option value="100">100 per page</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+    </div>
+  </div>
 </div>
 </section>
 <!-- ================= 11. VIEW: SALES & ORDERS ================= -->
@@ -1320,9 +1418,9 @@
 <div class="table-toolbar">
 <div class="table-title">
 <i data-lucide="shopping-cart"></i>
-<span>Customer Hardware Orders &amp; Fulfilment</span>
+<span id="ordersTableHeading">Customer Hardware Orders &amp; Fulfilment</span>
 </div>
-<div class="table-actions">
+<div class="table-actions" style="display: flex; align-items: center; gap: 8px;">
 <select id="orderStatusFilter" onchange="loadOrders(this.value)" style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
 <option value="">All Statuses</option>
 <option value="PAID">Paid</option>
@@ -1331,6 +1429,9 @@
 <option value="FULFILLED">Fulfilled</option>
 <option value="CANCELLED">Cancelled</option>
 </select>
+<button class="btn btn-primary btn-sm" onclick="switchNavTab('products')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+<i data-lucide="shopping-bag"></i> Order Hardware
+</button>
 <button class="btn btn-skin btn-sm" onclick="exportOrdersCsv()"><i data-lucide="download"></i> Export</button>
 </div>
 </div>
@@ -2455,6 +2556,6 @@
 <!-- Toast Notification Container -->
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="/admin/table-manager.js?v=4.0"></script><script src="/admin/app.js?v=4.0" charset="UTF-8"></script>
+<script src="/admin/table-manager.js?v=4.4"></script><script src="/admin/app.js?v=4.4" charset="UTF-8"></script>
 </body>
 </html>

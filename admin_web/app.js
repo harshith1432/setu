@@ -144,7 +144,7 @@ const ROLE_PERMISSIONS = {
   sales: ['overview', 'tasks', 'products', 'enquiries', 'orders', 'billing', 'farmers', 'reports'],
   support: ['overview', 'tasks', 'farmers', 'sheds', 'support', 'guidance', 'alerts', 'orders'],
   analyst: ['overview', 'live-monitoring', 'analytics', 'farmers', 'sheds', 'research', 'guidance', 'reports'],
-  farmer: ['tasks', 'live-monitoring', 'sheds', 'guidance', 'support', 'orders', 'alerts']
+  farmer: ['tasks', 'live-monitoring', 'sheds', 'guidance', 'support', 'products', 'orders', 'alerts']
 };
 
 const ROLE_DEFAULT_TABS = {
@@ -866,6 +866,12 @@ function updateUserBadge() {
   if (menuRole) menuRole.textContent = `Role: ${roleName}`;
   if (switcher) switcher.value = currentUser.role || 'superadmin';
 
+  // Dynamic label for Orders nav item (Farmers see 'Orders', Admins see 'Sales & Orders')
+  const ordersNavLabel = document.getElementById('navOrdersLabel') || document.querySelector('#sidebarNav .nav-item[data-tab="orders"] span');
+  if (ordersNavLabel) {
+    ordersNavLabel.textContent = (roleName === 'farmer') ? 'Orders' : 'Sales & Orders';
+  }
+
   // Update Top Tab Session Indicator
   const tabPill = document.getElementById('topTabSessionText');
   if (tabPill && currentUser) {
@@ -877,6 +883,7 @@ function updateUserBadge() {
 function enforceRoleNavigation() {
   const role = (currentUser && currentUser.role) ? currentUser.role : 'superadmin';
   const allowedTabs = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS['farmer'];
+  const isFarmer = (role === 'farmer');
 
   document.querySelectorAll('#sidebarNav .nav-item').forEach(item => {
     const tab = item.getAttribute('data-tab');
@@ -886,6 +893,28 @@ function enforceRoleNavigation() {
       item.style.display = 'none';
     }
   });
+
+  // Dynamic label for Orders navigation item: Farmer sees "Orders", administrative/commercial staff see "Sales & Orders"
+  const ordersNavLabel = document.getElementById('navOrdersLabel') || document.querySelector('#sidebarNav .nav-item[data-tab="orders"] span');
+  if (ordersNavLabel) {
+    ordersNavLabel.textContent = isFarmer ? 'Orders' : 'Sales & Orders';
+  }
+
+  // Also update Section header if visible
+  const ordersHeading = document.getElementById('ordersTableHeading') || document.querySelector('#section-orders .table-title span');
+  if (ordersHeading) {
+    ordersHeading.textContent = isFarmer ? 'My Equipment Orders & Tracking' : 'Customer Hardware Orders & Fulfilment';
+  }
+
+  // Enforce Amazon Storefront Grid for Farmers
+  if (isFarmer && typeof setProductViewMode === 'function') {
+    setProductViewMode('grid');
+    const toggleWrap = document.querySelector('.store-view-toggle');
+    if (toggleWrap) toggleWrap.style.display = 'none';
+  } else {
+    const toggleWrap = document.querySelector('.store-view-toggle');
+    if (toggleWrap) toggleWrap.style.display = 'inline-flex';
+  }
 
   // If active tab is not allowed, switch to first allowed tab
   if (!allowedTabs.includes(currentTab)) {
@@ -993,7 +1022,9 @@ function switchNavTab(tabName) {
     'sensor-config': { title: 'Sensor Hardware Configuration', bread: 'Sensor Calibration & Pin Offsets' },
     'products': { title: 'Sericulture Equipment Catalogue', bread: 'Products, Pricing & Stock' },
     'enquiries': { title: 'Website Demo Leads & Enquiries', bread: 'Public Enquiries & Lead Qualification' },
-    'orders': { title: 'Customer Sales Orders', bread: 'Commercial Order Lifecycle' },
+    'orders': (currentUser && currentUser.role === 'farmer')
+      ? { title: 'My Equipment Orders', bread: 'Orders & Tracking' }
+      : { title: 'Customer Sales Orders', bread: 'Commercial Order Lifecycle' },
     'billing': { title: 'Billing & Subscriptions', bread: 'Invoices & SaaS Contracts' },
     'support': { title: 'Customer Support Helpdesk', bread: 'Tickets & Escalation Desk' },
     'installations': { title: 'Field Installation Workflows', bread: 'Job Scheduling & Verification' },
@@ -1013,6 +1044,20 @@ function switchNavTab(tabName) {
 
   // Update contextual topbar visibility for shed & telemetry controls
   updateTopBarControlsVisibility();
+
+  if (tabName === 'orders') {
+    const isFarmer = (currentUser && currentUser.role === 'farmer');
+    const ordersHeading = document.getElementById('ordersTableHeading') || document.querySelector('#section-orders .table-title span');
+    if (ordersHeading) {
+      ordersHeading.textContent = isFarmer ? 'My Equipment Orders & Tracking' : 'Customer Hardware Orders & Fulfilment';
+    }
+  }
+
+  // Show farmer hardware procurement prompt in live monitoring if role is farmer
+  const farmerBanner = document.getElementById('farmerHardwareProcureBanner');
+  if (farmerBanner) {
+    farmerBanner.style.display = (currentUser && currentUser.role === 'farmer') ? 'flex' : 'none';
+  }
 
   // Load authoritative data for the activated tab
   loadTabData(tabName);
@@ -1093,9 +1138,6 @@ function loadTabData(tabName) {
       break;
     case 'users':
       loadUsers();
-      break;
-    case 'audit':
-      loadAuditLogs();
       break;
     case 'integrations':
       loadIntegrations();
@@ -2835,20 +2877,24 @@ async function loadUserTasks() {
       return;
     }
 
-    tbody.innerHTML = tasks.map(item => {
+    tbody.innerHTML = tasks.map((item, idx) => {
       let prBadge = 'badge-neutral';
       if (item.priority === 'CRITICAL') prBadge = 'badge-danger';
       else if (item.priority === 'HIGH') prBadge = 'badge-warning';
       else if (item.priority === 'MEDIUM') prBadge = 'badge-info';
 
       const dateStr = item.created ? new Date(item.created).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent';
+      const taskId = item.id || `task_${idx}`;
 
       return `
-        <tr>
+        <tr data-id="${taskId}">
+          <td class="td-bulk-select" style="text-align: center; width: 44px;">
+            <input type="checkbox" class="row-select-checkbox" data-row-id="${taskId}" aria-label="Select Task" onchange="SetuTableManager.handleRowCheck('tasksTable', '${taskId}', this)">
+          </td>
           <td>
             <div style="display: flex; align-items: center; gap: 8px;">
               <i data-lucide="${item.icon}" style="width: 15px; height: 15px; color: var(--brand-primary);"></i>
-              <span style="font-weight: 700;">${item.category}</span>
+              <span style="font-weight: 700;">${escapeHtml(item.category)}</span>
             </div>
           </td>
           <td>
@@ -2868,6 +2914,7 @@ async function loadUserTasks() {
       `;
     }).join('');
 
+    if (window.SetuTableManager) SetuTableManager.syncTable('tasksTable');
     if (window.lucide) lucide.createIcons();
 
   } catch (err) {
@@ -3020,7 +3067,10 @@ function renderEmployeesTable(employees) {
   }
 
   tbody.innerHTML = employees.map(e => `
-    <tr>
+    <tr data-id="${e.id}">
+      <td class="td-bulk-select" style="text-align: center; width: 44px;">
+        <input type="checkbox" class="row-select-checkbox" data-row-id="${e.id}" aria-label="Select Employee" onchange="SetuTableManager.handleRowCheck('employeesTable', '${e.id}', this)">
+      </td>
       <td>
         <div style="font-weight: 700; color: var(--text-main);">${e.full_name}</div>
         <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); font-weight: 600;">${e.employee_id} · @${e.username}</div>
@@ -3627,7 +3677,10 @@ function renderCustomRolesTable(customRoles) {
   }
 
   tbody.innerHTML = customRoles.map(r => `
-    <tr>
+    <tr data-id="${r.id}">
+      <td class="td-bulk-select" style="text-align: center; width: 44px;">
+        <input type="checkbox" class="row-select-checkbox" data-row-id="${r.id}" aria-label="Select Role" onchange="SetuTableManager.handleRowCheck('customRolesTable', '${r.id}', this)">
+      </td>
       <td><strong>${r.name}</strong></td>
       <td><span class="font-mono" style="font-size: 0.75rem;">${r.code}</span></td>
       <td><span style="font-size: 0.8rem; color: var(--text-secondary);">${r.description || 'Custom role'}</span></td>
@@ -3652,6 +3705,7 @@ function renderCustomRolesTable(customRoles) {
     </tr>
   `).join('');
 
+  if (window.SetuTableManager) SetuTableManager.syncTable('customRolesTable');
   if (window.lucide) lucide.createIcons();
 }
 
@@ -4176,7 +4230,10 @@ function renderAuditTable(records) {
   }
 
   tbody.innerHTML = records.map(r => `
-    <tr>
+    <tr data-id="${r.id}">
+      <td class="td-bulk-select" style="text-align: center; width: 44px;">
+        <input type="checkbox" class="row-select-checkbox" data-row-id="${r.id}" aria-label="Select Log" onchange="SetuTableManager.handleRowCheck('auditTable', '${r.id}', this)">
+      </td>
       <td style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); white-space: nowrap;">
         ${new Date(r.timestamp).toLocaleString()}
       </td>
@@ -4200,6 +4257,7 @@ function renderAuditTable(records) {
     </tr>
   `).join('');
 
+  if (window.SetuTableManager) SetuTableManager.syncTable('auditTable');
   if (window.lucide) lucide.createIcons();
 }
 
@@ -4407,10 +4465,304 @@ let allInvoicesList = [];
 // ------------------------------------------------------------------------------
 // 1. PRODUCTS & HARDWARE CATALOGUE
 // ------------------------------------------------------------------------------
+
+// ==============================================================================
+// 10. PRODUCT CATALOGUE & AMAZON-STYLE STOREFRONT ENGINE
+// ==============================================================================
+
+let storeCurrentPage = 1;
+let storePageSize = 10;
+let storeActiveCategory = 'ALL';
+let storeProductViewMode = 'grid'; // 'grid' (Amazon) or 'table'
+let filteredStoreProducts = [];
+
+function getProductIllustrationSvg(p) {
+  const sku = (p.sku || '').toUpperCase();
+  const cat = (p.category || '').toLowerCase();
+  const name = (p.name || '').toLowerCase();
+
+  // 1. Gateways & Controllers
+  if (sku.includes('GW') || cat.includes('gateway') || name.includes('gateway')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <defs>
+          <linearGradient id="gwGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e293b" />
+            <stop offset="100%" stop-color="#0f172a" />
+          </linearGradient>
+          <linearGradient id="antGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#64748b" />
+            <stop offset="100%" stop-color="#334155" />
+          </linearGradient>
+        </defs>
+        <!-- Antenna Left -->
+        <rect x="52" y="15" width="8" height="65" rx="3" fill="url(#antGrad)" />
+        <circle cx="56" cy="15" r="5" fill="#475569" />
+        <!-- Antenna Right -->
+        <rect x="140" y="15" width="8" height="65" rx="3" fill="url(#antGrad)" />
+        <circle cx="144" cy="15" r="5" fill="#475569" />
+        <!-- Main Chassis -->
+        <rect x="35" y="65" width="130" height="75" rx="10" fill="url(#gwGrad)" stroke="#334155" stroke-width="2" />
+        <!-- Aluminum Heatsink / Vent -->
+        <rect x="45" y="75" width="110" height="22" rx="4" fill="#0f172a" />
+        <line x1="55" y1="81" x2="145" y2="81" stroke="#334155" stroke-width="2" />
+        <line x1="55" y1="86" x2="145" y2="86" stroke="#334155" stroke-width="2" />
+        <line x1="55" y1="91" x2="145" y2="91" stroke="#334155" stroke-width="2" />
+        <!-- Status LEDs -->
+        <circle cx="55" cy="115" r="4" fill="#10b981" />
+        <circle cx="70" cy="115" r="4" fill="#3b82f6" />
+        <circle cx="85" cy="115" r="4" fill="#f59e0b" />
+        <circle cx="100" cy="115" r="4" fill="#10b981" />
+        <!-- Setu Logo Branding -->
+        <rect x="120" y="108" width="35" height="15" rx="3" fill="#1e293b" />
+        <text x="137" y="119" fill="#10b981" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">SETU IoT</text>
+      </svg>
+    `;
+  }
+
+  // 2. Temperature & Humidity Probes (SHT31)
+  if (sku.includes('SHT31') || (cat.includes('temperature') || name.includes('sht31') || name.includes('probe'))) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <defs>
+          <linearGradient id="probeMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#94a3b8" />
+            <stop offset="50%" stop-color="#f8fafc" />
+            <stop offset="100%" stop-color="#64748b" />
+          </linearGradient>
+          <linearGradient id="cableGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#1e293b" />
+            <stop offset="100%" stop-color="#0f172a" />
+          </linearGradient>
+        </defs>
+        <!-- Flexible Shielded Cable -->
+        <path d="M 100,105 Q 110,135 150,140" fill="none" stroke="url(#cableGrad)" stroke-width="8" stroke-linecap="round" />
+        <!-- Hex Nut Fitting -->
+        <rect x="88" y="90" width="24" height="16" rx="2" fill="#475569" stroke="#334155" stroke-width="1.5" />
+        <!-- Sintered Steel Mesh Filter Head (IP67) -->
+        <rect x="91" y="25" width="18" height="65" rx="4" fill="url(#probeMetal)" stroke="#64748b" stroke-width="1.5" />
+        <!-- Mesh Texture Lines -->
+        <line x1="91" y1="35" x2="109" y2="35" stroke="#475569" stroke-width="1" stroke-dasharray="2,2" />
+        <line x1="91" y1="45" x2="109" y2="45" stroke="#475569" stroke-width="1" stroke-dasharray="2,2" />
+        <line x1="91" y1="55" x2="109" y2="55" stroke="#475569" stroke-width="1" stroke-dasharray="2,2" />
+        <line x1="91" y1="65" x2="109" y2="65" stroke="#475569" stroke-width="1" stroke-dasharray="2,2" />
+        <line x1="91" y1="75" x2="109" y2="75" stroke="#475569" stroke-width="1" stroke-dasharray="2,2" />
+        <!-- Climate Sensing Radiations -->
+        <circle cx="100" cy="55" r="28" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="4,4" opacity="0.6" />
+        <circle cx="100" cy="55" r="42" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.4" />
+        <!-- Moisture & Temp Badges -->
+        <circle cx="50" cy="50" r="14" fill="#ecfdf5" stroke="#10b981" stroke-width="1.5" />
+        <text x="50" y="54" fill="#059669" font-size="10" font-weight="bold" text-anchor="middle">°C</text>
+        <circle cx="150" cy="50" r="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="1.5" />
+        <text x="150" y="54" fill="#2563eb" font-size="9" font-weight="bold" text-anchor="middle">%RH</text>
+      </svg>
+    `;
+  }
+
+  // 3. Gas / Air Quality Monitors (MQ135, CO2, Ammonia)
+  if (sku.includes('MQ135') || name.includes('co2') || name.includes('ammonia') || cat.includes('gas') || cat.includes('environment')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <!-- Blue Module PCB -->
+        <rect x="50" y="50" width="100" height="75" rx="8" fill="#1e3a8a" stroke="#172554" stroke-width="2" />
+        <!-- Mounting Holes -->
+        <circle cx="58" cy="58" r="3" fill="#cbd5e1" />
+        <circle cx="142" cy="58" r="3" fill="#cbd5e1" />
+        <circle cx="58" cy="117" r="3" fill="#cbd5e1" />
+        <circle cx="142" cy="117" r="3" fill="#cbd5e1" />
+        <!-- Round Steel Gas Sensor Dome -->
+        <circle cx="100" cy="80" r="26" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2" />
+        <circle cx="100" cy="80" r="21" fill="#475569" />
+        <!-- Internal Wire Mesh Pattern -->
+        <circle cx="100" cy="80" r="16" fill="#334155" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3,3" />
+        <text x="100" y="84" fill="#f8fafc" font-size="8" font-family="monospace" font-weight="bold" text-anchor="middle">MQ-135</text>
+        <!-- Gas Wave Particles -->
+        <path d="M 40,30 Q 70,20 100,28 T 160,25" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" opacity="0.7" />
+        <path d="M 45,40 Q 80,32 110,40 T 155,36" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" opacity="0.6" />
+        <!-- Indicator LEDs -->
+        <circle cx="68" cy="98" r="3" fill="#ef4444" />
+        <circle cx="80" cy="98" r="3" fill="#10b981" />
+      </svg>
+    `;
+  }
+
+  // 4. Mist Foggers & Ultrasonic Atomizers
+  if (sku.includes('MIST') || name.includes('fogger') || name.includes('mist')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <defs>
+          <linearGradient id="canisterGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#475569" />
+            <stop offset="40%" stop-color="#94a3b8" />
+            <stop offset="100%" stop-color="#334155" />
+          </linearGradient>
+        </defs>
+        <!-- Stainless Main Tank/Body -->
+        <rect x="60" y="65" width="80" height="70" rx="8" fill="url(#canisterGrad)" stroke="#334155" stroke-width="2" />
+        <!-- Top Manifold Plate -->
+        <rect x="52" y="58" width="96" height="10" rx="3" fill="#334155" />
+        <!-- 4 Ultrasonic Atomizing Nozzles -->
+        <rect x="66" y="44" width="8" height="14" rx="2" fill="#cbd5e1" stroke="#64748b" stroke-width="1" />
+        <rect x="86" y="44" width="8" height="14" rx="2" fill="#cbd5e1" stroke="#64748b" stroke-width="1" />
+        <rect x="106" y="44" width="8" height="14" rx="2" fill="#cbd5e1" stroke="#64748b" stroke-width="1" />
+        <rect x="126" y="44" width="8" height="14" rx="2" fill="#cbd5e1" stroke="#64748b" stroke-width="1" />
+        <!-- Ultrasonic Mist Vapor Clouds -->
+        <path d="M 68,40 C 60,25 75,15 70,5 C 65,15 80,25 72,40" fill="#bae6fd" opacity="0.7" />
+        <path d="M 88,40 C 80,22 95,12 90,4 C 85,15 100,25 92,40" fill="#7dd3fc" opacity="0.8" />
+        <path d="M 108,40 C 100,22 115,12 110,4 C 105,15 120,25 112,40" fill="#7dd3fc" opacity="0.8" />
+        <path d="M 128,40 C 120,25 135,15 130,5 C 125,15 140,25 132,40" fill="#bae6fd" opacity="0.7" />
+        <!-- Water Level Indicator Glass -->
+        <rect x="95" y="80" width="10" height="40" rx="4" fill="#0284c7" opacity="0.8" />
+      </svg>
+    `;
+  }
+
+  // 5. AC Dimmer / Solid State Relays
+  if (sku.includes('DIM') || name.includes('dimmer') || name.includes('pwm') || name.includes('relay')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <!-- Industrial DIN-Rail Module -->
+        <rect x="55" y="45" width="90" height="85" rx="6" fill="#1e293b" stroke="#334155" stroke-width="2" />
+        <!-- Aluminum Extruded Heatsink Fins -->
+        <rect x="65" y="25" width="10" height="20" rx="2" fill="#64748b" />
+        <rect x="80" y="25" width="10" height="20" rx="2" fill="#64748b" />
+        <rect x="95" y="25" width="10" height="20" rx="2" fill="#64748b" />
+        <rect x="110" y="25" width="10" height="20" rx="2" fill="#64748b" />
+        <rect x="125" y="25" width="10" height="20" rx="2" fill="#64748b" />
+        <!-- PWM Sine Wave / AC Waveform -->
+        <path d="M 70,80 Q 80,62 90,80 T 110,80 T 130,80" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" />
+        <!-- Screw Terminals -->
+        <circle cx="70" cy="115" r="5" fill="#475569" stroke="#94a3b8" />
+        <circle cx="88" cy="115" r="5" fill="#475569" stroke="#94a3b8" />
+        <circle cx="112" cy="115" r="5" fill="#475569" stroke="#94a3b8" />
+        <circle cx="130" cy="115" r="5" fill="#475569" stroke="#94a3b8" />
+        <text x="100" y="102" fill="#10b981" font-size="8" font-family="sans-serif" font-weight="bold" text-anchor="middle">ZERO-CROSS AC</text>
+      </svg>
+    `;
+  }
+
+  // 6. Ventilation Fans / SilkWatt Exhaust Vent
+  if (sku.includes('FAN') || name.includes('fan') || name.includes('vent') || name.includes('exhaust')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <!-- Fan Circular Shroud -->
+        <circle cx="100" cy="80" r="55" fill="#f1f5f9" stroke="#334155" stroke-width="4" />
+        <circle cx="100" cy="80" r="50" fill="#0f172a" />
+        <!-- Aerofoil Fan Blades -->
+        <path d="M 100,80 C 110,60 120,40 100,32 C 85,38 90,60 100,80 Z" fill="#475569" />
+        <path d="M 100,80 C 120,90 140,100 148,80 C 142,65 120,70 100,80 Z" fill="#64748b" />
+        <path d="M 100,80 C 90,100 80,120 100,128 C 115,122 110,100 100,80 Z" fill="#475569" />
+        <path d="M 100,80 C 80,70 60,60 52,80 C 58,95 80,90 100,80 Z" fill="#64748b" />
+        <!-- Center Motor Hub -->
+        <circle cx="100" cy="80" r="14" fill="#1e293b" stroke="#0ea5e9" stroke-width="2" />
+        <!-- Airflow Motion Arcs -->
+        <path d="M 40,40 A 65 65 0 0 1 160 40" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-dasharray="8,6" opacity="0.7" />
+        <path d="M 160,120 A 65 65 0 0 1 40 120" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-dasharray="8,6" opacity="0.7" />
+      </svg>
+    `;
+  }
+
+  // 7. Light / Lux Sensors (BH1750)
+  if (sku.includes('BH1750') || name.includes('lux') || name.includes('light')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <!-- Photoperiod Sensor Housing -->
+        <rect x="65" y="60" width="70" height="70" rx="10" fill="#1e293b" stroke="#334155" stroke-width="2" />
+        <!-- Optical Dome Sphere -->
+        <circle cx="100" cy="95" r="22" fill="#f8fafc" stroke="#38bdf8" stroke-width="2" />
+        <circle cx="95" cy="88" r="6" fill="#ffffff" opacity="0.8" />
+        <!-- Sun Photoperiod Rays -->
+        <circle cx="100" cy="35" r="12" fill="#fbbf24" />
+        <line x1="100" y1="14" x2="100" y2="20" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="100" y1="50" x2="100" y2="56" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="79" y1="35" x2="85" y2="35" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="115" y1="35" x2="121" y2="35" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="85" y1="20" x2="89" y2="24" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="111" y1="46" x2="115" y2="50" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="85" y1="50" x2="89" y2="46" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="111" y1="24" x2="115" y2="20" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round" />
+      </svg>
+    `;
+  }
+
+  // 8. Software Mobile App & License
+  if (sku.includes('SFT') || cat.includes('application') || name.includes('mobile app')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <!-- Smartphone Body -->
+        <rect x="70" y="20" width="60" height="115" rx="12" fill="#0f172a" stroke="#334155" stroke-width="2.5" />
+        <!-- Screen Glass -->
+        <rect x="74" y="32" width="52" height="92" rx="4" fill="#047857" />
+        <!-- Speaker / Camera Notch -->
+        <rect x="92" y="25" width="16" height="3" rx="1.5" fill="#475569" />
+        <!-- Mini Telemetry Gauges on Screen -->
+        <circle cx="100" cy="55" r="14" fill="#065f46" stroke="#34d399" stroke-width="2" />
+        <text x="100" y="58" fill="#ffffff" font-size="7" font-weight="bold" text-anchor="middle">26.2°C</text>
+        <rect x="80" y="76" width="40" height="12" rx="3" fill="#065f46" />
+        <rect x="80" y="76" width="28" height="12" rx="3" fill="#10b981" />
+        <rect x="80" y="93" width="40" height="6" rx="2" fill="#065f46" />
+        <rect x="80" y="103" width="30" height="6" rx="2" fill="#065f46" />
+        <!-- Silkworm Mascot Pill -->
+        <circle cx="100" cy="130" r="3" fill="#475569" />
+      </svg>
+    `;
+  }
+
+  // 9. Professional Services & Calibration
+  if (sku.includes('SRV') || cat.includes('service') || name.includes('service') || name.includes('calibration')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <!-- Shield Badge -->
+        <path d="M 100,25 L 145,45 C 145,85 100,125 100,125 C 100,125 55,85 55,45 Z" fill="#0f766e" stroke="#14b8a6" stroke-width="2.5" />
+        <!-- Center Precision Verification Check -->
+        <path d="M 85,75 L 96,88 L 120,60" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" />
+        <circle cx="100" cy="75" r="32" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.6" />
+        <!-- Calibration Ribbons -->
+        <path d="M 80,115 L 75,140 L 90,132 L 100,140 L 95,120" fill="#0d9488" />
+        <path d="M 120,115 L 125,140 L 110,132 L 100,140 L 105,120" fill="#0d9488" />
+      </svg>
+    `;
+  }
+
+  // 10. Default Hardware Module Graphic
+  return `
+    <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+      <rect x="50" y="40" width="100" height="80" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2" />
+      <rect x="65" y="55" width="70" height="30" rx="4" fill="#0f172a" />
+      <circle cx="75" cy="100" r="4" fill="#10b981" />
+      <circle cx="90" cy="100" r="4" fill="#3b82f6" />
+      <circle cx="105" cy="100" r="4" fill="#f59e0b" />
+      <text x="100" y="74" fill="#10b981" font-size="9" font-family="sans-serif" font-weight="bold" text-anchor="middle">SETU HARDWARE</text>
+    </svg>
+  `;
+}
+
+function getDeterministicRating(productId) {
+  let hash = 0;
+  for (let i = 0; i < (productId || '').length; i++) {
+    hash = (hash << 5) - hash + productId.charCodeAt(i);
+    hash |= 0;
+  }
+  const abs = Math.abs(hash);
+  const score = (4.7 + (abs % 4) * 0.1).toFixed(1);
+  const count = 35 + (abs % 220);
+  return { score, count };
+}
+
 async function loadProducts(statusFilter = 'ALL') {
+  const grid = document.getElementById('productsGrid');
   const tbody = document.getElementById('productsTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading catalogue...</td></tr>';
+  if (grid) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 16px; color: var(--text-muted);">
+        <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; margin: 0 auto 12px auto; display: block;"></i>
+        Loading equipment store...
+      </div>
+    `;
+  }
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading catalogue...</td></tr>';
+  }
 
   try {
     const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
@@ -4425,25 +4777,352 @@ async function loadProducts(statusFilter = 'ALL') {
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load products`);
     allProductsList = await res.json();
-    filterProducts(statusFilter);
+    filterStoreProducts();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Failed to load products: ${escapeHtml(err.message)}</td></tr>`;
+    if (grid) {
+      grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--rose); padding: 48px 16px;">Failed to load equipment store: ${escapeHtml(err.message)}</div>`;
+    }
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Failed to load products: ${escapeHtml(err.message)}</td></tr>`;
+    }
     if (window.SetuTableManager) SetuTableManager.syncTable('productsTable');
   }
 }
 
+function setStoreCategoryFilter(cat, btn) {
+  storeActiveCategory = cat;
+  document.querySelectorAll('#storeCategoryPills .store-cat-pill').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  storeCurrentPage = 1;
+  filterStoreProducts();
+}
+
+function setProductViewMode(mode) {
+  storeProductViewMode = mode;
+  const gridWrap = document.getElementById('productsGridContainer');
+  const tableWrap = document.getElementById('productsTableContainer');
+  const btnGrid = document.getElementById('btnProductViewGrid');
+  const btnTable = document.getElementById('btnProductViewTable');
+
+  if (mode === 'grid') {
+    if (gridWrap) gridWrap.classList.remove('hidden');
+    if (tableWrap) tableWrap.classList.add('hidden');
+    if (btnGrid) { btnGrid.classList.add('active', 'btn-skin'); btnGrid.classList.remove('btn-outline'); }
+    if (btnTable) { btnTable.classList.remove('active', 'btn-skin'); btnTable.classList.add('btn-outline'); }
+  } else {
+    if (gridWrap) gridWrap.classList.add('hidden');
+    if (tableWrap) tableWrap.classList.remove('hidden');
+    if (btnTable) { btnTable.classList.add('active', 'btn-skin'); btnTable.classList.remove('btn-outline'); }
+    if (btnGrid) { btnGrid.classList.remove('active', 'btn-skin'); btnGrid.classList.add('btn-outline'); }
+    if (window.SetuTableManager) SetuTableManager.syncTable('productsTable');
+  }
+}
+
+function filterStoreProducts() {
+  const isFarmer = (currentUser && currentUser.role === 'farmer');
+
+  // Handle role-specific UI controls
+  const btnNew = document.getElementById('btnNewProductSku');
+  const btnOrders = document.getElementById('btnFarmerMyOrders');
+  if (isFarmer) {
+    if (btnNew) btnNew.style.display = 'none';
+    if (btnOrders) btnOrders.classList.remove('hidden');
+  } else {
+    if (btnNew) btnNew.style.display = 'inline-flex';
+    if (btnOrders) btnOrders.classList.add('hidden');
+  }
+
+  const searchInput = document.getElementById('storeSearchInput');
+  const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  const statusFilter = document.getElementById('prodStatusFilter')?.value || 'ALL';
+  const sortFilter = document.getElementById('prodSortFilter')?.value || 'FEATURED';
+
+  let filtered = allProductsList || [];
+
+  // Filter 1: Active/Archive status
+  if (isFarmer) {
+    filtered = filtered.filter(p => p.is_active && p.publication_status !== 'ARCHIVED');
+  } else if (statusFilter === 'ACTIVE') {
+    filtered = filtered.filter(p => p.is_active && p.publication_status !== 'ARCHIVED');
+  } else if (statusFilter === 'ARCHIVED') {
+    filtered = filtered.filter(p => !p.is_active || p.publication_status === 'ARCHIVED');
+  }
+
+  // Filter 2: Category Pill
+  if (storeActiveCategory !== 'ALL') {
+    const targetCat = storeActiveCategory.toLowerCase();
+    filtered = filtered.filter(p => {
+      const pCat = (p.category || '').toLowerCase();
+      if (targetCat === 'sensors') return pCat.includes('sensor') || (p.sku || '').includes('SNS');
+      if (targetCat === 'gateways') return pCat.includes('gateway') || (p.sku || '').includes('GW');
+      if (targetCat === 'services') return pCat.includes('service') || (p.sku || '').includes('SRV');
+      return pCat.includes(targetCat);
+    });
+  }
+
+  // Filter 3: Search Query
+  if (query.length > 0) {
+    filtered = filtered.filter(p => {
+      return (p.name || '').toLowerCase().includes(query) ||
+        (p.sku || '').toLowerCase().includes(query) ||
+        (p.category || '').toLowerCase().includes(query) ||
+        (p.short_description || '').toLowerCase().includes(query) ||
+        (p.description || '').toLowerCase().includes(query);
+    });
+  }
+
+  // Filter 4: Sorting
+  if (sortFilter === 'PRICE_LOW') {
+    filtered.sort((a, b) => (a.price_minor_units || 0) - (b.price_minor_units || 0));
+  } else if (sortFilter === 'PRICE_HIGH') {
+    filtered.sort((a, b) => (b.price_minor_units || 0) - (a.price_minor_units || 0));
+  } else if (sortFilter === 'BEST_SELLING') {
+    filtered.sort((a, b) => (b.stock_quantity || 0) - (a.stock_quantity || 0));
+  }
+
+  filteredStoreProducts = filtered;
+
+  // Render both Grid and Tabular views
+  renderStoreProductGrid();
+  renderProductsTable(filtered);
+}
+
+// Backward-compatible alias
 function filterProducts(status = 'ALL') {
+  const sel = document.getElementById('prodStatusFilter');
+  if (sel) sel.value = status;
+  filterStoreProducts();
+}
+
+function renderStoreProductGrid() {
+  const grid = document.getElementById('productsGrid');
+  if (!grid) return;
+
+  const totalItems = filteredStoreProducts.length;
+  const isFarmer = (currentUser && currentUser.role === 'farmer');
+
+  if (totalItems === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 56px 20px; background: var(--bg-surface); border: 1px dashed var(--border-color); border-radius: 12px;">
+        <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; color: var(--text-muted);">
+          <i data-lucide="package-x" style="width: 32px; height: 32px;"></i>
+        </div>
+        <div style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">No Products Found</div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); max-width: 440px; margin: 0 auto 18px auto;">
+          We couldn't find any sericulture hardware matching your search or category filter.
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="setStoreCategoryFilter('ALL', null); document.getElementById('storeSearchInput').value=''; filterStoreProducts();">
+          Reset Filters & Show All Hardware
+        </button>
+      </div>
+    `;
+    updateStorePagination(0, 0, 0, 1, 1);
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  const pageSize = storePageSize === 'all' ? totalItems : storePageSize;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (storeCurrentPage > totalPages) storeCurrentPage = totalPages;
+
+  const startIndex = (storeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pageItems = filteredStoreProducts.slice(startIndex, endIndex);
+
+  grid.innerHTML = pageItems.map(p => {
+    const unitPricePaise = p.price_minor_units || 0;
+    const unitPrice = unitPricePaise / 100;
+    const priceWhole = Math.floor(unitPrice).toLocaleString('en-IN');
+    const priceFraction = (unitPrice % 1).toFixed(2).substring(1); // e.g. .00
+
+    // Amazon style MRP strikethrough (approx 25-35% higher)
+    const mrpMultiplier = 1.30;
+    const mrpPrice = Math.round((unitPrice * mrpMultiplier) / 50) * 50;
+    const mrpFormatted = mrpPrice.toLocaleString('en-IN');
+    const discountPct = Math.round(((mrpPrice - unitPrice) / mrpPrice) * 100);
+
+    const inStock = (p.stock_quantity || 0) > 0;
+    const isArchived = !p.is_active || p.publication_status === 'ARCHIVED';
+    const rating = getDeterministicRating(p.id);
+
+    const hasCustomImage = (p.images && p.images.length > 0 && p.images[0]);
+    const imageHtml = hasCustomImage
+      ? `<img src="${p.images[0]}" alt="${escapeHtml(p.name)}" class="amazon-product-img" onerror="this.onerror=null; this.parentElement.innerHTML=getProductIllustrationSvg(${JSON.stringify(p).replace(/"/g, '&quot;')});">`
+      : `<div class="amazon-hardware-illustration">${getProductIllustrationSvg(p)}</div>`;
+
+    // Badges
+    let badgeHtml = '';
+    if ((p.sku || '').includes('GW') || (p.sku || '').includes('SFT')) {
+      badgeHtml = `<span class="amazon-badge-bestseller">#1 Best Seller</span>`;
+    } else if ((p.sku || '').includes('SHT31') || (p.sku || '').includes('MIST')) {
+      badgeHtml = `<span class="amazon-badge-prime"><i data-lucide="check"></i> Setu Verified</span>`;
+    }
+
+    const shortDesc = p.short_description || p.description || 'Certified Sericulture precision hardware calibrated for silkworm rearing sheds.';
+
+    // Key specs chips
+    const specsChips = [];
+    if (p.compatibility) specsChips.push(p.compatibility);
+    if ((p.sku || '').includes('SHT31')) specsChips.push('±0.2°C Precision', 'RS485 Modbus');
+    if ((p.sku || '').includes('MQ135')) specsChips.push('CO2 / NH3 Dual', 'Sub-ppm Sensor');
+    if ((p.sku || '').includes('GW')) specsChips.push('Dual WiFi / BLE', 'Modbus RTU');
+    if ((p.sku || '').includes('DIM')) specsChips.push('1000W Zero-Cross', 'DIN-Rail');
+    if ((p.sku || '').includes('MIST')) specsChips.push('4x Brass Nozzles', 'Sub-10µm Mist');
+    if ((p.sku || '').includes('FAN')) specsChips.push('Reversible Vent', 'Instar Auto');
+
+    const chipsHtml = specsChips.slice(0, 3).map(c => `<span class="amazon-spec-chip">${escapeHtml(c)}</span>`).join('');
+
+    // Admin drop-down
+    const adminMenuHtml = !isFarmer ? `
+      <div class="row-action-dropdown">
+        <button type="button" class="amazon-admin-btn" onclick="toggleRowActionMenu(event, 'store-p-${p.id}')" title="Catalogue Options" aria-label="Product Options">
+          <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
+        </button>
+        <div class="row-action-menu hidden" id="row-action-menu-store-p-${p.id}">
+          <button type="button" class="row-action-item" onclick="toggleProductPublication('${p.id}', '${p.publication_status}'); closeAllRowActionMenus();">
+            <i data-lucide="globe"></i> <span>${p.publication_status === 'PUBLISHED' ? 'Unpublish to Draft' : 'Publish to Store'}</span>
+          </button>
+          <button type="button" class="row-action-item" onclick="toggleProductArchive('${p.id}'); closeAllRowActionMenus();">
+            <i data-lucide="${isArchived ? 'rotate-ccw' : 'archive'}"></i> <span>${isArchived ? 'Restore Product' : 'Archive SKU'}</span>
+          </button>
+          <div class="row-action-divider"></div>
+          <button type="button" class="row-action-item danger-item" onclick="confirmDeleteProduct('${p.id}'); closeAllRowActionMenus();">
+            <i data-lucide="trash-2"></i> <span>Delete Permanently</span>
+          </button>
+        </div>
+      </div>
+    ` : '';
+
+    return `
+      <div class="amazon-product-card" data-id="${p.id}">
+        <!-- Top Badges -->
+        <div class="amazon-card-badges">
+          ${badgeHtml}
+          <span class="amazon-category-tag">${escapeHtml(p.category || 'Hardware')}</span>
+        </div>
+
+        <!-- Product Visual -->
+        <div class="amazon-image-box" onclick="openProductSpecsModal('${p.id}')" title="Click to inspect technical specifications">
+          ${imageHtml}
+        </div>
+
+        <!-- Card Body -->
+        <div class="amazon-card-body">
+          <!-- Title -->
+          <h3 class="amazon-product-title" onclick="openProductSpecsModal('${p.id}')" title="${escapeHtml(p.name)}">
+            ${escapeHtml(p.name)}
+          </h3>
+
+          <!-- Amazon Star Rating & Social Proof -->
+          <div class="amazon-rating-row">
+            <div class="amazon-stars">★★★★★</div>
+            <span class="amazon-rating-score">${rating.score}</span>
+            <span class="amazon-review-count">(${rating.count} verified farmers)</span>
+          </div>
+
+          <!-- Short Feature Description -->
+          <p class="amazon-product-desc">${escapeHtml(shortDesc)}</p>
+
+          <!-- Specs Chips -->
+          ${chipsHtml ? `<div class="amazon-specs-chips">${chipsHtml}</div>` : ''}
+
+          <!-- Amazon Price Block -->
+          <div class="amazon-price-block">
+            <div class="amazon-price-main">
+              <span class="amazon-price-currency">₹</span>
+              <span class="amazon-price-amount">${priceWhole}</span>
+              <span class="amazon-price-fraction">${priceFraction}</span>
+            </div>
+            <div class="amazon-mrp-row">
+              <span class="amazon-mrp">M.R.P.: <del>₹${mrpFormatted}</del></span>
+              <span class="amazon-discount">${discountPct}% off</span>
+            </div>
+            <div class="amazon-tax-note">Inclusive of 18% GST (ITC Eligible)</div>
+          </div>
+
+          <!-- Stock & Delivery Badges -->
+          <div class="amazon-delivery-info">
+            <div class="amazon-stock-status ${inStock ? 'in-stock' : 'out-of-stock'}">
+              <i data-lucide="${inStock ? 'check-circle-2' : 'x-circle'}" style="width: 14px; height: 14px;"></i>
+              <span>${inStock ? `In Stock (${p.stock_quantity} units in Bangalore hub)` : 'Currently Out of Stock'}</span>
+            </div>
+            <div class="amazon-delivery-time">
+              <i data-lucide="truck" style="width: 14px; height: 14px;"></i>
+              <span>Free Shed Delivery &bull; Technician Calibration Included</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="amazon-card-actions">
+            <button type="button" class="amazon-btn-buy" onclick="openFarmerOrderModal('${p.id}')" ${!inStock ? 'disabled' : ''} title="${inStock ? 'Order equipment for rearing shed' : 'Out of stock'}">
+              <i data-lucide="shopping-bag" style="width: 15px; height: 15px;"></i> Buy Now
+            </button>
+            <button type="button" class="amazon-btn-specs" onclick="openProductSpecsModal('${p.id}')" title="Technical Specifications">
+              <i data-lucide="info" style="width: 14px; height: 14px;"></i> Specs
+            </button>
+            ${adminMenuHtml}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  updateStorePagination(startIndex + 1, endIndex, totalItems, storeCurrentPage, totalPages);
+  if (window.lucide) lucide.createIcons();
+}
+
+function updateStorePagination(start, end, total, current, totalPages) {
+  const startEl = document.getElementById('storeShowingStart');
+  const endEl = document.getElementById('storeShowingEnd');
+  const totalEl = document.getElementById('storeTotalItems');
+  const currPageEl = document.getElementById('storeCurrentPageNum');
+  const totalPagesEl = document.getElementById('storeTotalPagesNum');
+  const btnPrev = document.getElementById('btnStorePrevPage');
+  const btnNext = document.getElementById('btnStoreNextPage');
+
+  if (startEl) startEl.textContent = start;
+  if (endEl) endEl.textContent = end;
+  if (totalEl) totalEl.textContent = total;
+  if (currPageEl) currPageEl.textContent = current;
+  if (totalPagesEl) totalPagesEl.textContent = totalPages;
+
+  if (btnPrev) btnPrev.disabled = (current <= 1);
+  if (btnNext) btnNext.disabled = (current >= totalPages);
+}
+
+function prevStorePage() {
+  if (storeCurrentPage > 1) {
+    storeCurrentPage--;
+    renderStoreProductGrid();
+    const wrap = document.getElementById('section-products');
+    if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function nextStorePage() {
+  const pageSize = storePageSize === 'all' ? filteredStoreProducts.length : storePageSize;
+  const totalPages = Math.max(1, Math.ceil(filteredStoreProducts.length / pageSize));
+  if (storeCurrentPage < totalPages) {
+    storeCurrentPage++;
+    renderStoreProductGrid();
+    const wrap = document.getElementById('section-products');
+    if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function changeStorePageSize(val) {
+  storePageSize = (val === 'all') ? 'all' : parseInt(val, 10);
+  storeCurrentPage = 1;
+  renderStoreProductGrid();
+}
+
+function renderProductsTable(filtered) {
   const tbody = document.getElementById('productsTableBody');
   if (!tbody) return;
 
-  let filtered = allProductsList;
-  if (status === 'ACTIVE') {
-    filtered = allProductsList.filter(p => p.is_active && p.publication_status !== 'ARCHIVED');
-  } else if (status === 'ARCHIVED') {
-    filtered = allProductsList.filter(p => !p.is_active || p.publication_status === 'ARCHIVED');
-  }
+  const isFarmer = (currentUser && currentUser.role === 'farmer');
 
-  if (filtered.length === 0) {
+  if (!filtered || filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 36px; color: var(--text-muted);">
       <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 6px;">No Products Found</div>
       <div>No hardware products match the selected criteria.</div>
@@ -4453,7 +5132,7 @@ function filterProducts(status = 'ALL') {
   }
 
   tbody.innerHTML = filtered.map(p => {
-    const priceFormatted = (p.price_minor_units / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    const priceFormatted = ((p.price_minor_units || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
     const isArchived = !p.is_active || p.publication_status === 'ARCHIVED';
     const statusBadge = isArchived
       ? '<span class="badge badge-warning">ARCHIVED</span>'
@@ -4469,35 +5148,45 @@ function filterProducts(status = 'ALL') {
         </td>
         <td style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600;">${escapeHtml(p.sku)}</td>
         <td>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 36px; height: 36px; border-radius: 6px; background: rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 18px; height: 18px;"></i></div>`}
+          <div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="openProductSpecsModal('${p.id}')" title="Click to view full specifications">
+            ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 38px; height: 38px; border-radius: 6px; background: rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 18px; height: 18px;"></i></div>`}
             <div>
-              <div style="font-weight: 700; color: var(--text-main);">${escapeHtml(p.name)}</div>
-              ${p.short_description ? `<div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.2;">${escapeHtml(p.short_description.substring(0, 50))}...</div>` : ''}
+              <div style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">${escapeHtml(p.name)}</div>
+              ${p.short_description ? `<div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.2;">${escapeHtml(p.short_description.substring(0, 55))}...</div>` : ''}
             </div>
           </div>
         </td>
         <td><span style="font-size: 0.8rem;">${escapeHtml(p.category)}</span></td>
         <td style="font-weight: 700;">₹${priceFormatted}</td>
-        <td><span class="badge ${p.stock_quantity > 0 ? 'badge-info' : 'badge-danger'}">${p.stock_quantity} ${escapeHtml(p.unit || 'units')}</span></td>
+        <td><span class="badge ${p.stock_quantity > 0 ? 'badge-info' : 'badge-danger'}">${p.stock_quantity > 0 ? `${p.stock_quantity} in stock` : 'Out of Stock'}</span></td>
         <td>${statusBadge}</td>
         <td>
-          <div class="row-action-dropdown">
-            <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'prod-${p.id}')" title="Actions" aria-label="Product Actions">
-              <i data-lucide="more-vertical"></i>
+          <div style="display: flex; align-items: center; gap: 6px; justify-content: center;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openProductSpecsModal('${p.id}')" title="Technical Specifications" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="info" style="width: 13px; height: 13px;"></i> Specs
             </button>
-            <div class="row-action-menu hidden" id="row-action-menu-prod-${p.id}">
-              <button type="button" class="row-action-item" onclick="toggleProductPublication('${p.id}', '${p.publication_status}'); closeAllRowActionMenus();">
-                <i data-lucide="globe"></i> <span>${p.publication_status === 'PUBLISHED' ? 'Unpublish to Draft' : 'Publish to Store'}</span>
-              </button>
-              <button type="button" class="row-action-item" onclick="toggleProductArchive('${p.id}'); closeAllRowActionMenus();">
-                <i data-lucide="${isArchived ? 'rotate-ccw' : 'archive'}"></i> <span>${isArchived ? 'Restore Product' : 'Archive SKU'}</span>
-              </button>
-              <div class="row-action-divider"></div>
-              <button type="button" class="row-action-item danger-item" onclick="confirmDeleteProduct('${p.id}'); closeAllRowActionMenus();">
-                <i data-lucide="trash-2"></i> <span>Delete Permanently</span>
-              </button>
-            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openFarmerOrderModal('${p.id}')" title="Order equipment for rearing shed" style="padding: 4px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #FFD814; border: 1px solid #FCD200; color: #0F1111; white-space: nowrap;">
+              <i data-lucide="shopping-bag" style="width: 13px; height: 13px;"></i> Buy Now
+            </button>
+            ${!isFarmer ? `
+              <div class="row-action-dropdown">
+                <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'prod-${p.id}')" title="Admin Actions" aria-label="Product Actions">
+                  <i data-lucide="more-vertical"></i>
+                </button>
+                <div class="row-action-menu hidden" id="row-action-menu-prod-${p.id}">
+                  <button type="button" class="row-action-item" onclick="toggleProductPublication('${p.id}', '${p.publication_status}'); closeAllRowActionMenus();">
+                    <i data-lucide="globe"></i> <span>${p.publication_status === 'PUBLISHED' ? 'Unpublish to Draft' : 'Publish to Store'}</span>
+                  </button>
+                  <button type="button" class="row-action-item" onclick="toggleProductArchive('${p.id}'); closeAllRowActionMenus();">
+                    <i data-lucide="${isArchived ? 'rotate-ccw' : 'archive'}"></i> <span>${isArchived ? 'Restore Product' : 'Archive SKU'}</span>
+                  </button>
+                  <div class="row-action-divider"></div>
+                  <button type="button" class="row-action-item danger-item" onclick="confirmDeleteProduct('${p.id}'); closeAllRowActionMenus();">
+                    <i data-lucide="trash-2"></i> <span>Delete Permanently</span>
+                  </button>
+                </div>
+              </div>
+            ` : ''}
           </div>
         </td>
       </tr>
@@ -4506,6 +5195,320 @@ function filterProducts(status = 'ALL') {
 
   if (window.SetuTableManager) SetuTableManager.syncTable('productsTable');
   if (window.lucide) lucide.createIcons();
+}
+
+function adjustFarmerOrderQty(delta) {
+  let qty = (window.farmerCurrentOrderQty || 1) + delta;
+  if (qty < 1) qty = 1;
+  if (qty > 99) qty = 99;
+  window.farmerCurrentOrderQty = qty;
+
+  const display = document.getElementById('farmerOrderQtyDisplay');
+  const unitQty = document.getElementById('calcUnitQty');
+  if (display) display.textContent = qty;
+  if (unitQty) unitQty.textContent = qty;
+
+  const unitPrice = (window.farmerCurrentOrderUnitPricePaise || 0) / 100;
+  const subtotal = unitPrice * qty;
+  const gst = subtotal * 0.18;
+  const total = subtotal + gst;
+
+  const subtotalEl = document.getElementById('calcSubtotal');
+  const gstEl = document.getElementById('calcGst');
+  const totalEl = document.getElementById('calcTotalPayable');
+  const btnText = document.getElementById('farmerOrderBtnText');
+
+  if (subtotalEl) subtotalEl.textContent = `₹${subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  if (gstEl) gstEl.textContent = `₹${gst.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  if (totalEl) totalEl.textContent = `₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  if (btnText) btnText.textContent = `Place Order (₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})})`;
+}
+
+function handlePaymentMethodChange(method) {
+  const lblUPI = document.getElementById('payMethodLabelUPI');
+  const lblCOD = document.getElementById('payMethodLabelCOD');
+  if (lblUPI && lblCOD) {
+    if (method === 'UPI') {
+      lblUPI.style.borderColor = 'var(--brand-primary, #059669)';
+      lblUPI.style.background = 'var(--brand-tint, rgba(5,150,105,0.08))';
+      lblCOD.style.borderColor = 'var(--border-color)';
+      lblCOD.style.background = 'transparent';
+    } else {
+      lblCOD.style.borderColor = 'var(--brand-primary, #059669)';
+      lblCOD.style.background = 'var(--brand-tint, rgba(5,150,105,0.08))';
+      lblUPI.style.borderColor = 'var(--border-color)';
+      lblUPI.style.background = 'transparent';
+    }
+  }
+}
+
+function openFarmerOrderModal(productId) {
+  let p = allProductsList.find(x => x.id === productId);
+  if (!p) return;
+
+  window.farmerCurrentOrderQty = 1;
+  window.farmerCurrentOrderUnitPricePaise = p.price_minor_units || 0;
+
+  const unitPrice = (p.price_minor_units || 0) / 100;
+  const subtotal = unitPrice * 1;
+  const gst = subtotal * 0.18;
+  const total = subtotal + gst;
+
+  const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+  const farmerUser = currentUser || {};
+  const defaultAddress = farmerUser.farm_name 
+    ? `${farmerUser.farm_name}, ${farmerUser.region || 'Karnataka'}`
+    : 'Shed No. 1, Main Road, Sericulture Cluster';
+
+  const modalHtml = `
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <!-- Product Card -->
+      <div style="display: flex; gap: 14px; background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; align-items: center;">
+        ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 58px; height: 58px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 58px; height: 58px; border-radius: 8px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 28px; height: 28px;"></i></div>`}
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted); font-weight: 600;">${escapeHtml(p.sku)} · ${escapeHtml(p.category)}</div>
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-top: 1px;">${escapeHtml(p.name)}</div>
+          <div style="font-weight: 800; font-size: 1.1rem; color: var(--brand-primary, #059669); margin-top: 3px;">
+            ₹${unitPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})} 
+            <span style="font-size: 0.72rem; font-weight: 500; color: var(--text-muted);">per ${escapeHtml(p.unit || 'unit')}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quantity & Price Breakdown -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <span style="font-weight: 700; font-size: 0.86rem; color: var(--text-main);">Order Quantity:</span>
+          <div style="display: inline-flex; align-items: center; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden;">
+            <button type="button" class="btn btn-sm" onclick="adjustFarmerOrderQty(-1)" style="padding: 4px 12px; border-radius: 0; background: var(--bg-surface); font-weight: 700;">-</button>
+            <span id="farmerOrderQtyDisplay" style="padding: 4px 14px; font-weight: 700; font-size: 0.92rem; min-width: 38px; text-align: center;">1</span>
+            <button type="button" class="btn btn-sm" onclick="adjustFarmerOrderQty(1)" style="padding: 4px 12px; border-radius: 0; background: var(--bg-surface); font-weight: 700;">+</button>
+          </div>
+        </div>
+        
+        <div style="font-size: 0.82rem; border-top: 1px dashed var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: flex; justify-content: space-between; color: var(--text-secondary);">
+            <span>Base Subtotal (<span id="calcUnitQty">1</span> ${p.unit || 'unit'}):</span>
+            <span id="calcSubtotal">₹${subtotal.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: var(--text-secondary);">
+            <span>GST (18% ITC Eligible):</span>
+            <span id="calcGst">₹${gst.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: var(--text-secondary);">
+            <span>Shed Delivery & Transit:</span>
+            <span style="color: var(--brand-primary, #059669); font-weight: 700;">FREE</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1.02rem; color: var(--text-main); border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 2px;">
+            <span>Total Payable:</span>
+            <span id="calcTotalPayable" style="color: var(--brand-primary, #059669);">₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shed Delivery Address -->
+      <div>
+        <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Rearing Shed Delivery Address *</label>
+        <textarea id="farmerOrderAddress" rows="2" class="form-control" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.84rem;">${escapeHtml(defaultAddress)}</textarea>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Hardware dispatch will coordinate directly with your taluk sericulture field technician.</div>
+      </div>
+
+      <!-- Payment Method -->
+      <div>
+        <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 6px; color: var(--text-main);">Payment Method *</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <label style="display: flex; align-items: center; gap: 8px; padding: 10px; border: 1.5px solid var(--brand-primary, #059669); border-radius: 6px; cursor: pointer; background: var(--brand-tint, rgba(5,150,105,0.08));" id="payMethodLabelUPI">
+            <input type="radio" name="farmerPaymentMethod" value="UPI" checked onchange="handlePaymentMethodChange('UPI')">
+            <span style="font-size: 0.82rem; font-weight: 600;">UPI / Instant QR</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;" id="payMethodLabelCOD">
+            <input type="radio" name="farmerPaymentMethod" value="COD" onchange="handlePaymentMethodChange('COD')">
+            <span style="font-size: 0.82rem; font-weight: 600;">Pay at Shed (COD)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Error Alert -->
+      <div id="farmerOrderError" class="hidden" style="color: #b91c1c; background: #fef2f2; border: 1px solid #f87171; border-radius: 6px; padding: 8px 12px; font-size: 0.82rem;"></div>
+
+      <!-- Modal Footer -->
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSubmitFarmerOrder" onclick="submitFarmerHardwareOrder('${p.id}')" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 8px 20px;">
+          <i data-lucide="check-circle-2"></i> <span id="farmerOrderBtnText">Place Order (₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})</span>
+        </button>
+      </div>
+    </div>
+  `;
+
+  openAppModal('Complete Hardware Purchase', modalHtml, 'md');
+}
+
+async function submitFarmerHardwareOrder(productId) {
+  const p = allProductsList.find(x => x.id === productId);
+  if (!p) return;
+
+  const address = document.getElementById('farmerOrderAddress')?.value?.trim();
+  if (!address) {
+    const errBox = document.getElementById('farmerOrderError');
+    if (errBox) {
+      errBox.textContent = 'Please enter your rearing shed delivery address.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  const payMethod = document.querySelector('input[name="farmerPaymentMethod"]:checked')?.value || 'UPI';
+  const qty = window.farmerCurrentOrderQty || 1;
+  const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+
+  const btn = document.getElementById('btnSubmitFarmerOrder');
+  const btnText = document.getElementById('farmerOrderBtnText');
+  if (btn) btn.disabled = true;
+  if (btnText) btnText.textContent = 'Placing Order...';
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        items: [{ product_id: p.id, quantity: qty }],
+        shipping_address: address,
+        payment_method: payMethod,
+        notes: `Direct purchase from Setu Farmer Hub (${payMethod})`
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to place order.');
+
+    const orderNum = data.order_number || data.id || 'ORD-2026';
+    const totalINR = ((data.total_amount_minor_units || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+    // Success Screen
+    openAppModal('Order Confirmed!', `
+      <div style="text-align: center; padding: 16px 10px;">
+        <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(16, 185, 129, 0.12); color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto;">
+          <i data-lucide="check" style="width: 32px; height: 32px;"></i>
+        </div>
+        <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">Order Confirmed Successfully!</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 440px; margin: 0 auto 18px auto; line-height: 1.5;">
+          Your hardware order has been verified and registered with Setu Sericulture Fulfilment. An official GST invoice and tracking ID have been generated.
+        </p>
+        
+        <div style="background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; max-width: 420px; margin: 0 auto 22px auto; text-align: left; font-size: 0.84rem; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Order Number:</span>
+            <strong class="font-mono">${escapeHtml(orderNum)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Item Ordered:</span>
+            <strong>${escapeHtml(p.name)} (${qty} ${p.unit || 'unit'})</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Total Payable:</span>
+            <strong style="color: var(--brand-primary, #059669); font-size: 0.95rem;">₹${totalINR}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Payment Mode:</span>
+            <span class="badge badge-neutral">${escapeHtml(payMethod)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Dispatch Status:</span>
+            <span class="badge badge-success">CONFIRMED · DISPATCH PREP</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 12px;">
+          <button type="button" class="btn btn-primary" onclick="closeAppModal(); switchNavTab('orders');" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 8px 22px; border-radius: 6px;">
+            <i data-lucide="shopping-bag"></i> View in My Orders
+          </button>
+          <button type="button" class="btn btn-skin" onclick="closeAppModal();">
+            Continue Browsing
+          </button>
+        </div>
+      </div>
+    `, 'md');
+
+    showToast(`Order ${orderNum} placed successfully!`, 'success');
+    if (typeof loadOrders === 'function') loadOrders();
+  } catch (err) {
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.textContent = 'Place Order';
+    const errBox = document.getElementById('farmerOrderError');
+    if (errBox) {
+      errBox.textContent = err.message || 'Error occurred while placing order.';
+      errBox.classList.remove('hidden');
+    }
+  }
+}
+
+function openProductSpecsModal(productId) {
+  const p = allProductsList.find(x => x.id === productId);
+  if (!p) return;
+  const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+  const priceFormatted = (p.price_minor_units / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  
+  let specsHtml = '';
+  if (p.specifications && typeof p.specifications === 'object') {
+    specsHtml = '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;">' +
+      Object.entries(p.specifications).map(([k, v]) => `
+        <div style="background: var(--bg-surface-alt, #f8fafc); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">${escapeHtml(k)}</div>
+          <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-top: 2px;">${escapeHtml(String(v))}</div>
+        </div>
+      `).join('') +
+      '</div>';
+  }
+
+  const content = `
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; gap: 16px; align-items: center;">
+        ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 100px; height: 100px; border-radius: 8px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 40px; height: 40px;"></i></div>`}
+        <div style="flex: 1;">
+          <span class="badge badge-info" style="font-size: 0.72rem; margin-bottom: 4px;">${escapeHtml(p.category)}</span>
+          <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin: 2px 0 4px 0;">${escapeHtml(p.name)}</h3>
+          <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">SKU: ${escapeHtml(p.sku)}</div>
+          <div style="font-weight: 800; font-size: 1.25rem; color: var(--brand-primary, #059669); margin-top: 6px;">
+            ₹${priceFormatted} <span style="font-size: 0.74rem; font-weight: 500; color: var(--text-muted);">+ 18% GST (ITC Eligible)</span>
+          </div>
+        </div>
+      </div>
+      
+      <div>
+        <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Description & Field Application</h4>
+        <p style="font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; margin: 0;">${escapeHtml(p.description || p.short_description || 'Standard Sericulture IoT Hardware Component')}</p>
+      </div>
+
+      ${p.compatibility ? `
+        <div>
+          <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Hardware Compatibility</h4>
+          <div style="font-size: 0.8rem; background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; color: var(--text-secondary);">
+            <i data-lucide="check-circle" style="width: 14px; height: 14px; color: var(--brand-primary); display: inline; vertical-align: middle;"></i> ${escapeHtml(p.compatibility)}
+          </div>
+        </div>
+      ` : ''}
+
+      ${specsHtml ? `
+        <div>
+          <h4 style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 2px;">Technical Specifications</h4>
+          ${specsHtml}
+        </div>
+      ` : ''}
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="closeAppModal(); openFarmerOrderModal('${p.id}');" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 6px 18px;">
+          <i data-lucide="shopping-bag"></i> Buy Now
+        </button>
+      </div>
+    </div>
+  `;
+
+  openAppModal('Product Specifications & Field Guide', content, 'lg');
 }
 
 function openCreateProductModal() {
@@ -4651,6 +5654,12 @@ function confirmDeleteProduct(productId) {
 // 2. SALES & ORDERS
 // ------------------------------------------------------------------------------
 async function loadOrders(statusFilter = '') {
+  const isFarmer = (currentUser && currentUser.role === 'farmer');
+  const ordersHeading = document.getElementById('ordersTableHeading') || document.querySelector('#section-orders .table-title span');
+  if (ordersHeading) {
+    ordersHeading.textContent = isFarmer ? 'My Equipment Orders & Tracking' : 'Customer Hardware Orders & Fulfilment';
+  }
+
   const tbody = document.getElementById('ordersTableBody');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading orders...</td></tr>';
@@ -4674,12 +5683,30 @@ function renderOrdersTable(orders) {
   const tbody = document.getElementById('ordersTableBody');
   if (!tbody) return;
 
+  const isFarmer = (currentUser && currentUser.role === 'farmer');
+
   if (!orders || orders.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 36px; color: var(--text-muted);">
-      <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 6px;">No Orders Recorded</div>
-      <div>No sales orders match your query filter.</div>
-    </td></tr>`;
+    if (isFarmer) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 44px 20px;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--brand-tint, rgba(5,150,105,0.08)); color: var(--brand-primary, #059669); display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto;">
+          <i data-lucide="shopping-bag" style="width: 28px; height: 28px;"></i>
+        </div>
+        <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">No Hardware Orders Yet</div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 480px; margin: 0 auto 18px auto; line-height: 1.5;">
+          Equip your rearing shed with certified Setu IoT Gateways, ultrasonic cold-mist foggers, and high-precision Sensirion climate probes.
+        </p>
+        <button type="button" class="btn btn-primary btn-sm" onclick="switchNavTab('products')" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 8px 20px; border-radius: 6px;">
+          <i data-lucide="package"></i> Browse Hardware Catalogue & Buy
+        </button>
+      </td></tr>`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 36px; color: var(--text-muted);">
+        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 6px;">No Orders Recorded</div>
+        <div>No sales orders match your query filter.</div>
+      </td></tr>`;
+    }
     if (window.SetuTableManager) SetuTableManager.syncTable('ordersTable');
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
@@ -4704,22 +5731,29 @@ function renderOrdersTable(orders) {
         <td>${statBadge}</td>
         <td style="font-size: 0.78rem;">${createdDate}</td>
         <td>
-          <div class="row-action-dropdown">
-            <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'ord-${ord.id}')" title="Actions" aria-label="Order Actions">
-              <i data-lucide="more-vertical"></i>
+          <div style="display: flex; align-items: center; gap: 6px; justify-content: center;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="openOrderDetailsModal('${ord.id}')" title="View Order & Invoice Details" style="padding: 4px 10px; font-size: 0.75rem; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+              <i data-lucide="file-text" style="width: 13px; height: 13px;"></i> Details
             </button>
-            <div class="row-action-menu hidden" id="row-action-menu-ord-${ord.id}">
-              <button type="button" class="row-action-item" onclick="updateOrderStatusAction('${ord.id}', 'FULFILLED'); closeAllRowActionMenus();">
-                <i data-lucide="check-circle"></i> <span>Mark as Fulfilled</span>
-              </button>
-              <button type="button" class="row-action-item" onclick="updateOrderStatusAction('${ord.id}', 'PAID'); closeAllRowActionMenus();">
-                <i data-lucide="credit-card"></i> <span>Mark as Paid</span>
-              </button>
-              <div class="row-action-divider"></div>
-              <button type="button" class="row-action-item danger-item" onclick="updateOrderStatusAction('${ord.id}', 'CANCELLED'); closeAllRowActionMenus();">
-                <i data-lucide="x-circle"></i> <span>Cancel Order</span>
-              </button>
-            </div>
+            ${!isFarmer ? `
+              <div class="row-action-dropdown">
+                <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'ord-${ord.id}')" title="Actions" aria-label="Order Actions">
+                  <i data-lucide="more-vertical"></i>
+                </button>
+                <div class="row-action-menu hidden" id="row-action-menu-ord-${ord.id}">
+                  <button type="button" class="row-action-item" onclick="updateOrderStatusAction('${ord.id}', 'FULFILLED'); closeAllRowActionMenus();">
+                    <i data-lucide="check-circle"></i> <span>Mark as Fulfilled</span>
+                  </button>
+                  <button type="button" class="row-action-item" onclick="updateOrderStatusAction('${ord.id}', 'PAID'); closeAllRowActionMenus();">
+                    <i data-lucide="credit-card"></i> <span>Mark as Paid</span>
+                  </button>
+                  <div class="row-action-divider"></div>
+                  <button type="button" class="row-action-item danger-item" onclick="updateOrderStatusAction('${ord.id}', 'CANCELLED'); closeAllRowActionMenus();">
+                    <i data-lucide="x-circle"></i> <span>Cancel Order</span>
+                  </button>
+                </div>
+              </div>
+            ` : ''}
           </div>
         </td>
       </tr>
@@ -4728,6 +5762,97 @@ function renderOrdersTable(orders) {
 
   if (window.SetuTableManager) SetuTableManager.syncTable('ordersTable');
   if (window.lucide) lucide.createIcons();
+}
+
+async function openOrderDetailsModal(orderId) {
+  let ord = allOrdersList.find(o => o.id === orderId);
+  if (!ord) {
+    try {
+      const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+      const res = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) ord = await res.json();
+    } catch (e) {}
+  }
+  if (!ord) {
+    showToast('Order details could not be loaded.', 'error');
+    return;
+  }
+
+  const totalINR = ((ord.total_amount_minor_units || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+  const createdDate = ord.created_at ? new Date(ord.created_at).toLocaleString() : '--';
+  const statBadge = ord.status === 'PAID'
+    ? '<span class="badge badge-success">PAID</span>'
+    : (ord.status === 'FULFILLED'
+        ? '<span class="badge badge-info">FULFILLED</span>'
+        : (ord.status === 'CANCELLED' ? '<span class="badge badge-danger">CANCELLED</span>' : '<span class="badge badge-warning">PROCESSING</span>'));
+
+  const itemsHtml = (ord.items && ord.items.length > 0)
+    ? ord.items.map(it => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--border-color); font-size: 0.84rem;">
+          <div>
+            <strong>${escapeHtml(it.product_name || 'Hardware Component')}</strong>
+            <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">Qty: ${it.quantity} × ₹${((it.unit_price_minor_units || 0)/100).toFixed(2)}</div>
+          </div>
+          <strong style="color: var(--text-main);">₹${((it.total_price_minor_units || 0)/100).toFixed(2)}</strong>
+        </div>
+      `).join('')
+    : `<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 0.84rem;">
+        <div><strong>Sericulture IoT Sensor & Actuation Kit</strong></div>
+        <strong>₹${totalINR}</strong>
+       </div>`;
+
+  const modalHtml = `
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-alt, #f8fafc); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">ORDER NUMBER</div>
+          <div style="font-weight: 800; font-size: 1.05rem; color: var(--text-main);">${escapeHtml(ord.order_number || ord.id)}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 0.72rem; color: var(--text-muted);">FULFILMENT STATUS</div>
+          <div>${statBadge}</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.82rem;">
+        <div style="background: var(--bg-surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="color: var(--text-muted); font-size: 0.72rem; font-weight: 600;">CUSTOMER & REARING SHED</div>
+          <div style="font-weight: 700; margin-top: 2px;">${escapeHtml(ord.customer_name || 'Farmer')}</div>
+          <div style="color: var(--text-secondary);">${escapeHtml(ord.farm_name || 'Rearing Shed')}</div>
+        </div>
+        <div style="background: var(--bg-surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="color: var(--text-muted); font-size: 0.72rem; font-weight: 600;">DATE & PAYMENT METHOD</div>
+          <div style="font-weight: 700; margin-top: 2px;">${createdDate}</div>
+          <div style="color: var(--text-secondary);">Mode: ${escapeHtml(ord.payment_method || 'UPI / Pay at Shed')}</div>
+        </div>
+      </div>
+
+      ${ord.shipping_address ? `
+        <div style="font-size: 0.82rem; background: var(--bg-surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color);">
+          <div style="color: var(--text-muted); font-size: 0.72rem; font-weight: 600;">SHIPPING & DISPATCH DESTINATION</div>
+          <div style="margin-top: 2px; color: var(--text-main);">${escapeHtml(ord.shipping_address)}</div>
+        </div>
+      ` : ''}
+
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase;">Ordered Hardware Items</div>
+        ${itemsHtml}
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid var(--border-color); font-size: 1rem; font-weight: 800;">
+        <span>Total Amount:</span>
+        <span style="color: var(--brand-primary, #059669);">₹${totalINR}</span>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
+      </div>
+    </div>
+  `;
+
+  openAppModal('Sales Order & Fulfilment Details', modalHtml, 'md');
 }
 
 async function updateOrderStatusAction(orderId, nextStatus) {
@@ -5467,34 +6592,7 @@ async function loadUsers() {
 }
 
 async function loadAuditLogs() {
-  const tbody = document.getElementById('auditTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 24px;">Loading security audit trail...</td></tr>';
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/platform/audit-logs`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
-    if (!res.ok) throw new Error('Failed to load audit trail');
-    const logs = await res.json();
-
-    tbody.innerHTML = logs.map(l => `
-      <tr data-id="${l.id}">
-        <td class="td-bulk-select" style="text-align: center;">
-          <input type="checkbox" class="row-select-checkbox" data-row-id="${l.id}" aria-label="Select Log" onchange="SetuTableManager.handleRowCheck('auditTable', '${l.id}', this)">
-        </td>
-        <td style="font-family: var(--font-mono); font-size: 0.78rem;">${new Date(l.created_at).toLocaleString()}</td>
-        <td style="font-weight: 600;">${escapeHtml(l.actor_identity)}</td>
-        <td><span class="badge badge-info">${escapeHtml(l.action)}</span></td>
-        <td style="font-family: var(--font-mono); font-size: 0.78rem;">${escapeHtml(l.resource_type)}</td>
-        <td style="font-size: 0.8rem;">${escapeHtml(l.details)}</td>
-        <td style="font-family: var(--font-mono); font-size: 0.76rem;">${escapeHtml(l.ip_address || '127.0.0.1')}</td>
-      </tr>
-    `).join('');
-
-    if (window.SetuTableManager) SetuTableManager.syncTable('auditTable');
-    if (window.lucide) lucide.createIcons();
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--rose); padding: 20px;">Failed to load audit logs: ${escapeHtml(err.message)}</td></tr>`;
-  }
+  return loadAuditRecords();
 }
 
 async function loadGuidanceArticles(lang = 'en') {
@@ -6049,3 +7147,9 @@ window.loadRolesAndPermissions = loadRolesAndPermissions;
 window.loadDepartmentsList = loadDepartmentsList;
 window.loadAuditRecords = loadAuditRecords;
 window.switchNavTab = switchNavTab;
+window.setProductViewMode = setProductViewMode;
+window.filterStoreProducts = filterStoreProducts;
+window.setStoreCategoryFilter = setStoreCategoryFilter;
+window.prevStorePage = prevStorePage;
+window.nextStorePage = nextStorePage;
+window.changeStorePageSize = changeStorePageSize;

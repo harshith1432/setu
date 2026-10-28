@@ -435,6 +435,11 @@ class SetuProvider with ChangeNotifier {
 
   Future<({bool success, bool needsFarmSetup, String message, String? defaultName, String? email})> signInWithGoogle() async {
     try {
+      // 1. Force Google account selection picker by signing out any cached session first
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         return (
@@ -448,9 +453,9 @@ class SetuProvider with ChangeNotifier {
 
       String? googleEmail = (googleUser.email.trim().isNotEmpty) ? googleUser.email.trim() : null;
       String googleName = (googleUser.displayName?.trim().isNotEmpty == true) ? googleUser.displayName!.trim() : 'Farmer';
-      String googleId = (googleUser.id.trim().isNotEmpty) ? googleUser.id.trim() : 'usr_';
+      String googleId = (googleUser.id.trim().isNotEmpty) ? googleUser.id.trim() : 'usr_${DateTime.now().millisecondsSinceEpoch}';
 
-      // Attempt optional Firebase Auth session linking without blocking backend OAuth
+      // 2. Attempt optional Firebase Auth session linking in background without blocking backend OAuth
       try {
         if (_firebaseAuthSafe != null) {
           final googleAuth = await googleUser.authentication;
@@ -470,7 +475,7 @@ class SetuProvider with ChangeNotifier {
           }
         }
       } catch (fbErr) {
-        debugPrint('[Auth] Firebase credential linking skipped/optional: ');
+        debugPrint('[Auth] Firebase credential linking skipped/optional: $fbErr');
       }
 
       _pendingGoogleName = googleName;
@@ -480,8 +485,8 @@ class SetuProvider with ChangeNotifier {
       final lookupKey = (googleEmail != null && googleEmail.isNotEmpty) ? googleEmail.toLowerCase() : googleId;
       final check = await _apiService.checkFarmer(lookupKey);
 
-      if (check != null && check['exists'] == true && check['has_profile'] == true) {
-        // Existing registered farmer with completed profile -> sync immediately
+      // 3. If user is an existing farmer (or profile exists), log in immediately!
+      if (check != null && check['exists'] == true) {
         final syncRes = await _apiService.googleSync(
           fullName: googleName,
           email: googleEmail,
@@ -509,14 +514,14 @@ class SetuProvider with ChangeNotifier {
           return (
             success: true,
             needsFarmSetup: false,
-            message: 'Welcome back, !',
+            message: 'Welcome back, $_userName!',
             defaultName: _userName,
             email: googleEmail,
           );
         }
       }
 
-      // New farmer or profile incomplete -> Needs farm data input
+      // 4. New farmer who has never registered before -> Show initial farm setup
       return (
         success: true,
         needsFarmSetup: true,
@@ -525,7 +530,7 @@ class SetuProvider with ChangeNotifier {
         email: googleEmail,
       );
     } catch (e) {
-      debugPrint('[Auth] Google sign-in failed: ');
+      debugPrint('[Auth] Google sign-in failed: $e');
       return (
         success: false,
         needsFarmSetup: false,

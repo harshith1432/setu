@@ -146,7 +146,8 @@ class _AuthScreenState extends State<AuthScreen> {
   }) {
     final setupNameController = TextEditingController(text: defaultName);
     final setupPhoneController = TextEditingController();
-    final setupFarmController = TextEditingController();
+    final defaultFarm = (defaultName.trim().isNotEmpty) ? '${defaultName.trim()} Farm' : 'My Sericulture Farm';
+    final setupFarmController = TextEditingController(text: defaultFarm);
     final setupBatchController = TextEditingController(text: 'SERI-2026-B01');
     final setupDflController = TextEditingController(text: '200 DFL');
     bool isSaving = false;
@@ -313,26 +314,15 @@ class _AuthScreenState extends State<AuthScreen> {
                               final name = setupNameController.text.trim();
                               final phone = setupPhoneController.text.trim();
                               final farm = setupFarmController.text.trim();
-
-                              if (phone.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter your mobile phone number.')),
-                                );
-                                return;
-                              }
-                              if (farm.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Please enter your farm / shed name.')),
-                                );
-                                return;
-                              }
+                              final farmToUse = farm.isNotEmpty ? farm : defaultFarm;
+                              final phoneToUse = phone.isNotEmpty ? phone : 'N/A';
 
                               setModalState(() => isSaving = true);
                               final provider = Provider.of<SetuProvider>(context, listen: false);
                               final res = await provider.completeGoogleFarmSetup(
                                 fullName: name.isNotEmpty ? name : (defaultName.isNotEmpty ? defaultName : 'Farmer'),
-                                phone: phone,
-                                farmName: farm,
+                                phone: phoneToUse,
+                                farmName: farmToUse,
                                 batchId: setupBatchController.text.trim().isNotEmpty ? setupBatchController.text.trim() : 'SERI-2026-B01',
                                 dflCapacity: setupDflController.text.trim().isNotEmpty ? setupDflController.text.trim() : '200 DFL',
                               );
