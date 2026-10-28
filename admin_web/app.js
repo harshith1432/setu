@@ -144,7 +144,7 @@ const ROLE_PERMISSIONS = {
   sales: ['overview', 'tasks', 'products', 'enquiries', 'orders', 'billing', 'farmers', 'reports'],
   support: ['overview', 'tasks', 'farmers', 'sheds', 'support', 'guidance', 'alerts', 'orders'],
   analyst: ['overview', 'live-monitoring', 'analytics', 'farmers', 'sheds', 'research', 'guidance', 'reports'],
-  farmer: ['tasks', 'live-monitoring', 'sheds', 'guidance', 'support', 'products', 'orders', 'alerts']
+  farmer: ['live-monitoring', 'guidance', 'analytics', 'alerts', 'products', 'orders']
 };
 
 const ROLE_DEFAULT_TABS = {
@@ -894,16 +894,59 @@ function enforceRoleNavigation() {
     }
   });
 
-  // Dynamic label for Orders navigation item: Farmer sees "Orders", administrative/commercial staff see "Sales & Orders"
-  const ordersNavLabel = document.getElementById('navOrdersLabel') || document.querySelector('#sidebarNav .nav-item[data-tab="orders"] span');
-  if (ordersNavLabel) {
-    ordersNavLabel.textContent = isFarmer ? 'Orders' : 'Sales & Orders';
+  // Automatically hide empty navigation accordion groups so farmers see only their dedicated tools
+  document.querySelectorAll('#sidebarNav .nav-group').forEach(group => {
+    const items = Array.from(group.querySelectorAll('.nav-item'));
+    const anyVisible = items.some(item => item.style.display !== 'none');
+    group.style.display = anyVisible ? 'block' : 'none';
+  });
+
+  // Update sidebar branding badge and role label
+  const sidebarRoleBadge = document.getElementById('sidebarRoleBadge');
+  if (sidebarRoleBadge) {
+    if (isFarmer) {
+      sidebarRoleBadge.textContent = 'Farmer Portal';
+    } else {
+      sidebarRoleBadge.textContent = (role === 'superadmin') ? 'Super Admin Hub' : role.replace('_', ' ').toUpperCase();
+    }
   }
 
-  // Also update Section header if visible
+  const sidebarRoleText = document.getElementById('sidebarRoleText');
+  if (sidebarRoleText) {
+    if (isFarmer) {
+      sidebarRoleText.textContent = 'Farmer Account';
+    } else {
+      sidebarRoleText.textContent = (role === 'superadmin') ? 'Master Access' : 'Staff Access';
+    }
+  }
+
+  // Synchronize farmer-friendly labels matching mobile app
+  const navMap = {
+    'live-monitoring': { farmer: 'Live Shed & Controls', def: 'Live Monitoring' },
+    'guidance': { farmer: 'AI Agronomist & Guidance', def: 'Farmer Guidance' },
+    'analytics': { farmer: 'Insights & Trends', def: 'Analytics & Trends' },
+    'alerts': { farmer: 'Alerts & Incidents', def: 'Alerts & Incidents' },
+    'products': { farmer: 'Hardware Store', def: 'Product Catalogue' },
+    'orders': { farmer: 'My Orders', def: 'Sales & Orders' }
+  };
+
+  Object.keys(navMap).forEach(tab => {
+    const labelEl = document.querySelector(`#sidebarNav .nav-item[data-tab="${tab}"] span`);
+    if (labelEl) {
+      labelEl.textContent = isFarmer ? navMap[tab].farmer : navMap[tab].def;
+    }
+  });
+
+  // Section header for Orders
   const ordersHeading = document.getElementById('ordersTableHeading') || document.querySelector('#section-orders .table-title span');
   if (ordersHeading) {
     ordersHeading.textContent = isFarmer ? 'My Equipment Orders & Tracking' : 'Customer Hardware Orders & Fulfilment';
+  }
+
+  // Section header for Products
+  const productsHeading = document.getElementById('productsTableHeading') || document.querySelector('#section-products .table-title span');
+  if (productsHeading) {
+    productsHeading.textContent = isFarmer ? 'Sericulture Hardware Store' : 'Hardware Product Catalogue';
   }
 
   // Enforce Amazon Storefront Grid for Farmers
@@ -918,7 +961,7 @@ function enforceRoleNavigation() {
 
   // If active tab is not allowed, switch to first allowed tab
   if (!allowedTabs.includes(currentTab)) {
-    switchNavTab(allowedTabs[0] || 'overview');
+    switchNavTab(allowedTabs[0] || 'live-monitoring');
   }
 }
 
@@ -1013,14 +1056,22 @@ function switchNavTab(tabName) {
     'roles': { title: 'Roles & Fine-Grained Permissions', bread: 'Role Templates & Delegation Policies' },
     'departments': { title: 'Departments & Reporting Structures', bread: 'Teams & Organizational Units' },
     'tasks': { title: 'My Work & Priority Queue', bread: 'Operations & Personal Tasks' },
-    'live-monitoring': { title: 'Live Environmental Monitoring', bread: 'IoT Sensors & Hardware Telemetry' },
-    'analytics': { title: 'Platform & Environmental Analytics', bread: 'Time-Series & Growth Metrics' },
-    'alerts': { title: 'Alerts & Incident Management', bread: 'Threshold Violations & Interlocks' },
+    'live-monitoring': (currentUser && currentUser.role === 'farmer')
+      ? { title: 'Live Shed Climate & Controls', bread: 'Real-time Telemetry & Actuators' }
+      : { title: 'Live Environmental Monitoring', bread: 'IoT Sensors & Hardware Telemetry' },
+    'analytics': (currentUser && currentUser.role === 'farmer')
+      ? { title: 'Insights & Environmental Trends', bread: '24-Hour Telemetry History' }
+      : { title: 'Platform & Environmental Analytics', bread: 'Time-Series & Growth Metrics' },
+    'alerts': (currentUser && currentUser.role === 'farmer')
+      ? { title: 'Shed Alerts & Notifications', bread: 'Safety Interlocks & Alerts' }
+      : { title: 'Alerts & Incident Management', bread: 'Threshold Violations & Interlocks' },
     'farmers': { title: 'Enrolled Farmers Directory', bread: 'Farmers & Rearing Sheds Directory' },
     'sheds': { title: 'Rearing Shed Climate Setpoints', bread: 'Growth Stages 1–5 Microclimates' },
     'devices': { title: 'IoT Hardware Nodes & Gateways', bread: 'Device Provisioning & Status' },
     'sensor-config': { title: 'Sensor Hardware Configuration', bread: 'Sensor Calibration & Pin Offsets' },
-    'products': { title: 'Sericulture Equipment Catalogue', bread: 'Products, Pricing & Stock' },
+    'products': (currentUser && currentUser.role === 'farmer')
+      ? { title: 'Sericulture Hardware Store', bread: 'Direct Shed Delivery & Equipment' }
+      : { title: 'Sericulture Equipment Catalogue', bread: 'Products, Pricing & Stock' },
     'enquiries': { title: 'Website Demo Leads & Enquiries', bread: 'Public Enquiries & Lead Qualification' },
     'orders': (currentUser && currentUser.role === 'farmer')
       ? { title: 'My Equipment Orders', bread: 'Orders & Tracking' }
@@ -1030,7 +1081,9 @@ function switchNavTab(tabName) {
     'installations': { title: 'Field Installation Workflows', bread: 'Job Scheduling & Verification' },
     'install-team': { title: 'Certified Field Technicians', bread: 'Installation Team Roster' },
     'research': { title: 'Scientific Sericulture Research', bread: 'Environmental Anomaly Analysis' },
-    'guidance': { title: 'Multilingual Rearing Advisory', bread: 'CSRTI Research Guidelines' },
+    'guidance': (currentUser && currentUser.role === 'farmer')
+      ? { title: 'AI Agronomist & Rearing Guidelines', bread: 'CSRTI Research & AI Advisory' }
+      : { title: 'Multilingual Rearing Advisory', bread: 'CSRTI Research Guidelines' },
     'reports': { title: 'Platform & Financial Reports', bread: 'CSV & Analytical Exports' },
     'users': { title: 'Platform User Management', bread: 'Security Roles & Permissions' },
     'audit': { title: 'Immutable Security Audit Logs', bread: 'Operations Audit Trail' },

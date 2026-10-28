@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/setu_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/live_weather_card.dart';
+import 'products_screen.dart';
+import 'orders_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenDetails;
@@ -385,6 +387,91 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 const Icon(Icons.arrow_forward, size: 18),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Hardware Store and Equipment Procurement Banner
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE8F5E9), Color(0xFFF1F8E9)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFA5D6A7)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B5E20),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Need Shed Hardware or Sensors?',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF1B5E20),
+                            ),
+                          ),
+                          Text(
+                            'Gateways, foggers, heaters, and probes delivered to your shed',
+                            style: TextStyle(fontSize: 10, color: Color(0xFF4B6350)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1B5E20),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.shopping_bag_outlined, size: 16),
+                        label: const Text('Storefront', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductsScreen())),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1B5E20),
+                          side: const BorderSide(color: Color(0xFF2E7D32)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.local_shipping_outlined, size: 16),
+                        label: const Text('My Orders', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrdersScreen())),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

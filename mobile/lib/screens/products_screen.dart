@@ -182,7 +182,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
                     // Payment Method selector
                     DropdownButtonFormField<String>(
-                      value: paymentMethod,
+                      initialValue: paymentMethod,
                       decoration: InputDecoration(
                         labelText: 'Payment Method',
                         prefixIcon: const Icon(Icons.payment_outlined, color: Color(0xFF2E7D32), size: 19),
@@ -254,7 +254,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 notes: notesController.text.trim(),
                               );
 
-                              if (!modalCtx.mounted) return;
+                              if (!modalCtx.mounted || !mounted) return;
                               if (res['success'] == true) {
                                 Navigator.pop(modalCtx);
                                 ScaffoldMessenger.of(context).showSnackBar(

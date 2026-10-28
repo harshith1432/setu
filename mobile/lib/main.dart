@@ -12,6 +12,8 @@ import 'screens/ai_guidance_screen.dart';
 import 'screens/environment_screen.dart';
 import 'screens/growth_stage_screen.dart';
 import 'screens/insights_screen.dart';
+import 'screens/products_screen.dart';
+import 'screens/orders_screen.dart';
 import 'widgets/advanced_mode_modal.dart';
 import 'widgets/system_settings_modal.dart';
 import 'widgets/user_profile_modal.dart';
@@ -214,6 +216,26 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront_outlined, color: Color(0xFF1B5E20), size: 23),
+            tooltip: 'Hardware Store',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProductsScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.local_shipping_outlined, color: Color(0xFF1B5E20), size: 23),
+            tooltip: 'My Orders',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OrdersScreen()),
+              );
+            },
+          ),
           PopupMenuButton<String>(
             icon: const Icon(
               Icons.more_vert,
@@ -230,6 +252,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             onSelected: (value) {
               if (value == 'profile') {
                 _openProfileSheet(context);
+              } else if (value == 'products') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProductsScreen()),
+                );
+              } else if (value == 'orders') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                );
               } else if (value == 'advanced') {
                 _openAdvancedSheet(context);
               } else if (value == 'settings') {
@@ -237,6 +269,67 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               }
             },
             itemBuilder: (BuildContext ctx) => [
+              PopupMenuItem<String>(
+                value: 'products',
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.storefront_outlined,
+                        size: 16,
+                        color: Color(0xFF1B5E20),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Hardware Store',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1C251D),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'orders',
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.local_shipping_outlined,
+                        size: 16,
+                        color: Color(0xFF0288D1),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'My Orders',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1C251D),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(height: 1),
               PopupMenuItem<String>(
                 value: 'profile',
                 child: Row(
