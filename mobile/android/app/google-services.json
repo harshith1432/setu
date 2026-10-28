@@ -1,20 +1,28 @@
 {
   "project_info": {
-    "project_number": "751761886912",
-    "project_id": "setu-96d33",
-    "storage_bucket": "setu-96d33.firebasestorage.app"
+    "project_number": "756971197809",
+    "project_id": "setu-513019",
+    "storage_bucket": "setu-513019.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:751761886912:android:2cb1c5c9279d434f442725",
+        "mobilesdk_app_id": "1:756971197809:android:2cb1c5c9279d434f442725",
         "android_client_info": {
           "package_name": "com.example.setu"
         }
       },
       "oauth_client": [
         {
-          "client_id": "751761886912-hdp60cus4mk80m1ahvgm7mcc42b4r931.apps.googleusercontent.com",
+          "client_id": "756971197809-mn9qdoqof2o91fg7b58u1384k8cei6qh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.setu",
+            "certificate_hash": "f4ee47e7873252ae0304bf658f2e7c5fb11b414b"
+          }
+        },
+        {
+          "client_id": "756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -27,7 +35,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "751761886912-hdp60cus4mk80m1ahvgm7mcc42b4r931.apps.googleusercontent.com",
+              "client_id": "756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

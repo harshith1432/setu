@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from app.core.security import get_current_user_payload
+from app.core.security import get_current_user_payload, require_roles
 from app.models.schemas import UserProfileUpdate
 from app.services.db_service import (
     get_all_farmers,
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/admin", tags=["Super Admin"])
 
 def require_superadmin(payload: dict = Depends(get_current_user_payload)):
     role = payload.get("role")
-    if role not in ["admin", "superadmin"]:
+    if role not in ["admin", "superadmin", "company_admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super Admin privileges required"
@@ -39,7 +39,7 @@ class EmergencyBypassPayload(BaseModel):
     action: str  # "COOLDOWN_ALL", "FOGGER_BOOST", "EMERGENCY_VENTILATE"
 
 @router.get("/stats")
-def get_admin_dashboard_stats(admin_user: dict = Depends(require_superadmin)):
+def get_admin_dashboard_stats(admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "technician", "analyst"]))):
     farmers = get_all_farmers()
     active_farmers = [f for f in farmers if f.get("is_active", 1)]
     
@@ -66,11 +66,32 @@ def get_admin_dashboard_stats(admin_user: dict = Depends(require_superadmin)):
     }
 
 @router.get("/sheds")
-def list_monitored_sheds(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:
+def list_monitored_sheds(current_user: dict = Depends(get_current_user_payload)) -> List[Dict[str, Any]]:
     """
     Returns list of all active rearing sheds dynamically from enrolled farmers and live telemetry.
-    100% data-driven from the database - zero hardcoding.
+    If the requesting user is a farmer, returns only their own rearing shed.
     """
+    uid = current_user.get("user_id") or current_user.get("sub")
+    role = current_user.get("role", "farmer")
+
+    # If the user is a farmer, only return their own shed!
+    if role == "farmer":
+        user_record = get_user_by_id(uid) or get_user_by_username(uid)
+        if user_record:
+            s_id = user_record.get("shed_id") or f"shed_{user_record['id']}"
+            farm_name = user_record.get("farm_name") or "Rearing Shed"
+            farmer_name = user_record.get("full_name") or user_record.get("username") or "Farmer"
+            display = f"{farm_name} ({farmer_name})"
+            return [{
+                "shed_id": s_id,
+                "farm_name": farm_name,
+                "farmer_name": farmer_name,
+                "region": user_record.get("region", "Karnataka"),
+                "batch_id": user_record.get("batch_id", "SERI-2026"),
+                "display_name": display,
+                "is_active": bool(user_record.get("is_active", True))
+            }]
+
     farmers = get_all_farmers()
     sheds_list = []
     seen_ids = set()
@@ -82,16 +103,17 @@ def list_monitored_sheds(admin_user: dict = Depends(require_superadmin)) -> List
         farmer_name = f.get("full_name") or f.get("username") or "Sericulture Farmer"
         display = f"{farm_name} ({farmer_name})"
 
-        sheds_list.append({
-            "shed_id": s_id,
-            "farm_name": farm_name,
-            "farmer_name": farmer_name,
-            "region": f.get("region", "Global Network"),
-            "batch_id": f.get("batch_id", "SERI-2026"),
-            "display_name": display,
-            "is_active": bool(f.get("is_active", True))
-        })
-        seen_ids.add(s_id)
+        if s_id not in seen_ids:
+            sheds_list.append({
+                "shed_id": s_id,
+                "farm_name": farm_name,
+                "farmer_name": farmer_name,
+                "region": f.get("region", "Global Network"),
+                "batch_id": f.get("batch_id", "SERI-2026"),
+                "display_name": display,
+                "is_active": bool(f.get("is_active", True))
+            })
+            seen_ids.add(s_id)
 
     # 2. Only if no farmers exist in database at all, provide a single default fallback shed
     if not sheds_list:
@@ -108,11 +130,11 @@ def list_monitored_sheds(admin_user: dict = Depends(require_superadmin)) -> List
     return sheds_list
 
 @router.get("/farmers")
-def list_enrolled_farmers(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:
+def list_enrolled_farmers(admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "support", "sales", "analyst"]))) -> List[Dict[str, Any]]:
     return get_all_farmers()
 
 @router.get("/farmers/{farmer_id}")
-def get_farmer_detail(farmer_id: str, admin_user: dict = Depends(require_superadmin)):
+def get_farmer_detail(farmer_id: str, admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "support", "sales", "analyst"]))):
     """
     Get full farmer profile, linked shed overview, recent telemetry history, and alert context.
     """
@@ -136,6 +158,7 @@ def get_farmer_detail(farmer_id: str, admin_user: dict = Depends(require_superad
         "history": history
     }
 
+@router.put("/farmers/{farmer_id}")
 @router.put("/farmers/{farmer_id}")
 @router.patch("/farmers/{farmer_id}")
 def update_farmer_details(
@@ -170,28 +193,59 @@ def update_farmer_details(
     return {"status": "success", "farmer": updated_user}
 
 @router.patch("/farmers/{farmer_id}/status")
-def change_farmer_status(farmer_id: str, payload: FarmerStatusUpdate, admin_user: dict = Depends(require_superadmin)):
-    update_user_status(farmer_id, payload.is_active)
+@router.put("/farmers/{farmer_id}/status")
+def change_farmer_status(
+    farmer_id: str,
+    payload: Optional[FarmerStatusUpdate] = None,
+    active: Optional[bool] = None,
+    admin_user: dict = Depends(require_superadmin)
+):
+    is_active = False
+    if payload is not None:
+        is_active = payload.is_active
+    elif active is not None:
+        is_active = active
+    update_user_status(farmer_id, is_active)
     log_audit(
         admin_user.get("sub", "admin"),
         "STATUS_CHANGE",
-        f"Farmer {farmer_id} status updated to {'Active' if payload.is_active else 'Deactivated'}"
+        f"Farmer {farmer_id} status updated to {'Active' if is_active else 'Deactivated'}"
     )
-    return {"status": "success", "farmer_id": farmer_id, "is_active": payload.is_active}
+    return {"status": "success", "farmer_id": farmer_id, "is_active": is_active}
 
 @router.delete("/farmers/{farmer_id}")
 def remove_farmer(farmer_id: str, admin_user: dict = Depends(require_superadmin)):
-    delete_user(farmer_id)
+    user = get_user_by_id(farmer_id) or get_user_by_username(farmer_id)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Farmer '{farmer_id}' not found")
+    
+    farmer_name = user.get("full_name") or user.get("username") or farmer_id
+    success = delete_user(farmer_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Farmer '{farmer_id}' could not be deleted")
+    
     log_audit(
         admin_user.get("sub", "admin"),
         "DELETE_FARMER",
-        f"Farmer {farmer_id} was removed from the system"
+        f"Farmer {farmer_name} (ID: {farmer_id}) was permanently removed from the system"
     )
-    return {"status": "success", "message": f"Farmer {farmer_id} deleted"}
+    return {"status": "success", "message": f"Farmer '{farmer_name}' deleted successfully", "farmer_id": farmer_id}
 
+@router.get("/audit")
 @router.get("/audit-logs")
-def view_audit_trail(admin_user: dict = Depends(require_superadmin)):
-    return get_audit_logs(limit=50)
+def view_audit_trail(
+    action: Optional[str] = None,
+    actor: Optional[str] = None,
+    search: Optional[str] = None,
+    org_id: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    admin_user: dict = Depends(require_roles(["superadmin", "admin", "ceo", "company_admin", "hr"]))
+):
+    role = admin_user.get("role")
+    if role not in ["superadmin", "admin"]:
+        org_id = admin_user.get("organization_id", "default_org")
+    return get_audit_logs(limit=limit, action=action, actor=actor, org_id=org_id, search=search, offset=offset)
 
 @router.post("/emergency-control")
 def emergency_system_control(payload: EmergencyBypassPayload, admin_user: dict = Depends(require_superadmin)):
@@ -251,7 +305,7 @@ class ShedActuatorOverridePayload(BaseModel):
     value: Optional[int] = None
 
 @router.get("/stages")
-def list_growth_stages(admin_user: dict = Depends(require_superadmin)) -> List[Dict[str, Any]]:
+def list_growth_stages(current_user: dict = Depends(get_current_user_payload)) -> List[Dict[str, Any]]:
     """
     Get all 5 sericulture rearing stages and their temperature/humidity setpoints.
     """
@@ -262,7 +316,7 @@ def list_growth_stages(admin_user: dict = Depends(require_superadmin)) -> List[D
     return stages
 
 @router.get("/stages/{stage_id}")
-def get_growth_stage_detail(stage_id: int, admin_user: dict = Depends(require_superadmin)):
+def get_growth_stage_detail(stage_id: int, current_user: dict = Depends(get_current_user_payload)):
     stage = get_stage_threshold(stage_id)
     if not stage:
         raise HTTPException(status_code=404, detail=f"Stage {stage_id} not found")

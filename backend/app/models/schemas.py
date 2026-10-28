@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -29,7 +29,7 @@ class GoogleAuthRequest(BaseModel):
     preferred_language: Optional[str] = "en"
 
 class UserBase(BaseModel):
-    username: str
+    username: Optional[str] = None
     full_name: str
     phone: str
     preferred_language: str = "kn"
@@ -48,6 +48,9 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    confirm_password: Optional[str] = None
+    email: Optional[str] = None
+    terms_accepted: Optional[bool] = False
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -87,6 +90,8 @@ class UserOut(BaseModel):
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     current_stage: Optional[int] = 3
+    official_email: Optional[str] = None
+    access_scope: Optional[str] = "GLOBAL"
 
     class Config:
         from_attributes = True
@@ -94,6 +99,7 @@ class UserOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    session_id: Optional[str] = None
     user: UserOut
 
 # --- Environmental & Control Schemas ---
@@ -118,7 +124,6 @@ class TelemetryPayload(BaseModel):
     event_id: Optional[str] = None
     sequence_number: Optional[int] = None
     device_id: Optional[str] = None
-    organization_id: Optional[str] = "default_org"
     measured_at: Optional[datetime] = None
     firmware_version: Optional[str] = "1.0.0"
     schema_version: Optional[str] = "1.0"
@@ -169,7 +174,6 @@ class DeviceCommandAck(BaseModel):
 
 class DeviceCommandOut(BaseModel):
     command_id: str
-    organization_id: str
     device_id: str
     shed_id: str
     requested_by: str
@@ -187,7 +191,6 @@ class DeviceCommandOut(BaseModel):
 class DeviceRegistration(BaseModel):
     device_id: str
     shed_id: str
-    organization_id: Optional[str] = "default_org"
     device_name: Optional[str] = None
     firmware_version: Optional[str] = "1.0.0"
     device_key: Optional[str] = None
@@ -233,3 +236,103 @@ class ShedOverview(BaseModel):
     light_lux_target: float = 25.0
     photoperiod_mode: str = "DAY"  # "DAY", "NIGHT", "SPINNING"
     last_updated: datetime
+
+
+# ==============================================================================
+# ENTERPRISE ORGANIZATIONS, DEPARTMENTS, ROLES & EMPLOYEES SCHEMAS
+# ==============================================================================
+
+# Organization schemas removed
+
+class DepartmentCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=128)
+    code: str = Field(..., min_length=2, max_length=64)
+    description: Optional[str] = None
+    head_id: Optional[str] = None
+    status: Optional[str] = "ACTIVE"
+
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    head_id: Optional[str] = None
+    status: Optional[str] = None
+
+class CustomRoleCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=128)
+    code: str = Field(..., min_length=2, max_length=64)
+    description: Optional[str] = None
+    permissions: List[str] = Field(default_factory=list)
+    status: Optional[str] = "ACTIVE"
+
+class CustomRoleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    status: Optional[str] = None
+
+class EmployeeCreate(BaseModel):
+    official_email: str = Field(..., min_length=5, max_length=255)
+    full_name: str = Field(..., min_length=2, max_length=128)
+    employee_id: Optional[str] = None
+    employee_code: Optional[str] = None
+    phone: Optional[str] = "+91 98000 00000"
+    department_id: Optional[str] = None
+    designation: Optional[str] = "Operations Staff"
+    reporting_manager_id: Optional[str] = None
+    role_code: Optional[str] = "technician"
+    role_id: Optional[str] = None
+    access_scope: Optional[str] = "GLOBAL"
+    assigned_resources: Optional[Dict[str, Any]] = None
+    send_invitation: Optional[bool] = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("employee_id") and data.get("employee_code"):
+                data["employee_id"] = data["employee_code"]
+            if not data.get("role_code") and data.get("role_id"):
+                data["role_code"] = data["role_id"]
+        return data
+
+class EmployeeUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    department_id: Optional[str] = None
+    designation: Optional[str] = None
+    reporting_manager_id: Optional[str] = None
+    role_code: Optional[str] = None
+    access_scope: Optional[str] = None
+    assigned_resources: Optional[Dict[str, Any]] = None
+
+class EmployeeStatusUpdate(BaseModel):
+    status: str = Field(..., pattern="^(ACTIVE|SUSPENDED|PENDING_ACTIVATION)$")
+
+class InvitationAccept(BaseModel):
+    password: str = Field(..., min_length=8)
+    mfa_enabled: Optional[bool] = False
+
+
+class OrganizationCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    code: str = Field(..., min_length=2, max_length=64)
+    domain: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    subscription_tier: str = "ENTERPRISE"
+    max_users: int = 100
+    max_sheds: int = 50
+
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = None
+    domain: Optional[str] = None
+    contact_email: Optional[EmailStr] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    subscription_tier: Optional[str] = None
+    max_users: Optional[int] = None
+    max_sheds: Optional[int] = None
+
+class OrganizationStatusUpdate(BaseModel):
+    status: str

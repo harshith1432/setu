@@ -25,6 +25,7 @@ class Settings(BaseModel):
     SECRET_KEY: str = os.getenv("SETU_SECRET_KEY", "setu-secret-key-production-safety-2026")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days for farmers
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
     # Database configuration (PostgreSQL only in the current backend)
     DATABASE_URL: str = os.getenv(
@@ -43,8 +44,13 @@ class Settings(BaseModel):
         ).split(",")
         if origin.strip()
     ]
+    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "")
+    FIREBASE_CLIENT_EMAIL: str = os.getenv("FIREBASE_CLIENT_EMAIL", "")
+    FIREBASE_CLIENT_ID: str = os.getenv("FIREBASE_CLIENT_ID", "")
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
     FIREBASE_SERVICE_ACCOUNT_JSON: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
     # Twilio / WhatsApp notifications
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SSID", "")
@@ -68,4 +74,20 @@ class Settings(BaseModel):
         or "https://setu-8vh9.onrender.com"
     )
 
+    def validate_production_security(self):
+        if self.ENVIRONMENT.lower() == "production":
+            insecure_keys = [
+                "setu-secret-key-production-safety-2026",
+                "secret",
+                "changeme",
+                "default",
+                "admin",
+            ]
+            if self.SECRET_KEY in insecure_keys or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "CRITICAL SECURITY CONFIGURATION ERROR: A strong, unique SECRET_KEY (>= 32 chars) "
+                    "must be set via the SETU_SECRET_KEY environment variable in production environments."
+                )
+
 settings = Settings()
+settings.validate_production_security()

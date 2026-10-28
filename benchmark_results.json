@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-10-28T17:34:59Z",
+  "environment": "Local Dedicated PostgreSQL Instance (127.0.0.1:5432), Python 3.13 ASGI Starlette Engine",
+  "benchmarks": [
+    {
+      "benchmark": "Health Endpoint (GET /health)",
+      "total_requests": 1000,
+      "concurrency": 50,
+      "duration_seconds": 1.731,
+      "throughput_rps": 577.81,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 50.69,
+        "p50": 72.27,
+        "p95": 145.08,
+        "p99": 157.77,
+        "max": 166.56
+      }
+    },
+    {
+      "benchmark": "IoT Telemetry Ingestion (POST /api/v1/telemetry)",
+      "total_requests": 1000,
+      "concurrency": 25,
+      "duration_seconds": 55.754,
+      "throughput_rps": 17.94,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 90.0,
+        "p50": 1421.08,
+        "p95": 2085.02,
+        "p99": 2502.22,
+        "max": 2515.25
+      }
+    },
+    {
+      "benchmark": "Dashboard Overview (GET /api/v1/dashboard/overview)",
+      "total_requests": 100,
+      "concurrency": 10,
+      "duration_seconds": 10.993,
+      "throughput_rps": 9.1,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 353.82,
+        "p50": 1033.37,
+        "p95": 1622.78,
+        "p99": 1798.18,
+        "max": 1798.18
+      }
+    }
+  ]
+}

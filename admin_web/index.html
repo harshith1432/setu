@@ -1,1443 +1,2415 @@
 <!DOCTYPE html>
-<html lang="en">
+
+<html data-theme="light" lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Setu | Super Admin Command Portal (SeriCare)</title>
-  
-  <!-- Setu Official Brand Favicon -->
-  <link rel="icon" type="image/png" href="assets/logo.png">
-
-  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  
-  <!-- Chart.js 4.4 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <!-- Bespoke Sericulture Stylesheet -->
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Setu | Super Admin &amp; Platform Management</title>
+<meta content="Setu Platform (SeriCare)" name="application-name"/>
+<!-- Brand Favicon -->
+<link href="/admin/assets/logo.png" rel="icon" type="image/png"/>
+<!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Chart.js 4.4 -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- Google Identity Services (OAuth / GIS) -->
+<script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
+<!-- Enterprise Design System Stylesheet -->
+<link href="/admin/style.css" rel="stylesheet"/>
 </head>
 <body>
-
-  <!-- ================= INITIAL LOADING GATEWAY (SECURITY SESSIONS) ================= -->
-  <div id="loadingGateway" class="loading-gateway">
-    <div class="loading-gateway-card">
-      <div class="loading-logo-box">
-        <img src="assets/logo.png" alt="Setu Logo" class="pulse">
-      </div>
-      <h3>Setu Command Portal</h3>
-      <p>Verifying secure administrative session...</p>
-      <div class="loading-spinner-bar">
-        <div class="loading-spinner-fill"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= AUTHENTICATION VIEW ================= -->
-  <div id="authView" class="auth-wrapper hidden">
-    <div class="auth-card">
-      <div class="auth-brand-header">
-        <div class="auth-logo-wrap">
-          <img src="assets/logo.png" alt="Setu Logo" class="auth-logo-img">
-        </div>
-        <div class="auth-brand-badge">
-          <i data-lucide="shield-check"></i>
-          <span>ENTERPRISE SECURE COMMAND</span>
-        </div>
-      </div>
-      <h2>Super Admin Console</h2>
-      <p class="auth-subtitle">Central supervisory portal for Sericulture rearing sheds & IoT microclimate automation.</p>
-      
-      <!-- Dynamic Security / Rate-Limit Alert -->
-      <div id="lockoutBanner" class="security-lockout-banner hidden">
-        <i data-lucide="shield-alert"></i>
-        <span id="lockoutTimerText">Security cooldown active.</span>
-      </div>
-
-      <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label for="username"><i data-lucide="user"></i> Admin Username</label>
-          <input type="text" id="username" value="admin" placeholder="e.g. admin" required autocomplete="username">
-        </div>
-        
-        <div class="form-group">
-          <label for="password"><i data-lucide="key"></i> Security Key / Password</label>
-          <div class="password-input-wrapper">
-            <input type="password" id="password" value="admin" placeholder="Enter password" required autocomplete="current-password">
-            <button type="button" id="togglePasswordBtn" class="btn-toggle-password" onclick="togglePasswordVisibility()" title="Show/Hide Password" aria-label="Toggle password visibility">
-              <i data-lucide="eye" id="passwordEyeIcon"></i>
-            </button>
-          </div>
-        </div>
-        
-        <div id="loginError" class="alert-box error hidden"></div>
-
-        <button type="submit" id="loginBtn" class="btn btn-primary btn-full">
-          <span>Authorize Access</span>
-          <i data-lucide="arrow-right"></i>
-        </button>
-      </form>
-      
-      <div class="auth-footer">
-        <p><i data-lucide="lock"></i> End-to-end encrypted session & Role-Based Access Control.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= MAIN DASHBOARD APPLICATION ================= -->
-  <div id="dashboardView" class="app-layout hidden">
-    
-    <!-- LEFT SIDEBAR -->
-    <aside class="app-sidebar" id="appSidebar">
-      <div class="sidebar-header">
-        <div class="brand-crest">
-          <div class="sidebar-logo-box">
-            <img src="assets/logo.png" alt="Setu Logo" class="sidebar-logo-img">
-          </div>
-          <div class="brand-title-wrap">
-            <h1>Setu <span class="brand-sub">SeriCare</span></h1>
-            <span class="brand-role-chip">Super Admin Hub</span>
-          </div>
-        </div>
-        <div class="cluster-tag">
-          <i data-lucide="globe"></i>
-          <span>Global Sericulture Network</span>
-        </div>
-      </div>
-
-      <!-- Navigation Links -->
-      <nav class="sidebar-nav">
-        <div class="nav-section-title">Operations</div>
-        
-        <a class="nav-item active" onclick="switchNavTab('overview')">
-          <i data-lucide="layout-dashboard"></i>
-          <span>Overview & KPIs</span>
-        </a>
-
-        <a class="nav-item" onclick="switchNavTab('stages')">
-          <i data-lucide="sliders"></i>
-          <span>Stage Climate Levels</span>
-          <span class="nav-pill">Auto-Mode</span>
-        </a>
-
-        <a class="nav-item" onclick="switchNavTab('telemetry')">
-          <i data-lucide="activity"></i>
-          <span>Live Sensors & Relays</span>
-        </a>
-
-        <a class="nav-item" onclick="switchNavTab('analytics')">
-          <i data-lucide="line-chart"></i>
-          <span>Sensor Graphs (24h)</span>
-        </a>
-
-        <div class="nav-section-title">Management</div>
-
-        <a class="nav-item" onclick="switchNavTab('farmers')">
-          <i data-lucide="users"></i>
-          <span>Farmers & Sheds</span>
-          <span class="nav-pill" id="navFarmerCount">--</span>
-        </a>
-
-        <a class="nav-item" onclick="switchNavTab('emergency')">
-          <i data-lucide="alert-octagon"></i>
-          <span>Emergency Controls</span>
-        </a>
-
-        <a class="nav-item" onclick="switchNavTab('audit')">
-          <i data-lucide="clipboard-list"></i>
-          <span>Audit Logs</span>
-        </a>
-      </nav>
-
-      <!-- Sidebar Footer -->
-      <div class="sidebar-footer">
-        <div class="admin-brief">
-          <div class="admin-avatar">
-            <i data-lucide="user-check"></i>
-          </div>
-          <div class="admin-brief-info">
-            <div class="admin-name" id="sidebarAdminName">Super Admin</div>
-            <div class="admin-role-text">Master Access</div>
-          </div>
-        </div>
-        <button class="btn-sidebar-logout" onclick="handleLogout()" title="Log Out">
-          <i data-lucide="log-out"></i>
-        </button>
-      </div>
-    </aside>
-
-    <!-- MAIN APP CANVAS -->
-    <main class="app-main">
-      
-      <!-- TOP NAVIGATION BAR -->
-      <header class="top-bar">
-        <div class="top-bar-left">
-          <button class="btn-sidebar-toggle" id="btnSidebarToggle" onclick="toggleSidebar()" aria-label="Toggle Navigation">
-            <i data-lucide="menu"></i>
-          </button>
-          <div class="page-title-wrap">
-            <h2 id="topBarTitle">Cluster Operations Hub</h2>
-            <div class="page-breadcrumb">
-              <span>Setu SeriCare</span>
-              <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
-              <span id="topBarBreadcrumb">Live Real-Time Telemetry</span>
+<!-- ================= INITIAL LOADING GATEWAY ================= -->
+<div class="loading-gateway" id="loadingGateway">
+<div class="loading-gateway-card">
+<div class="loading-logo-box">
+<img alt="Setu Logo" class="pulse" src="/admin/assets/logo.png"/>
+</div>
+<h3>Setu Enterprise Platform</h3>
+<p>Verifying secure administrative session &amp; RBAC credentials...</p>
+<div class="loading-spinner-bar">
+<div class="loading-spinner-fill"></div>
+</div>
+</div>
+</div>
+<!-- ================= AUTHENTICATION VIEW (UNIFIED OFFICIAL SETU LOGIN) ================= -->
+<div class="auth-wrapper hidden" id="authView">
+<div class="auth-card">
+<div class="auth-brand-header">
+<div class="auth-logo-wrap">
+<img alt="Setu Logo" class="auth-logo-img" src="/admin/assets/logo.png"/>
+</div>
+<div class="auth-brand-badge">
+<i data-lucide="shield-check"></i>
+<span>OFFICIAL SETU PLATFORM</span>
+</div>
+</div>
+<h2>Sign In to Setu</h2>
+<p class="auth-subtitle">Smart Sericulture Monitoring &amp; Environment Management</p>
+<!-- Dynamic Security / Rate-Limit Alert -->
+<div class="security-lockout-banner hidden" id="lockoutBanner">
+<i data-lucide="shield-alert"></i>
+<span id="lockoutTimerText">Security cooldown active.</span>
+</div>
+<form id="loginForm" onsubmit="handleLogin(event)">
+<div class="form-group">
+<label for="username"><i data-lucide="user"></i> Username, Phone, or Email</label>
+<input autocomplete="username" id="username" placeholder="e.g. username, mobile, or email" required="" type="text"/>
+</div>
+<div class="form-group">
+<label for="password"><i data-lucide="key"></i> Password</label>
+<div class="password-input-wrapper">
+<input autocomplete="current-password" id="password" placeholder="Enter your password" required="" type="password"/>
+<button aria-label="Toggle password visibility" class="btn-toggle-password" id="togglePasswordBtn" onclick="togglePasswordVisibility('password', this)" title="Show/Hide Password" type="button">
+<i data-lucide="eye" id="passwordEyeIcon"></i>
+</button>
+</div>
+</div>
+<div class="auth-options-row">
+<label class="remember-label">
+<input id="rememberMe" type="checkbox"/>
+<span>Remember this device</span>
+</label>
+<a class="forgot-link" href="javascript:void(0)" onclick="openForgotPasswordModal()">Forgot password?</a>
+</div>
+<div class="alert-box error hidden" id="loginError"></div>
+<button class="btn btn-primary btn-full" id="loginBtn" type="submit">
+<span>Sign In</span>
+<i data-lucide="arrow-right"></i>
+</button>
+</form>
+<div class="auth-divider">
+<span>OR</span>
+</div>
+<button class="btn btn-google btn-full" id="googleSignInBtn" onclick="handleGoogleSignIn()" type="button">
+<svg class="google-icon" height="18" viewbox="0 0 24 24" width="18" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"></path>
+</svg>
+<span>Sign in with Google</span>
+</button>
+<div class="auth-switch-box">
+<span>New to Setu?</span>
+<a class="auth-switch-link" href="/register">Register as a Farmer</a>
+</div>
+<div class="auth-trust-footer">
+<i data-lucide="lock"></i>
+<span>Protected by Setu Enterprise Authentication · ISO 9001:2015 QA Compliant</span>
+</div>
+</div>
+</div>
+<!-- ================= MAIN DASHBOARD APPLICATION ================= -->
+<div class="app-layout hidden" id="dashboardView">
+<!-- LEFT SIDEBAR -->
+<aside class="app-sidebar" id="appSidebar">
+<div class="sidebar-header">
+<div class="brand-crest">
+<div class="brand-crest-left" onclick="refreshPlatform()" onkeydown="if(event.key==='Enter'||event.key===' '){refreshPlatform();}" role="button" style="cursor: pointer;" tabindex="0" title="Click to refresh Setu Platform">
+<div class="sidebar-logo-box">
+<img alt="Setu Logo" class="sidebar-logo-img" src="/admin/assets/logo.png"/>
+</div>
+<div class="brand-title-wrap">
+<h1>Setu <span class="brand-sub">Platform</span></h1>
+<span class="brand-role-chip" id="sidebarRoleBadge">Super Admin Hub</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Navigation Links (Structured Accordion Groups) -->
+<nav class="sidebar-nav" id="sidebarNav">
+<!-- 1. Overview Group -->
+<div class="nav-group" id="navGroupOverview">
+<div class="nav-group-header" onclick="toggleNavGroup('navGroupOverview')">
+<span class="nav-group-title">Overview</span>
+<i class="nav-group-chevron" data-lucide="chevron-down"></i>
+</div>
+<div class="nav-group-items">
+<a class="nav-item active" data-tab="overview" onclick="switchNavTab('overview')">
+<i data-lucide="layout-dashboard"></i>
+<span>Overview & KPIs</span>
+</a>
+<a class="nav-item" data-tab="tasks" onclick="switchNavTab('tasks')">
+<i data-lucide="check-square"></i>
+<span>My Work / Tasks</span>
+</a>
+</div>
+</div>
+<!-- 2. Operations & Monitoring -->
+<div class="nav-group" id="navGroupOps">
+<div class="nav-group-header" onclick="toggleNavGroup('navGroupOps')">
+<span class="nav-group-title">Operations &amp; Monitoring</span>
+<i class="nav-group-chevron" data-lucide="chevron-down"></i>
+</div>
+<div class="nav-group-items">
+<a class="nav-item" data-tab="live-monitoring" onclick="switchNavTab('live-monitoring')">
+<i data-lucide="activity"></i>
+<span>Live Monitoring</span>
+</a>
+<a class="nav-item" data-tab="analytics" onclick="switchNavTab('analytics')">
+<i data-lucide="line-chart"></i>
+<span>Analytics &amp; Trends</span>
+</a>
+<a class="nav-item" data-tab="alerts" onclick="switchNavTab('alerts')">
+<i data-lucide="alert-triangle"></i>
+<span>Alerts &amp; Incidents</span>
+</a>
+</div>
+</div>
+<!-- 3. Farmers & Infrastructure -->
+<div class="nav-group" id="navGroupInfra">
+<div class="nav-group-header" onclick="toggleNavGroup('navGroupInfra')">
+<span class="nav-group-title">Farmers &amp; Infrastructure</span>
+<i class="nav-group-chevron" data-lucide="chevron-down"></i>
+</div>
+<div class="nav-group-items">
+<a class="nav-item" data-tab="farmers" onclick="switchNavTab('farmers')">
+<i data-lucide="users"></i>
+<span>Farmers Directory</span>
+</a>
+<a class="nav-item" data-tab="sheds" onclick="switchNavTab('sheds')">
+<i data-lucide="warehouse"></i>
+<span>Rearing Sheds</span>
+</a>
+<a class="nav-item" data-tab="devices" onclick="switchNavTab('devices')">
+<i data-lucide="cpu"></i>
+<span>IoT Devices</span>
+</a>
+<a class="nav-item" data-tab="sensor-config" onclick="switchNavTab('sensor-config')">
+<i data-lucide="sliders"></i>
+<span>Sensor Configuration</span>
+</a>
+<a class="nav-item" data-tab="installations" onclick="switchNavTab('installations')">
+<i data-lucide="wrench"></i>
+<span>Installations</span>
+</a>
+<a class="nav-item" data-tab="install-team" onclick="switchNavTab('install-team')">
+<i data-lucide="user-check"></i>
+<span>Installation Team</span>
+</a>
+</div>
+</div>
+<!-- 4. Commercial & Sales -->
+<div class="nav-group" id="navGroupCommercial">
+<div class="nav-group-header" onclick="toggleNavGroup('navGroupCommercial')">
+<span class="nav-group-title">Commercial</span>
+<i class="nav-group-chevron" data-lucide="chevron-down"></i>
+</div>
+<div class="nav-group-items">
+<a class="nav-item" data-tab="products" onclick="switchNavTab('products')">
+<i data-lucide="package"></i>
+<span>Product Catalogue</span>
+</a>
+<a class="nav-item" data-tab="orders" onclick="switchNavTab('orders')">
+<i data-lucide="shopping-cart"></i>
+<span>Sales &amp; Orders</span>
+</a>
+<a class="nav-item" data-tab="billing" onclick="switchNavTab('billing')">
+<i data-lucide="credit-card"></i>
+<span>Billing &amp; Invoices</span>
+</a>
+</div>
+</div>
+<!-- 5. Customer Operations & Research -->
+<div class="nav-group" id="navGroupCustomer">
+<div class="nav-group-header" onclick="toggleNavGroup('navGroupCustomer')">
+<span class="nav-group-title">Customer Operations</span>
+<i class="nav-group-chevron" data-lucide="chevron-down"></i>
+</div>
+<div class="nav-group-items">
+<a class="nav-item" data-tab="support" onclick="switchNavTab('support')">
+<i data-lucide="headphones"></i>
+<span>Support Tickets</span>
+</a>
+<a class="nav-item" data-tab="guidance" onclick="switchNavTab('guidance')">
+<i data-lucide="book-open"></i>
+<span>Farmer Guidance</span>
+</a>
+<a class="nav-item" data-tab="research" onclick="switchNavTab('research')">
+<i data-lucide="microscope"></i>
+<span>Research &amp; Insights</span>
+</a>
+<a class="nav-item" data-tab="reports" onclick="switchNavTab('reports')">
+<i data-lucide="file-text"></i>
+<span>Reports &amp; Export</span>
+</a>
+</div>
+</div>
+<!-- 6. Organization & Access Governance -->
+<div class="nav-group" id="navGroupAdmin">
+<div class="nav-group-header" onclick="toggleNavGroup('navGroupAdmin')">
+<span class="nav-group-title">Access &amp; User Governance</span>
+<i class="nav-group-chevron" data-lucide="chevron-down"></i>
+</div>
+<div class="nav-group-items">
+<a class="nav-item" data-tab="employees" onclick="switchNavTab('employees')">
+<i data-lucide="user-cog"></i>
+<span>Employees &amp; Users</span>
+</a>
+<a class="nav-item" data-tab="roles" onclick="switchNavTab('roles')">
+<i data-lucide="key-round"></i>
+<span>Roles &amp; Permissions</span>
+</a>
+<a class="nav-item" data-tab="departments" onclick="switchNavTab('departments')">
+<i data-lucide="network"></i>
+<span>Departments &amp; Teams</span>
+</a>
+<a class="nav-item" data-tab="audit" onclick="switchNavTab('audit')">
+<i data-lucide="shield-alert"></i>
+<span>Access &amp; Audit Logs</span>
+</a>
+<a class="nav-item" data-tab="integrations" onclick="switchNavTab('integrations')">
+<i data-lucide="plug"></i>
+<span>Integrations</span>
+</a>
+<a class="nav-item" data-tab="settings" onclick="switchNavTab('settings')">
+<i data-lucide="settings"></i>
+<span>Platform Settings</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- Sidebar Fixed User Footer -->
+<div class="sidebar-footer">
+<div class="admin-brief" onclick="toggleUserDropdown()" title="Account &amp; Preferences">
+<div class="admin-avatar">
+<i data-lucide="user-check"></i>
+</div>
+<div class="admin-brief-info">
+<div class="admin-name" id="sidebarAdminName">Administrator</div>
+<div class="admin-role-text" id="sidebarRoleText">Master Access</div>
+</div>
+</div>
+<button aria-label="Log Out" class="btn-sidebar-logout" onclick="handleLogout()" title="Log Out">
+<i data-lucide="log-out"></i>
+</button>
+</div>
+</aside>
+<!-- MAIN APP CANVAS -->
+<main class="app-main">
+<!-- TOP NAVIGATION BAR -->
+<header class="top-bar">
+<div class="top-bar-left">
+<button aria-label="Toggle Navigation" class="btn-sidebar-toggle" id="btnSidebarToggle" onclick="toggleSidebar()" title="Toggle Navigation">
+<i data-lucide="menu"></i>
+</button>
+<div class="page-title-wrap">
+<h2 id="topBarTitle">System Overview</h2>
+<div class="page-breadcrumb">
+<span>Setu</span>
+<i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+<span id="topBarBreadcrumb">Operations &amp; Platform Overview</span>
+</div>
+</div>
+</div>
+<!-- Global Search Bar (Opens Command Palette on focus / click) -->
+<div class="top-bar-center">
+<div class="global-search-wrap" onclick="openCommandPalette()">
+<i data-lucide="search"></i>
+<input class="global-search-input" id="globalSearchInput" placeholder="Search platform (Ctrl+K)..." readonly="" type="text"/>
+<span class="search-shortcut-badge">Ctrl K</span>
+</div>
+</div>
+<!-- Topbar Controls -->
+<div class="top-bar-right">
+<!-- Active Shed & Telemetry Controls (Contextual: only displayed for authorized operational roles & relevant views) -->
+<div class="top-shed-telemetry-controls" id="topShedTelemetryControls" style="display: none; align-items: center; gap: 8px;">
+<!-- Active Shed Selector -->
+<div class="shed-select-wrap" id="topShedSelectWrap">
+<select id="shedSelect" onchange="handleShedChange(this.value)">
+<option disabled="" selected="" value="">Loading active shed...</option>
+</select>
+<i data-lucide="chevron-down"></i>
+</div>
+<!-- Real-Time Sync Clock & Health Indicator -->
+<div class="top-sync-clock" id="topSyncClock" title="Authoritative PostgreSQL Sync Time">
+              Synced: Just now
             </div>
-          </div>
-        </div>
-
-        <div class="top-bar-right">
-          <!-- Real-Time Stream Status -->
-          <div class="stream-status-pill">
-            <span class="pulse-dot"></span>
-            <span id="streamStatusText">LIVE TELEMETRY STREAM</span>
-          </div>
-
-          <!-- Active Shed Selector -->
-          <div class="shed-select-wrap">
-            <select id="shedSelect" onchange="handleShedChange(this.value)">
-              <option value="" disabled selected>Loading active shed...</option>
-            </select>
-            <i data-lucide="chevron-down"></i>
-          </div>
-
-          <!-- Live Weather Pill -->
-          <div class="weather-chip" id="topWeatherChip">
-            <i data-lucide="sun"></i>
-            <span id="weatherChipText">Outside: --°C</span>
-          </div>
-
-          <!-- Manual Sync Button -->
-          <button class="btn btn-skin btn-sm" id="syncBtn" onclick="syncAllRealtimeData()" title="Force Sync Real-Time Data">
-            <i data-lucide="refresh-cw" id="syncIcon"></i>
-            <span>Sync</span>
-          </button>
-        </div>
-      </header>
-
-      <!-- CONTENT BODY -->
-      <div class="content-body">
-        
-        <!-- ================= SECTION 1: OVERVIEW & KPIS ================= -->
-        <section id="section-overview" class="view-section">
-          
-          <!-- Executive KPI Grid (Real Data Only) -->
-          <div class="kpi-grid">
-            <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Enrolled Farmers</span>
-                <div class="kpi-icon"><i data-lucide="users"></i></div>
-              </div>
-              <div class="kpi-value" id="kpiFarmers">--</div>
-              <div class="kpi-caption">
-                <strong id="kpiActiveFarmers">--</strong> active rearing batches
-              </div>
-            </div>
-
-            <div class="kpi-card kpi-gold">
-              <div class="kpi-top">
-                <span class="kpi-label">Rearing Capacity</span>
-                <div class="kpi-icon"><i data-lucide="package"></i></div>
-              </div>
-              <div class="kpi-value" id="kpiDfl">--</div>
-              <div class="kpi-caption">Total DFL layings in cluster</div>
-            </div>
-
-            <div class="kpi-card kpi-blue">
-              <div class="kpi-top">
-                <span class="kpi-label">Monitored Sheds</span>
-                <div class="kpi-icon"><i data-lucide="warehouse"></i></div>
-              </div>
-              <div class="kpi-value" id="kpiSheds">--</div>
-              <div class="kpi-caption">
-                <span class="badge badge-green" style="padding:1px 6px;">100% ONLINE</span>
-              </div>
-            </div>
-
-            <div class="kpi-card kpi-amber">
-              <div class="kpi-top">
-                <span class="kpi-label">Active Relays</span>
-                <div class="kpi-icon"><i data-lucide="cpu"></i></div>
-              </div>
-              <div class="kpi-value" id="kpiActuators">--</div>
-              <div class="kpi-caption">Coolers, Heaters, Fans & Bulbs</div>
-            </div>
-
-            <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-label">Compliance Index</span>
-                <div class="kpi-icon"><i data-lucide="check-circle-2"></i></div>
-              </div>
-              <div class="kpi-value" id="kpiCompliance">--%</div>
-              <div class="kpi-caption">Within stage target envelope</div>
-            </div>
-
-            <div class="kpi-card kpi-gold">
-              <div class="kpi-top">
-                <span class="kpi-label">Ambient Weather</span>
-                <div class="kpi-icon"><i data-lucide="cloud-sun"></i></div>
-              </div>
-              <div class="kpi-value" id="kpiOutsideTemp">--°C</div>
-              <div class="kpi-caption" id="kpiOutsideHum">Outside Humidity: --%</div>
-            </div>
-          </div>
-
-          <!-- Microclimate Status & Stage Overview Row -->
-          <div class="two-col-layout">
-            
-            <!-- Real-Time Microclimate Telemetry Gauges -->
-            <div class="card-panel">
-              <div class="card-panel-header">
-                <div class="card-title-group">
-                  <div class="card-icon-badge"><i data-lucide="thermometer"></i></div>
-                  <div>
-                    <h3>Active Shed Microclimate</h3>
-                    <p id="overviewShedLabel">Loading active shed microclimate...</p>
-                  </div>
+<button class="btn btn-skin btn-sm" id="syncBtn" onclick="syncAllRealtimeData()" title="Authoritative Refresh">
+<i data-lucide="refresh-cw" id="syncIcon"></i>
+</button>
+<div class="top-health-pill" id="topHealthPill">
+<span class="pulse-dot"></span>
+<span id="topHealthText">SYSTEM OPERATIONAL</span>
+</div>
+<!-- Independent Multi-Account Tab Session Indicator -->
+<div class="top-health-pill" id="topTabSessionPill" style="background: var(--skin-bg-alt); border-color: var(--skin-border); gap: 6px;" title="Tab-Isolated Session Context">
+<i data-lucide="layers" style="width: 13px; height: 13px; color: var(--emerald-500);"></i>
+<span id="topTabSessionText" style="font-size: 0.72rem; font-weight: 700; color: var(--text-main);">TAB: ISOLATED</span>
+</div>
+</div>
+<!-- Notification Bell Center -->
+<div class="notif-btn-wrap">
+<button aria-label="Notification Center" class="btn-icon-badge" onclick="toggleNotificationDropdown()" title="Notification Center">
+<i data-lucide="bell"></i>
+<span class="badge-count" id="notifBadgeCount">0</span>
+</button>
+<div class="notif-dropdown hidden" id="notifDropdown">
+<div class="notif-header">
+<span>Incident Notifications</span>
+<button class="btn btn-skin btn-sm" onclick="markAllNotificationsRead()">Dismiss All</button>
+</div>
+<div class="notif-list" id="notifList">
+<div style="padding: 18px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+                  No active critical notifications.
                 </div>
-                <span class="badge badge-green" id="overviewHealthBadge">OPTIMAL</span>
-              </div>
-
-              <div class="telemetry-dials-grid">
-                <div class="dial-card">
-                  <div class="dial-title">Indoor Temp</div>
-                  <div class="dial-reading" id="dialIndoorTemp">--°C</div>
-                  <div class="dial-target" id="dialTempTarget">Target: --</div>
-                </div>
-
-                <div class="dial-card">
-                  <div class="dial-title">Indoor Humidity</div>
-                  <div class="dial-reading" id="dialIndoorHum">--%</div>
-                  <div class="dial-target" id="dialHumTarget">Target: --</div>
-                </div>
-
-                <div class="dial-card">
-                  <div class="dial-title">Air Quality (CO₂)</div>
-                  <div class="dial-reading" id="dialAirQuality">--%</div>
-                  <div class="dial-target" id="dialAirTarget">Target: &ge; 80%</div>
-                </div>
-
-                <div class="dial-card">
-                  <div class="dial-title">Light Intensity</div>
-                  <div class="dial-reading" id="dialLightLux">-- Lux</div>
-                  <div class="dial-target" id="dialLightTarget">Day: 15–30 Lux</div>
-                </div>
-
-                <div class="dial-card">
-                  <div class="dial-title">Outside Ambient</div>
-                  <div class="dial-reading" id="dialOutdoorTemp">--°C</div>
-                  <div class="dial-target" id="dialOutdoorHum">Humidity: --%</div>
-                </div>
-              </div>
-
-              <!-- Status Headline & Subline -->
-              <div class="stage-info-banner" style="margin-bottom:0;">
-                <i data-lucide="info"></i>
-                <div class="stage-info-banner-content">
-                  <h4 id="overviewHeadline">Telemetry Stream Active</h4>
-                  <p id="overviewSubline">Monitoring live sensor feed from shed ESP32 controller and evaluating biological safety rules.</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Active Stage & Hardware Automation Card -->
-            <div class="card-panel">
-              <div class="card-panel-header">
-                <div class="card-title-group">
-                  <div class="card-icon-badge"><i data-lucide="sliders"></i></div>
-                  <div>
-                    <h3>Silkworm Life Stage & Automation</h3>
-                    <p>Current biological phase controlling auto-mode rules</p>
-                  </div>
-                </div>
-                <div class="badge badge-skin" id="overviewStageBadge">Instar --</div>
-              </div>
-
-              <div style="padding: 12px 0;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
-                  <strong style="font-size: 0.92rem; color:var(--green-deep);" id="overviewStageName">--</strong>
-                  <span class="badge badge-green" id="overviewAutoModeBadge">AUTO-MODE ACTIVE</span>
-                </div>
-                <p style="font-size:0.82rem; color:var(--text-secondary); line-height: 1.5; margin-bottom: 18px;" id="overviewStageDesc">
-                  Loading stage profile...
-                </p>
-
-                <!-- Relay mini status -->
-                <div class="actuator-matrix">
-                  <div class="actuator-card" id="miniRelayCooler">
-                    <div class="actuator-name">Cooling Fogger</div>
-                    <span class="relay-status-tag" id="miniStateCooler">OFF</span>
-                  </div>
-                  <div class="actuator-card" id="miniRelayFan">
-                    <div class="actuator-name">Exhaust Fan</div>
-                    <span class="relay-status-tag" id="miniStateFan">OFF</span>
-                  </div>
-                  <div class="actuator-card" id="miniRelayHeater">
-                    <div class="actuator-name">Halogen Heater</div>
-                    <span class="relay-status-tag" id="miniStateHeater">OFF</span>
-                  </div>
-                  <div class="actuator-card" id="miniRelayLight">
-                    <div class="actuator-name">Photoperiod Bulb</div>
-                    <span class="relay-status-tag" id="miniStateLight">OFF</span>
-                  </div>
-                </div>
-
-                <div style="margin-top: 20px; display:flex; gap:10px;">
-                  <button class="btn btn-primary btn-sm" onclick="switchNavTab('stages')">
-                    <i data-lucide="sliders"></i> Configure Climate Levels
-                  </button>
-                  <button class="btn btn-skin btn-sm" onclick="switchNavTab('telemetry')">
-                    <i data-lucide="cpu"></i> Actuator Control
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </section>
-
-
-
-        <!-- ================= SECTION 2: STAGE CLIMATE LEVELS (SUPER ADMIN CONTROLS) ================= -->
-        <section id="section-stages" class="view-section hidden">
-          
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="sliders"></i></div>
-                <div>
-                  <h3>Sericulture Life Stage Climate Setpoints & Auto-Mode Control</h3>
-                  <p>Configure software levels for silkworm growth stages (Instars 1–5). These thresholds govern auto-mode microclimate regulation across all sheds.</p>
-                </div>
-              </div>
-              <button class="btn btn-skin btn-sm" onclick="resetStagesToStandards()">
-                <i data-lucide="rotate-ccw"></i> Reset to CSB Standards
+</div>
+</div>
+</div>
+<!-- User Menu Dropdown Wrap -->
+<div class="user-menu-wrap">
+<button aria-label="User Menu" class="user-menu-trigger" onclick="toggleUserDropdown()">
+<div class="admin-avatar" style="width: 32px; height: 32px; font-size: 0.75rem;">
+<i data-lucide="user"></i>
+</div>
+<i data-lucide="chevron-down" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+</button>
+<div class="user-menu-dropdown hidden" id="userMenuDropdown">
+<div class="user-menu-header">
+<div class="user-full-name" id="menuUserFullName">Platform Administrator</div>
+<div class="user-role-badge" id="menuUserRole">Role: superadmin</div>
+</div>
+<!-- Persona Switcher -->
+<div style="padding: 6px 10px;">
+<label style="font-size: 0.70rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Simulate Persona:</label>
+<select class="form-select" id="roleSwitcherSelect" onchange="simulateRoleChange(this.value)" style="margin-top: 4px; padding: 5px; font-size: 0.78rem; width: 100%; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+<option value="superadmin">Role: Platform Super Admin</option>
+<option value="company_admin">Role: Company Admin</option>
+<option value="ceo">Role: CEO / Executive</option>
+<option value="hr">Role: HR / User Admin</option>
+<option value="operations_manager">Role: Operations Manager</option>
+<option value="technician">Role: Field Technician</option>
+<option value="sales">Role: Sales &amp; Billing</option>
+<option value="support">Role: Support Agent</option>
+<option value="analyst">Role: Analyst / Researcher</option>
+<option value="farmer">Role: Farmer</option>
+</select>
+</div>
+<button class="user-menu-item" onclick="toggleTheme()">
+<i data-lucide="moon" id="themeIcon"></i>
+<span id="themeToggleLabel">Dark Theme</span>
+</button>
+<a class="user-menu-item" href="/landing" target="_blank">
+<i data-lucide="external-link"></i>
+<span>Public Website</span>
+</a>
+<button class="user-menu-item" onclick="switchNavTab('settings'); toggleUserDropdown();">
+<i data-lucide="settings"></i>
+<span>Platform Settings</span>
+</button>
+<div style="height: 1px; background: var(--border-subtle); margin: 4px 0;"></div>
+<button class="user-menu-item" onclick="openActiveSessionsModal(); toggleUserDropdown();">
+<i data-lucide="shield-check"></i>
+<span>Active Tab Sessions</span>
+</button>
+<button class="user-menu-item danger" onclick="handleLogout()" title="Terminate current tab session">
+<i data-lucide="log-out"></i>
+<span>Sign Out This Tab</span>
+</button>
+<button class="user-menu-item danger" onclick="handleLogoutAll()" style="color: #ef4444; font-size: 0.78rem;" title="Terminate sessions on all tabs and devices">
+<i data-lucide="power"></i>
+<span>Sign Out All Tabs</span>
+</button>
+</div>
+</div>
+</div>
+</header>
+<!-- CONTENT BODY -->
+<div class="content-body">
+<!-- ================= 1. VIEW: OVERVIEW & KPIS ================= -->
+<section class="view-section" id="section-overview">
+<!-- DYNAMIC ROLE-BASED DASHBOARD HERO EXPERIENCE -->
+<div class="role-dashboard-hero" id="roleDashboardHero" style="background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-deep) 100%); color: #fff; padding: 22px 26px; border-radius: var(--radius-md); margin-bottom: 20px; box-shadow: 0 4px 14px rgba(11,40,27,0.15); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+<div>
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+<span class="brand-role-chip" id="roleHeroBadge" style="background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3); font-size: 0.75rem; padding: 3px 10px;">SUPER ADMIN</span>
+<span id="roleHeroOrg" style="font-size: 0.8rem; opacity: 0.85;"><i data-lucide="building" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle;"></i> SeriCare Apex Corporation</span>
+</div>
+<h2 id="roleHeroTitle" style="font-size: 1.45rem; font-weight: 800; color: #fff; margin: 0;">Command Center &amp; Platform Governance</h2>
+<p id="roleHeroSubtitle" style="font-size: 0.84rem; opacity: 0.8; margin: 4px 0 0; max-width: 650px;">Authoritative multi-tenant governance, live IoT telemetry, and organizational resource isolation.</p>
+</div>
+<div style="display: flex; gap: 10px; align-items: center;">
+<button class="btn btn-sm" onclick="refreshRoleDashboard()" style="background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.25);">
+<i data-lucide="refresh-cw"></i> Refresh Role View
               </button>
-            </div>
-
-            <!-- Stage Level Selector Tabs -->
-            <div class="stage-tabs-header" id="stageTabsContainer">
-              <!-- Dynamically populated 5 stage tabs -->
-            </div>
-
-            <!-- Stage Level Editor -->
-            <div class="stage-editor-box">
-              <div class="stage-info-banner">
-                <i data-lucide="sparkles"></i>
-                <div class="stage-info-banner-content">
-                  <h4 id="editStageHeaderTitle">1st Instar (Chawki) — Days 1–3</h4>
-                  <p id="editStageHeaderDesc">Delicate newly-hatched larvae require high humidity and constant warm temperatures to prevent desiccation.</p>
-                </div>
-              </div>
-
-              <!-- Envelopes Control Grid -->
-              <div class="thresholds-control-grid">
-                
-                <!-- Temperature Setpoint Envelope -->
-                <div class="envelope-card">
-                  <div class="envelope-header">
-                    <div class="envelope-title">
-                      <i data-lucide="thermometer"></i>
-                      <span>Temperature Envelope (°C)</span>
-                    </div>
-                    <div class="envelope-target-badge" id="tempRangeBadge">27.0°C – 28.0°C</div>
-                  </div>
-
-                  <div class="range-inputs-row">
-                    <div class="form-group">
-                      <label for="inputTempMin">Target Min Temp (°C)</label>
-                      <input type="number" id="inputTempMin" step="0.1" min="15" max="38" value="27.0" oninput="handleStageInputChange()">
-                    </div>
-                    <div class="form-group">
-                      <label for="inputTempMax">Target Max Temp (°C)</label>
-                      <input type="number" id="inputTempMax" step="0.1" min="15" max="38" value="28.0" oninput="handleStageInputChange()">
-                    </div>
-                  </div>
-
-                  <div class="visual-range-bar-container">
-                    <div class="range-bar-track">
-                      <div class="range-bar-fill" id="tempRangeFill" style="left: 40%; width: 25%;"></div>
-                    </div>
-                    <div class="range-bar-labels">
-                      <span>15°C (Min Safe)</span>
-                      <span id="tempRangeLabel">Optimal: 27.0°C - 28.0°C</span>
-                      <span>38°C (Max Safe)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Humidity Setpoint Envelope -->
-                <div class="envelope-card">
-                  <div class="envelope-header">
-                    <div class="envelope-title">
-                      <i data-lucide="droplets"></i>
-                      <span>Relative Humidity Envelope (%)</span>
-                    </div>
-                    <div class="envelope-target-badge" id="humRangeBadge">80% – 85%</div>
-                  </div>
-
-                  <div class="range-inputs-row">
-                    <div class="form-group">
-                      <label for="inputHumMin">Target Min Humidity (%)</label>
-                      <input type="number" id="inputHumMin" step="1" min="30" max="95" value="80" oninput="handleStageInputChange()">
-                    </div>
-                    <div class="form-group">
-                      <label for="inputHumMax">Target Max Humidity (%)</label>
-                      <input type="number" id="inputHumMax" step="1" min="30" max="95" value="85" oninput="handleStageInputChange()">
-                    </div>
-                  </div>
-
-                  <div class="visual-range-bar-container">
-                    <div class="range-bar-track">
-                      <div class="range-bar-fill" id="humRangeFill" style="left: 60%; width: 20%; background: linear-gradient(90deg, #4E9571, #235B85);"></div>
-                    </div>
-                    <div class="range-bar-labels">
-                      <span>30% (Dry)</span>
-                      <span id="humRangeLabel">Optimal: 80% - 85%</span>
-                      <span>95% (Max)</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              <!-- Advanced Automation Tolerances & Hysteresis -->
-              <div class="advanced-tolerances-row">
-                <div class="tolerance-group">
-                  <label for="inputHysteresisTemp">Temperature Deadband (°C)</label>
-                  <input type="number" id="inputHysteresisTemp" step="0.1" min="0.1" max="3.0" value="0.5">
-                  <small style="font-size:0.7rem; color:var(--text-muted);">Prevents relay oscillation</small>
-                </div>
-
-                <div class="tolerance-group">
-                  <label for="inputHysteresisHum">Humidity Deadband (%)</label>
-                  <input type="number" id="inputHysteresisHum" step="0.5" min="0.5" max="10.0" value="3.0">
-                  <small style="font-size:0.7rem; color:var(--text-muted);">Prevents fogger chattering</small>
-                </div>
-
-                <div class="tolerance-group">
-                  <label for="inputFanOffset">Exhaust Fan Trigger Offset (°C)</label>
-                  <input type="number" id="inputFanOffset" step="0.1" min="0.5" max="4.0" value="1.5">
-                  <small style="font-size:0.7rem; color:var(--text-muted);">Triggers above target max</small>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="inputStageDesc">Sericultural Guidance & Notes</label>
-                <textarea id="inputStageDesc" rows="2" placeholder="Notes for farmers on this stage..."></textarea>
-              </div>
-
-              <!-- Action Buttons -->
-              <div class="stage-action-buttons">
-                <div>
-                  <button type="button" class="btn btn-outline btn-sm" onclick="applyCurrentStageToShed()">
-                    <i data-lucide="check-check"></i> Apply This Level to Active Shed
-                  </button>
-                </div>
-                <div class="stage-action-buttons-right">
-                  <button type="button" class="btn btn-primary" onclick="saveStageSetpoints()">
-                    <i data-lucide="save"></i> Save Setpoints to Backend
-                  </button>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Comparison Table for All 5 Stages -->
-            <div style="margin-top: 30px;">
-              <h4 style="font-size: 0.95rem; font-weight: 700; color:var(--green-deep); margin-bottom: 12px;">
-                Central Silk Board Standard Levels Comparison Matrix
+</div>
+</div>
+<!-- ROLE-SPECIFIC 4-KPI SUMMARY ROW -->
+<div class="kpi-grid" id="roleKpiRow" style="margin-bottom: 20px;">
+<!-- Dynamically populated by renderRoleSpecificKpis() -->
+</div>
+<!-- B. Operational Priority Panel ("Needs Attention") -->
+<div class="priority-attention-panel" id="priorityAttentionPanel">
+<div class="priority-panel-header">
+<div class="priority-panel-title">
+<i data-lucide="alert-circle"></i>
+<span>Operational Priority &amp; Immediate Action Items</span>
+</div>
+<span class="badge badge-neutral" id="priorityCountBadge">0 Pending</span>
+</div>
+<div class="priority-items-list" id="priorityItemsList">
+<div class="priority-empty-card">
+<div class="priority-empty-icon">
+<i data-lucide="check"></i>
+</div>
+<div class="priority-empty-info">
+<h4>All Operational Systems Nominal</h4>
+<p>No critical microclimate breaches, hardware dropouts, or overdue installations requiring supervisory action.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- C. Enterprise KPI Cards Grid -->
+<div class="kpi-grid">
+<div class="kpi-card" onclick="switchNavTab('farmers')">
+<div class="kpi-card-header">
+<div class="kpi-label">Registered Farmers</div>
+<div class="kpi-icon-wrap"><i data-lucide="users"></i></div>
+</div>
+<div class="kpi-value" id="kpiTotalFarmers">--</div>
+<div class="kpi-sub" id="kpiActiveFarmers"><i data-lucide="check-circle-2" style="width:12px;height:12px;color:var(--status-success);"></i> Active: --</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('sheds')">
+<div class="kpi-card-header">
+<div class="kpi-label">Monitored Sheds</div>
+<div class="kpi-icon-wrap"><i data-lucide="warehouse"></i></div>
+</div>
+<div class="kpi-value" id="kpiTotalSheds">--</div>
+<div class="kpi-sub"><i data-lucide="layers" style="width:12px;height:12px;"></i> Sericulture Clusters</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('devices')">
+<div class="kpi-card-header">
+<div class="kpi-label">Online IoT Nodes</div>
+<div class="kpi-icon-wrap" style="color: var(--status-success); background: var(--status-success-bg); border-color: var(--status-success-border);"><i data-lucide="wifi"></i></div>
+</div>
+<div class="kpi-value" id="kpiOnlineDevices">--</div>
+<div class="kpi-sub" id="kpiOfflineDevices"><i data-lucide="wifi-off" style="width:12px;height:12px;color:var(--status-danger);"></i> Offline: 0</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('billing')">
+<div class="kpi-card-header">
+<div class="kpi-label">Active Subscriptions</div>
+<div class="kpi-icon-wrap"><i data-lucide="repeat"></i></div>
+</div>
+<div class="kpi-value" id="kpiActiveSubs">--</div>
+<div class="kpi-sub" id="kpiMrr">MRR: ₹--</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('orders')">
+<div class="kpi-card-header">
+<div class="kpi-label">Pending Orders</div>
+<div class="kpi-icon-wrap"><i data-lucide="shopping-bag"></i></div>
+</div>
+<div class="kpi-value" id="kpiPendingOrders">0</div>
+<div class="kpi-sub" id="kpiTotalRevenue">Total Rev: ₹--</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('support')">
+<div class="kpi-card-header">
+<div class="kpi-label">Open Support Tickets</div>
+<div class="kpi-icon-wrap" style="color: var(--status-warning); background: var(--status-warning-bg); border-color: var(--status-warning-border);"><i data-lucide="headphones"></i></div>
+</div>
+<div class="kpi-value" id="kpiOpenTickets">0</div>
+<div class="kpi-sub" id="kpiCriticalTickets">Critical: 0</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('alerts')">
+<div class="kpi-card-header">
+<div class="kpi-label">Active Critical Alerts</div>
+<div class="kpi-icon-wrap" style="color: var(--status-danger); background: var(--status-danger-bg); border-color: var(--status-danger-border);"><i data-lucide="alert-octagon"></i></div>
+</div>
+<div class="kpi-value" id="kpiActiveAlerts">0</div>
+<div class="kpi-sub">Microclimate Interlocks</div>
+</div>
+<div class="kpi-card" onclick="switchNavTab('installations')">
+<div class="kpi-card-header">
+<div class="kpi-label">Field Installations</div>
+<div class="kpi-icon-wrap"><i data-lucide="truck"></i></div>
+</div>
+<div class="kpi-value" id="kpiPendingInstalls">0</div>
+<div class="kpi-sub">Pending Verification</div>
+</div>
+</div>
+<!-- D. Environmental Microclimate Overview & Actuator Controls -->
+<div class="dashboard-banner-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
+<!-- Sensor Dials Container -->
+<div class="microclimate-card">
+<div class="microclimate-header">
+<div class="microclimate-title-box">
+<i data-lucide="thermometer"></i>
+<div>
+<h3 id="overviewShedTitle">Primary Rearing Shed Microclimate</h3>
+<p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+                      Authoritative live readings from Sensirion SHT31, MQ-135, and BH1750 sensors:
+                    </p>
+</div>
+</div>
+<span class="badge badge-success" id="overviewFreshnessBadge"><i data-lucide="check-circle" style="width:12px;height:12px;"></i> Verified Live Telemetry</span>
+</div>
+<div class="sensor-grid-4">
+<div class="sensor-dial-box">
+<div class="sensor-dial-header">
+<span class="sensor-name">INDOOR TEMP</span>
+<span class="sensor-chip">SHT31</span>
+</div>
+<div class="sensor-reading-value" id="overviewIndoorTemp">--°C</div>
+<div class="sensor-target-band" id="overviewTempBand"><i data-lucide="target" style="width:12px;height:12px;"></i> Target: 26-28°C</div>
+</div>
+<div class="sensor-dial-box">
+<div class="sensor-dial-header">
+<span class="sensor-name">HUMIDITY</span>
+<span class="sensor-chip">SHT31</span>
+</div>
+<div class="sensor-reading-value" id="overviewIndoorHum">--%</div>
+<div class="sensor-target-band" id="overviewHumBand"><i data-lucide="target" style="width:12px;height:12px;"></i> Target: 75-85%</div>
+</div>
+<div class="sensor-dial-box">
+<div class="sensor-dial-header">
+<span class="sensor-name">AIR FRESHNESS</span>
+<span class="sensor-chip">MQ-135</span>
+</div>
+<div class="sensor-reading-value" id="overviewIndoorAq">--%</div>
+<div class="sensor-target-band"><i data-lucide="shield" style="width:12px;height:12px;"></i> CO2 Safe &gt;80%</div>
+</div>
+<div class="sensor-dial-box">
+<div class="sensor-dial-header">
+<span class="sensor-name">LIGHT LUX</span>
+<span class="sensor-chip">BH1750</span>
+</div>
+<div class="sensor-reading-value" id="overviewIndoorLux">-- Lux</div>
+<div class="sensor-target-band"><i data-lucide="sun" style="width:12px;height:12px;"></i> Circadian 15-30 lx</div>
+</div>
+</div>
+</div>
+<!-- Hardware Actuator States & Safety Interlocks -->
+<div class="microclimate-card">
+<div class="microclimate-header">
+<div class="microclimate-title-box">
+<i data-lucide="zap"></i>
+<div>
+<h3>Actuators &amp; Relays</h3>
+<p style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">Firmware interlock protected</p>
+</div>
+</div>
+</div>
+<div class="actuator-panel-grid" style="display: flex; flex-direction: column; gap: 8px;">
+<div class="actuator-item" id="overviewActCooler">
+<div class="actuator-info">
+<span class="actuator-name">Evaporative Cooler</span>
+<span class="actuator-sub">Water pump &amp; pads</span>
+</div>
+<span class="act-state">STANDBY</span>
+</div>
+<div class="actuator-item" id="overviewActHeater">
+<div class="actuator-info">
+<span class="actuator-name">Heating Element</span>
+<span class="actuator-sub">Coil interlocked</span>
+</div>
+<span class="act-state">STANDBY</span>
+</div>
+<div class="actuator-item" id="overviewActFan">
+<div class="actuator-info">
+<span class="actuator-name">Exhaust Ventilation</span>
+<span class="actuator-sub">Air exchange vent</span>
+</div>
+<span class="act-state">STANDBY</span>
+</div>
+<div class="actuator-item" id="overviewActLight">
+<div class="actuator-info">
+<span class="actuator-name">PWM Dimmer</span>
+<span class="actuator-sub">Circadian lighting</span>
+</div>
+<span class="act-state" id="overviewPwmText">0% OFF</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 2. VIEW: MY WORK / TASKS ================= -->
+<section class="view-section hidden" id="section-tasks">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="check-square"></i>
+<span>My Work &amp; Priority Queue</span>
+<span class="badge badge-neutral" id="tasksBadgeCount">0 Tasks</span>
+</div>
+<div class="table-actions">
+<button class="btn btn-skin btn-sm" onclick="loadUserTasks()">Refresh Tasks</button>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="tasksTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('tasksTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('tasksTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('tasksTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('tasksTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="tasksTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('tasksTable', this.checked)" type="checkbox"/></th>
+<th>Category</th>
+<th>Task Item / Reference</th>
+<th>Assigned To</th>
+<th>Priority</th>
+<th>Due / Created</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="tasksTableBody">
+<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading pending workflow tasks...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="tasksPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('tasksTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('tasksTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('tasksTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+<!-- Farmers Table Pagination Bar -->
+</div>
+</section>
+<!-- ================= 3. VIEW: LIVE MONITORING ================= -->
+<section class="view-section hidden" id="section-live-monitoring">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="activity"></i>
+<span>Live Shed Environmental Telemetry</span>
+</div>
+<div class="table-actions">
+<span class="badge badge-success" id="liveMonitoringStatus">Connected</span>
+<button class="btn btn-skin btn-sm" onclick="syncLiveTelemetryStream()">Refresh</button>
+</div>
+</div>
+<!-- Gauges & Telemetry Visualizer -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+<div class="detail-card">
+<h4><i data-lucide="thermometer"></i> Temperature Probe</h4>
+<div style="text-align: center; padding: 24px 0;">
+<div id="liveGaugeTemp" style="font-size: 2.8rem; font-weight: 800; color: var(--brand-dark);">--</div>
+<div style="font-size: 0.85rem; color: var(--text-muted);">Degrees Celsius (°C)</div>
+<div class="badge badge-success" id="liveTempBadge" style="margin-top: 8px;">In Safety Range</div>
+</div>
+</div>
+<div class="detail-card">
+<h4><i data-lucide="droplets"></i> Relative Humidity Probe</h4>
+<div style="text-align: center; padding: 24px 0;">
+<div id="liveGaugeHum" style="font-size: 2.8rem; font-weight: 800; color: var(--brand-dark);">--</div>
+<div style="font-size: 0.85rem; color: var(--text-muted);">Relative Humidity (%)</div>
+<div class="badge badge-success" id="liveHumBadge" style="margin-top: 8px;">Optimal Moisture</div>
+</div>
+</div>
+<div class="detail-card">
+<h4><i data-lucide="wind"></i> Air Freshness (CO2)</h4>
+<div style="text-align: center; padding: 24px 0;">
+<div id="liveGaugeAq" style="font-size: 2.8rem; font-weight: 800; color: var(--brand-dark);">--</div>
+<div style="font-size: 0.85rem; color: var(--text-muted);">Fresh Air Index (%)</div>
+<div class="badge badge-success" id="liveAqBadge" style="margin-top: 8px;">Safe Breathing</div>
+</div>
+</div>
+<div class="detail-card">
+<h4><i data-lucide="sun"></i> Ambient Illuminance</h4>
+<div style="text-align: center; padding: 24px 0;">
+<div id="liveGaugeLux" style="font-size: 2.8rem; font-weight: 800; color: var(--brand-dark);">--</div>
+<div style="font-size: 0.85rem; color: var(--text-muted);">Illuminance (Lux)</div>
+<div class="badge badge-info" id="liveLuxBadge" style="margin-top: 8px;">Circadian Match</div>
+</div>
+</div>
+</div>
+<!-- Actuator Control Sliders (With Safety Lock) -->
+<div class="table-card" style="padding: 20px;">
+<div class="table-title">
+<i data-lucide="sliders"></i>
+<span>Hardware Actuator Controls &amp; Safety Interlocks</span>
+</div>
+<p style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 12px;">
+              Heater and Cooler are electrically mutually-exclusive in firmware to prevent thermal shorting.
+            </p>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
+<div class="detail-card">
+<h4>Evaporative Cooler</h4>
+<p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">Active cooling pad &amp; pump.</p>
+<button class="btn btn-skin btn-sm" id="btnToggleCooler" onclick="triggerActuatorCommand('cooler')">Toggle Cooler</button>
+</div>
+<div class="detail-card">
+<h4>Electric Heating Element</h4>
+<p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">Thermal heating coil.</p>
+<button class="btn btn-skin btn-sm" id="btnToggleHeater" onclick="triggerActuatorCommand('heater')">Toggle Heater</button>
+</div>
+<div class="detail-card">
+<h4>Exhaust Ventilation Fan</h4>
+<p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px;">Rapid air-exchange vent.</p>
+<button class="btn btn-skin btn-sm" id="btnToggleFan" onclick="triggerActuatorCommand('fan')">Toggle Fan</button>
+</div>
+<div class="detail-card">
+<h4>Circadian PWM Dimmer (0–100%)</h4>
+<input id="pwmSlider" max="100" min="0" onchange="handlePwmChange(this.value)" style="width: 100%; margin: 10px 0;" type="range" value="0"/>
+<div style="display: flex; justify-content: space-between; font-size: 0.76rem; color: var(--text-muted);">
+<span>0% (Dark)</span>
+<span id="pwmValueDisplay" style="font-weight: 800; color: var(--brand-dark);">0%</span>
+<span>100% (Full)</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 4. VIEW: ANALYTICS & TRENDS ================= -->
+<section class="view-section hidden" id="section-analytics">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="line-chart"></i>
+<span>Platform &amp; Environmental Analytics</span>
+</div>
+<div class="table-actions">
+<select class="form-select" id="analyticsRangeSelect" onchange="loadAnalyticsTrends(this.value)" style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+<option value="7">Last 7 Days</option>
+<option value="14">Last 14 Days</option>
+<option value="30">Last 30 Days</option>
+<option value="90">Last 90 Days</option>
+</select>
+<button class="btn btn-skin btn-sm" onclick="exportAnalyticsReport('csv')">
+<i data-lucide="download"></i> Export CSV
+              </button>
+</div>
+</div>
+<!-- Charts Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px;">
+<div class="table-card" style="padding: 20px;">
+<h4 style="font-size: 0.92rem; font-weight: 800; color: var(--brand-dark); margin-bottom: 12px;">
+                Historical Temperature &amp; Humidity Averages
               </h4>
-              <div class="table-responsive">
-                <table class="matrix-table">
-                  <thead>
-                    <tr>
-                      <th>Level #</th>
-                      <th>Stage Name</th>
-                      <th>Duration</th>
-                      <th>Optimal Temperature</th>
-                      <th>Optimal Humidity</th>
-                      <th>Deadband</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="stageMatrixTableBody">
-                    <!-- Dynamic Rows -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- ================= SECTION 3: LIVE SENSORS & RELAYS ================= -->
-        <section id="section-telemetry" class="view-section hidden">
-          
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="activity"></i></div>
-                <div>
-                  <h3>Live Shed IoT Telemetry & Actuator Matrix</h3>
-                  <p>Real-time microclimate conditions from the ESP32 sensor array in Shed 01</p>
-                </div>
-              </div>
-              
-              <div style="display:flex; align-items:center; gap:10px;">
-                <label style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
-                  <input type="checkbox" id="autoModeToggle" onchange="toggleAutoMode(this.checked)" style="width:16px; height:16px;">
-                  Auto-Mode Enabled
-                </label>
-              </div>
-            </div>
-
-            <div class="telemetry-dials-grid">
-              <div class="dial-card">
-                <div class="dial-title">Shed Internal Temp</div>
-                <div class="dial-reading" id="fullDialIndoorTemp">--°C</div>
-                <div class="dial-target" id="fullDialTempTarget">Target: --</div>
-              </div>
-
-              <div class="dial-card">
-                <div class="dial-title">Shed Internal Humidity</div>
-                <div class="dial-reading" id="fullDialIndoorHum">--%</div>
-                <div class="dial-target" id="fullDialHumTarget">Target: --</div>
-              </div>
-
-              <div class="dial-card">
-                <div class="dial-title">Air Quality (CO₂)</div>
-                <div class="dial-reading" id="fullDialAirQuality">--%</div>
-                <div class="dial-target" id="fullDialAirTarget">Target: &ge; 80% (CO₂ &lt; 1%)</div>
-              </div>
-
-              <div class="dial-card">
-                <div class="dial-title">Light Intensity (Lux)</div>
-                <div class="dial-reading" id="fullDialLightLux">-- Lux</div>
-                <div class="dial-target" id="fullDialLightTarget">Photoperiod: 15–30 Lux</div>
-              </div>
-
-              <div class="dial-card">
-                <div class="dial-title">Outdoor Ambient Weather</div>
-                <div class="dial-reading" id="fullDialOutdoorTemp">--°C</div>
-                <div class="dial-target" id="fullDialOutdoorHum">Condition: Sunny</div>
-              </div>
-            </div>
-
-            <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--green-deep); margin: 24px 0 12px;">
-              Connected IoT Actuators & Relays (240V Relays & PWM Dimmers)
-            </h4>
-
-            <div class="actuator-matrix">
-              <!-- Cooling Fogger Card -->
-              <div class="actuator-card" id="cardCooler">
-                <div class="actuator-header">
-                  <div class="actuator-icon-box"><i data-lucide="droplets"></i></div>
-                  <span class="relay-status-tag" id="tagCooler">OFF</span>
-                </div>
-                <div>
-                  <div class="actuator-name">Cooling Fogger</div>
-                  <div class="actuator-pin">GPIO Pin 18 • High Pressure Mist</div>
-                </div>
-                <button class="actuator-toggle-btn" id="btnToggleCooler" onclick="manualToggleActuator('cooler')">
-                  Toggle Fogger
+<div style="height: 280px; position: relative;">
+<canvas id="chartTempHum"></canvas>
+</div>
+</div>
+<div class="table-card" style="padding: 20px;">
+<h4 style="font-size: 0.92rem; font-weight: 800; color: var(--brand-dark); margin-bottom: 12px;">
+                Daily Sales Orders &amp; Revenue Performance (₹)
+              </h4>
+<div style="height: 280px; position: relative;">
+<canvas id="chartOrdersRev"></canvas>
+</div>
+</div>
+<div class="table-card" style="padding: 20px;">
+<h4 style="font-size: 0.92rem; font-weight: 800; color: var(--brand-dark); margin-bottom: 12px;">
+                Regional Farmer Distribution
+              </h4>
+<div style="height: 260px; position: relative;">
+<canvas id="chartRegional"></canvas>
+</div>
+</div>
+<div class="table-card" style="padding: 20px;">
+<h4 style="font-size: 0.92rem; font-weight: 800; color: var(--brand-dark); margin-bottom: 12px;">
+                Farmer Enrollment Growth Trend
+              </h4>
+<div style="height: 260px; position: relative;">
+<canvas id="chartFarmerGrowth"></canvas>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 5. VIEW: FARMERS DIRECTORY ================= -->
+<section class="view-section hidden" id="section-farmers">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="users"></i>
+<span>Enrolled Sericulture Farmers</span>
+<span class="badge badge-neutral" id="farmersBadgeCount">0 Enrolled</span>
+</div>
+<div class="table-actions">
+<div class="search-input-wrap">
+<i data-lucide="search"></i>
+<input id="farmersSearchInput" oninput="filterFarmersTable(this.value)" placeholder="Search by name, phone, shed..." type="text"/>
+</div>
+<select id="farmersRegionSelect" onchange="filterFarmersRegion(this.value)" style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+<option value="">All Regions</option>
+</select>
+<button class="btn btn-skin btn-sm" onclick="exportFarmersCsv()"><i data-lucide="download"></i> Export</button>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="farmersTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('farmersTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('farmersTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('farmersTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('farmersTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="farmersTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('farmersTable', this.checked)" type="checkbox"/></th>
+<th>Farmer Name</th>
+<th>Phone / Contact</th>
+<th>Farm / Shed Name</th>
+<th>Cluster Region</th>
+<th>DFL Capacity</th>
+<th>Breed</th>
+<th>Stage</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="farmersTableBody">
+<tr><td colspan="10" style="text-align: center; padding: 24px;">Loading farmers from database...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="farmersPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('farmersTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('farmersTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('farmersTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 6. VIEW: REARING SHEDS CONTROL ================= -->
+<section class="view-section hidden" id="section-sheds">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="warehouse"></i>
+<span>Rearing Shed Climate Setpoints &amp; Stage Guidelines</span>
+</div>
+<div class="table-actions">
+<span class="badge badge-success">Instars 1–5 Configured</span>
+</div>
+</div>
+<div id="stageThresholdsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+<!-- Dynamically populated from stage_thresholds database table -->
+</div>
+</section>
+<!-- ================= 7. VIEW: IOT DEVICES ================= -->
+<section class="view-section hidden" id="section-devices">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="cpu"></i>
+<span>Registered IoT Hardware Nodes &amp; Gateways</span>
+</div>
+<div class="table-actions">
+<button class="btn btn-primary btn-sm" onclick="openProvisionDeviceModal()">
+<i data-lucide="plus"></i> Provision Hardware Node
                 </button>
-              </div>
-
-              <!-- Exhaust Fan Card -->
-              <div class="actuator-card" id="cardFan">
-                <div class="actuator-header">
-                  <div class="actuator-icon-box"><i data-lucide="wind"></i></div>
-                  <span class="relay-status-tag" id="tagFan">OFF</span>
-                </div>
-                <div>
-                  <div class="actuator-name">Exhaust Ventilation Fan</div>
-                  <div class="actuator-pin">GPIO Pin 23 • Aeration & CO₂ Evacuation</div>
-                </div>
-                <button class="actuator-toggle-btn" id="btnToggleFan" onclick="manualToggleActuator('fan')">
-                  Toggle Fan
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="devicesTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('devicesTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('devicesTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('devicesTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('devicesTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="devicesTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('devicesTable', this.checked)" type="checkbox"/></th>
+<th>Device ID</th>
+<th>Device Name</th>
+<th>Assigned Shed</th>
+<th>Firmware</th>
+<th>Auth Mode</th>
+<th>Status</th>
+<th>Last Seen</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="devicesTableBody">
+<tr><td colspan="9" style="text-align: center; padding: 24px;">Loading devices...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="devicesPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('devicesTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('devicesTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('devicesTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 8. VIEW: SENSOR CONFIGURATION ================= -->
+<section class="view-section hidden" id="section-sensor-config">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="sliders"></i>
+<span>Sensors Hardware Registry &amp; Calibration Offsets</span>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="sensorsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('sensorsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('sensorsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('sensorsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('sensorsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="sensorsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('sensorsTable', this.checked)" type="checkbox"/></th>
+<th>Sensor ID</th>
+<th>Component Model</th>
+<th>Type</th>
+<th>Pin / Bus</th>
+<th>Safe Range</th>
+<th>Reporting Interval</th>
+<th>Calibration Offset</th>
+<th>Status</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="sensorsTableBody">
+<tr><td colspan="10" style="text-align: center; padding: 24px;">Loading sensors...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="sensorsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('sensorsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('sensorsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('sensorsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 9. VIEW: ALERTS & INCIDENTS ================= -->
+<section class="view-section hidden" id="section-alerts">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="alert-triangle"></i>
+<span>Environmental Threshold Breaches &amp; Incidents</span>
+</div>
+<div class="table-actions">
+<select id="alertSeverityFilter" onchange="loadAlerts(this.value)" style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+<option value="">All Severities</option>
+<option value="CRITICAL">Critical</option>
+<option value="WARNING">Warning</option>
+<option value="INFO">Info</option>
+</select>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="alertsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('alertsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('alertsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('alertsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('alertsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="alertsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('alertsTable', this.checked)" type="checkbox"/></th>
+<th>Alert Code</th>
+<th>Severity</th>
+<th>Shed ID</th>
+<th>Alert Type</th>
+<th>Description</th>
+<th>Value / Limit</th>
+<th>Triggered At</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="alertsTableBody">
+<tr><td colspan="10" style="text-align: center; padding: 24px;">No active alerts.</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="alertsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('alertsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('alertsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('alertsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 10. VIEW: PRODUCT CATALOGUE ================= -->
+<section class="view-section hidden" id="section-products">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="package"></i>
+<span>Sericulture Equipment &amp; Hardware Catalogue</span>
+</div>
+<div class="table-actions" style="display: flex; align-items: center; gap: 10px;">
+<select class="form-select" id="prodStatusFilter" onchange="filterProducts(this.value)" style="padding: 5px 12px; font-size: 0.78rem; font-weight: 600; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); cursor: pointer;">
+<option value="ALL">All Statuses</option>
+<option value="ACTIVE">Active Only</option>
+<option value="ARCHIVED">Archived Only</option>
+</select>
+<button class="btn btn-primary btn-sm" onclick="openCreateProductModal()">
+<i data-lucide="plus"></i> New Product SKU
                 </button>
-              </div>
-
-              <!-- Halogen Heater Card -->
-              <div class="actuator-card" id="cardHeater">
-                <div class="actuator-header">
-                  <div class="actuator-icon-box"><i data-lucide="flame"></i></div>
-                  <span class="relay-status-tag" id="tagHeater">OFF</span>
-                </div>
-                <div>
-                  <div class="actuator-name">Halogen Rearing Heater</div>
-                  <div class="actuator-pin">GPIO Pin 24 • Chawki Thermal Maintenance</div>
-                </div>
-                <button class="actuator-toggle-btn" id="btnToggleHeater" onclick="manualToggleActuator('heater')">
-                  Toggle Heater
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="productsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('productsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('productsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('productsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('productsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="productsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('productsTable', this.checked)" type="checkbox"/></th>
+<th>SKU</th>
+<th>Product Name</th>
+<th>Category</th>
+<th>Price (INR)</th>
+<th>Stock Available</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="productsTableBody">
+<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading catalogue...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="productsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('productsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('productsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('productsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 11. VIEW: SALES & ORDERS ================= -->
+<section class="view-section hidden" id="section-orders">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="shopping-cart"></i>
+<span>Customer Hardware Orders &amp; Fulfilment</span>
+</div>
+<div class="table-actions">
+<select id="orderStatusFilter" onchange="loadOrders(this.value)" style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+<option value="">All Statuses</option>
+<option value="PAID">Paid</option>
+<option value="PENDING">Pending</option>
+<option value="PROCESSING">Processing</option>
+<option value="FULFILLED">Fulfilled</option>
+<option value="CANCELLED">Cancelled</option>
+</select>
+<button class="btn btn-skin btn-sm" onclick="exportOrdersCsv()"><i data-lucide="download"></i> Export</button>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="ordersTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('ordersTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('ordersTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('ordersTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('ordersTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="ordersTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('ordersTable', this.checked)" type="checkbox"/></th>
+<th>Order #</th>
+<th>Customer Name</th>
+<th>Farm / Shed</th>
+<th>Total Amount</th>
+<th>Status</th>
+<th>Created At</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="ordersTableBody">
+<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading orders...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="ordersPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('ordersTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('ordersTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('ordersTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 12. VIEW: BILLING & SUBSCRIPTIONS ================= -->
+<section class="view-section hidden" id="section-billing">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="repeat"></i>
+<span>Active SaaS Subscriptions &amp; Monitoring Contracts</span>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="subsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('subsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('subsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('subsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('subsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="subsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('subsTable', this.checked)" type="checkbox"/></th>
+<th>Code</th>
+<th>Customer Name</th>
+<th>Plan Name</th>
+<th>Tier</th>
+<th>Monthly Price</th>
+<th>Period End</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="subsTableBody">
+<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading subscriptions...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="subsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('subsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('subsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('subsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+<div class="table-card" style="margin-top: 18px;">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="file-text"></i>
+<span>Issued Customer Invoices</span>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="invoicesTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('invoicesTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('invoicesTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('invoicesTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('invoicesTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="invoicesTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('invoicesTable', this.checked)" type="checkbox"/></th>
+<th>Invoice #</th>
+<th>Customer</th>
+<th>Subtotal</th>
+<th>GST (18%)</th>
+<th>Total</th>
+<th>Due Date</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="invoicesTableBody">
+<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading invoices...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="invoicesPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('invoicesTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('invoicesTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('invoicesTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 13. VIEW: HELP & SUPPORT ================= -->
+<section class="view-section hidden" id="section-support">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="headphones"></i>
+<span>Farmer Support Tickets &amp; Helpdesk</span>
+</div>
+<div class="table-actions">
+<button class="btn btn-primary btn-sm" onclick="openCreateTicketModal()">
+<i data-lucide="plus"></i> New Support Ticket
                 </button>
-              </div>
-
-              <!-- Dimmable Photoperiod Bulb Card -->
-              <div class="actuator-card" id="cardLight">
-                <div class="actuator-header">
-                  <div class="actuator-icon-box"><i data-lucide="lightbulb"></i></div>
-                  <span class="relay-status-tag" id="tagLight">OFF</span>
-                </div>
-                <div>
-                  <div class="actuator-name">Dimmable Photoperiod Bulb</div>
-                  <div class="actuator-pin" id="lightBrightnessInfo">GPIO Pin 25 • PWM Dimmer (15–30 Lux)</div>
-                </div>
-
-                <!-- Interactive PWM Dimmer Controls -->
-                <div class="actuator-pwm-container">
-                  <div class="pwm-slider-row">
-                    <span class="pwm-label">Bulb PWM Duty Cycle</span>
-                    <span class="pwm-value-badge" id="pwmValueLabel">35% PWM</span>
-                  </div>
-                  <input type="range" id="pwmSlider" class="pwm-range-slider" min="0" max="100" value="35" oninput="handlePwmInput(this.value)" onchange="handlePwmChange(this.value)">
-                  <div class="pwm-preset-chips">
-                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(0)">Dark 0%</button>
-                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(25)">Dim 25%</button>
-                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(40)">Active 40%</button>
-                    <button type="button" class="pwm-preset-btn" onclick="setBulbPreset(100)">Full 100%</button>
-                  </div>
-                </div>
-
-                <button class="actuator-toggle-btn" id="btnToggleLight" onclick="manualToggleActuator('light')">
-                  Toggle Bulb Power
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="ticketsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('ticketsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('ticketsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('ticketsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('ticketsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="ticketsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('ticketsTable', this.checked)" type="checkbox"/></th>
+<th>Ticket #</th>
+<th>Subject</th>
+<th>Farmer</th>
+<th>Category</th>
+<th>Priority</th>
+<th>Status</th>
+<th>Assigned To</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="ticketsTableBody">
+<tr><td colspan="9" style="text-align: center; padding: 24px;">Loading tickets...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="ticketsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('ticketsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('ticketsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('ticketsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 14. VIEW: INSTALLATIONS ================= -->
+<section class="view-section hidden" id="section-installations">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="wrench"></i>
+<span>Field Installation Jobs &amp; Verification</span>
+</div>
+<div class="table-actions">
+<button class="btn btn-primary btn-sm" onclick="openScheduleInstallModal()">
+<i data-lucide="plus"></i> Schedule Installation
                 </button>
-              </div>
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- ================= SECTION 4: ANALYTICS & SENSOR GRAPHS ================= -->
-        <section id="section-analytics" class="view-section hidden">
-          
-          <!-- Temperature Line Chart -->
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="thermometer"></i></div>
-                <div>
-                  <h3>24-Hour Temperature Telemetry vs Target Safe Zone</h3>
-                  <p>Real IoT readings compared with configured stage min/max limits</p>
-                </div>
-              </div>
-              <div class="chart-header-actions">
-                <button class="btn btn-skin btn-sm" onclick="exportCsvData()">
-                  <i data-lucide="download"></i> Export CSV
-                </button>
-              </div>
-            </div>
-
-            <div class="chart-container-box">
-              <canvas id="temperatureChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Humidity Line Chart -->
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="droplets"></i></div>
-                <div>
-                  <h3>24-Hour Relative Humidity Telemetry vs Target Safe Zone</h3>
-                  <p>Indoor microclimate humidity curve with optimal boundaries</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="chart-container-box">
-              <canvas id="humidityChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Air Quality & CO2 Line Chart -->
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="wind"></i></div>
-                <div>
-                  <h3>24-Hour Air Quality & CO₂ Telemetry vs Safe Threshold</h3>
-                  <p>Indoor fresh air percentage with automated exhaust ventilation trigger boundary (&ge;80%)</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="chart-container-box">
-              <canvas id="airQualityChart"></canvas>
-            </div>
-          </div>
-
-          <!-- Light Intensity (Lux) Line Chart -->
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="sun"></i></div>
-                <div>
-                  <h3>24-Hour Photoperiod Light Intensity (Lux)</h3>
-                  <p>Circadian illuminance curves ensuring optimal larval feeding (15–30 Lux) and cocooning</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="chart-container-box">
-              <canvas id="lightChart"></canvas>
-            </div>
-          </div>
-
-        </section>
-
-        <!-- ================= SECTION 5: FARMERS & SHEDS DIRECTORY ================= -->
-        <section id="section-farmers" class="view-section hidden">
-          
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="users"></i></div>
-                <div>
-                  <h3>Enrolled Sericulture Farmers & Rearing Sheds</h3>
-                  <p>Database of registered rearers and rearing shed locations</p>
-                </div>
-              </div>
-
-              <div style="display:flex; align-items:center; gap:12px;">
-                <div class="search-input-wrap">
-                  <i data-lucide="search"></i>
-                  <input type="text" id="farmerSearchInput" placeholder="Search farmer, farm or batch..." oninput="handleFarmerSearch()">
-                </div>
-                <button class="btn btn-primary btn-sm" onclick="openEnrollFarmerModal()">
-                  <i data-lucide="user-plus"></i> Enroll Farmer
-                </button>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Farmer & Account</th>
-                    <th>Farm / Shed Name</th>
-                    <th>Region Cluster</th>
-                    <th>Active Batch</th>
-                    <th>DFL Capacity</th>
-                    <th>Silkworm Breed</th>
-                    <th>Status</th>
-                    <th>Account Controls</th>
-                  </tr>
-                </thead>
-                <tbody id="farmersTableBody">
-                  <tr>
-                    <td colspan="8" style="text-align:center; padding:32px;">Loading enrolled farmers from PostgreSQL...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-          </div>
-
-        </section>
-
-        <!-- ================= SECTION 6: EMERGENCY OVERRIDES ================= -->
-        <section id="section-emergency" class="view-section hidden">
-          
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge" style="background:var(--rose-tint); border-color:var(--rose-border); color:var(--rose);">
-                  <i data-lucide="alert-triangle"></i>
-                </div>
-                <div>
-                  <h3>Super Admin Emergency Actuator Overrides</h3>
-                  <p>High-priority immediate commands that bypass automatic software rules during heatwaves, power anomalies, or equipment faults.</p>
-                </div>
-              </div>
-              <span class="badge badge-rose">Master Command</span>
-            </div>
-
-            <div class="emergency-grid">
-              
-              <!-- Ventilation Force -->
-              <div class="emergency-action-card">
-                <div>
-                  <h4>Emergency Exhaust Ventilation</h4>
-                  <p>Instantly engage high-velocity ventilation fans at 100% duty cycle to evacuate ammonia buildup and trapped heat.</p>
-                </div>
-                <button class="btn btn-warning" onclick="triggerEmergency('EMERGENCY_VENTILATE')">
-                  <i data-lucide="wind"></i> Force Ventilation Fans ON
-                </button>
-              </div>
-
-              <!-- Fogger Boost -->
-              <div class="emergency-action-card">
-                <div>
-                  <h4>Emergency Fogger Boost (Rapid Cool)</h4>
-                  <p>Force cooling fogger misting pumps to rapidly drive down internal shed temperatures during severe ambient heat spikes.</p>
-                </div>
-                <button class="btn btn-primary" onclick="triggerEmergency('FOGGER_BOOST')">
-                  <i data-lucide="droplets"></i> Engage Fogger Boost
-                </button>
-              </div>
-
-              <!-- Master Kill All -->
-              <div class="emergency-action-card danger-card">
-                <div>
-                  <h4>Emergency Master Equipment Shutdown</h4>
-                  <p>Safely turn OFF all heaters, cooling foggers, fans, and lamps instantly. Use during sensor faults, electrical shorts, or repairs.</p>
-                </div>
-                <button class="btn btn-danger" onclick="triggerEmergency('COOLDOWN_ALL')">
-                  <i data-lucide="power-off"></i> Master Kill All Relays
-                </button>
-              </div>
-
-              <!-- Air Quality Evacuation Purge -->
-              <div class="emergency-action-card">
-                <div>
-                  <h4>Emergency Fresh Air & CO₂ Evacuation</h4>
-                  <p>Force high-velocity exhaust fans to 100% capacity to flush out carbon dioxide or ammonia buildup when air quality deteriorates.</p>
-                </div>
-                <button class="btn btn-warning" onclick="triggerEmergency('EMERGENCY_VENTILATE_AIR')">
-                  <i data-lucide="wind"></i> Force Fresh Air Purge
-                </button>
-              </div>
-
-              <!-- Emergency Darkness Lock -->
-              <div class="emergency-action-card">
-                <div>
-                  <h4>Emergency Photoperiod Darkness Lock</h4>
-                  <p>Instantly switch OFF all shed illumination (0% PWM) to enforce rest and soothe stressed or agitated silkworms.</p>
-                </div>
-                <button class="btn btn-skin" onclick="triggerEmergency('EMERGENCY_LIGHTS_OFF')">
-                  <i data-lucide="moon"></i> Force Complete Darkness (0% PWM)
-                </button>
-              </div>
-
-              <!-- Emergency Daytime Inspection Lighting -->
-              <div class="emergency-action-card">
-                <div>
-                  <h4>Inspection Illumination Override</h4>
-                  <p>Engage photoperiod lamps at uniform 40% PWM for cluster officers and veterinarians inspecting trays without thermal glare.</p>
-                </div>
-                <button class="btn btn-primary" onclick="triggerEmergency('EMERGENCY_DAY_LIGHT')">
-                  <i data-lucide="sun"></i> Engage 40% Inspection Light
-                </button>
-              </div>
-
-            </div>
-          </div>
-
-        </section>
-
-        <!-- ================= SECTION 7: AUDIT LOGS ================= -->
-        <section id="section-audit" class="view-section hidden">
-          
-          <div class="card-panel">
-            <div class="card-panel-header">
-              <div class="card-title-group">
-                <div class="card-icon-badge"><i data-lucide="clipboard-list"></i></div>
-                <div>
-                  <h3>Security & System Control Audit Logs</h3>
-                  <p>Immutable traceability stream of administrative setpoint modifications, emergency triggers, and farmer account actions.</p>
-                </div>
-              </div>
-              <button class="btn btn-skin btn-sm" onclick="fetchAuditLogs()">
-                <i data-lucide="refresh-cw"></i> Refresh Trail
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="installationsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('installationsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('installationsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('installationsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('installationsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="installationsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('installationsTable', this.checked)" type="checkbox"/></th>
+<th>Job #</th>
+<th>Farmer</th>
+<th>Shed ID</th>
+<th>Assigned Technician</th>
+<th>Scheduled Date</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="installationsTableBody">
+<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading installation jobs...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="installationsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('installationsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('installationsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('installationsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 15. VIEW: INSTALLATION TEAM ================= -->
+<section class="view-section hidden" id="section-install-team">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="user-check"></i>
+<span>Certified Field Technicians Roster</span>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="teamTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('teamTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('teamTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('teamTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('teamTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="teamTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('teamTable', this.checked)" type="checkbox"/></th>
+<th>Technician Name</th>
+<th>Username</th>
+<th>Phone Contact</th>
+<th>Operating Region</th>
+<th>Active Assignments</th>
+</tr>
+</thead>
+<tbody id="teamTableBody">
+<tr><td colspan="6" style="text-align: center; padding: 24px;">Loading technicians...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="teamPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('teamTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('teamTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('teamTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 16. VIEW: RESEARCH & INSIGHTS ================= -->
+<section class="view-section hidden" id="section-research">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="microscope"></i>
+<span>Sericultural Environmental Telemetry Research</span>
+</div>
+<div class="table-actions">
+<button class="btn btn-skin btn-sm" onclick="exportAnalyticsReport('csv')">
+<i data-lucide="download"></i> Download Full Timeseries
               </button>
-            </div>
-
-            <div class="table-responsive">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th style="width: 190px;">Timestamp (UTC)</th>
-                    <th style="width: 140px;">Actor / Admin</th>
-                    <th style="width: 180px;">Action Code</th>
-                    <th>Details & Execution Payload</th>
-                  </tr>
-                </thead>
-                <tbody id="auditTableBody">
-                  <tr>
-                    <td colspan="4" style="text-align:center; padding:32px;">Loading audit trail...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-          </div>
-
-        </section>
-
-      </div>
-    </main>
-
-  </div>
-
-  <!-- ================= ENROLL FARMER MODAL ================= -->
-  <div id="enrollModal" class="modal-backdrop hidden">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h3><i data-lucide="user-plus"></i> Enroll New Sericulture Farmer</h3>
-        <button class="btn-close-modal" onclick="closeEnrollModal()"><i data-lucide="x"></i></button>
-      </div>
-
-      <form id="enrollFarmerForm" onsubmit="handleEnrollFarmer(event)">
-        <div class="modal-body">
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="enrollUsername">Username *</label>
-              <input type="text" id="enrollUsername" required placeholder="e.g. prakash_gowda">
-            </div>
-            <div class="form-group">
-              <label for="enrollFullName">Full Name *</label>
-              <input type="text" id="enrollFullName" required placeholder="e.g. Prakash Gowda">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="enrollPassword">Initial Password *</label>
-              <input type="password" id="enrollPassword" required placeholder="Min 6 characters">
-            </div>
-            <div class="form-group">
-              <label for="enrollPhone">Phone Number *</label>
-              <input type="text" id="enrollPhone" required placeholder="e.g. +91 98450 77889">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="enrollFarmName">Shed / Farm Name *</label>
-              <input type="text" id="enrollFarmName" required placeholder="e.g. Gowda Silk Farm Shed 2">
-            </div>
-            <div class="form-group">
-              <label for="enrollShedId">Shed ID (Optional)</label>
-              <input type="text" id="enrollShedId" placeholder="e.g. shed_04 (auto-assigned if blank)">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="enrollRegion">Region / Location</label>
-              <input type="text" id="enrollRegion" placeholder="e.g. Mysuru, Karnataka or Tokyo">
-            </div>
-            <div class="form-group">
-              <label for="enrollBatchId">Initial Batch ID</label>
-              <input type="text" id="enrollBatchId" value="SERI-2026-M06">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="enrollDfl">DFL Capacity</label>
-              <input type="text" id="enrollDfl" value="250 DFL">
-            </div>
-            <div class="form-group">
-              <label for="enrollBreed">Silkworm Breed</label>
-              <select id="enrollBreed" onchange="handleBreedSelectionChange(this.value)">
-                <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
-                <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
-                <option value="Pure Mysore">Pure Mysore</option>
-                <option value="Other">Other (Specify Custom Breed)</option>
-              </select>
-            </div>
-          </div>
-
-          <div id="enrollBreedOtherWrap" class="form-group hidden">
-            <label for="enrollBreedCustom">Specify Silkworm Breed *</label>
-            <input type="text" id="enrollBreedCustom" placeholder="e.g. Swarna, Nistari, CSR2, or Local Hybrid">
-          </div>
-
-          <div id="enrollError" class="alert-box error hidden"></div>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+<div class="detail-card">
+<h4>Sensor Anomaly Detection</h4>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Automated detection of sudden thermal gradients (&gt;3°C/10min) and moisture drops:</p>
+<div style="font-size: 0.84rem; color: var(--brand-light); font-weight: 700;">Zero abnormal gradient events recorded in past 24h.</div>
+</div>
+<div class="detail-card">
+<h4>Chawki Stage Compliance Index</h4>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;">Hours maintained strictly within 27–28°C and 85–90% RH:</p>
+<div style="font-size: 1.4rem; font-weight: 800; color: var(--brand-dark);">98.4% Compliance</div>
+</div>
+</div>
+</section>
+<!-- ================= 17. VIEW: GUIDANCE & UPDATES ================= -->
+<section class="view-section hidden" id="section-guidance">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="book-open"></i>
+<span>Farmer Rearing Guides &amp; CSRTI Advisory</span>
+</div>
+<div class="table-actions">
+<select id="guidanceLangSelect" onchange="loadGuidanceArticles(this.value)" style="padding: 6px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+<option value="en">English</option>
+<option value="kn">Kannada (ಕನ್ನಡ)</option>
+<option value="te">Telugu (తెలుగు)</option>
+<option value="hi">Hindi (हिन्दी)</option>
+<option value="ta">Tamil (தமிழ்)</option>
+<option value="ml">Malayalam (മലയാളം)</option>
+</select>
+</div>
+</div>
+<div id="guidanceArticlesGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+<!-- Dynamically populated from guidance_articles -->
+</div>
+</section>
+<!-- ================= 18. VIEW: REPORTS ================= -->
+<section class="view-section hidden" id="section-reports">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="file-text"></i>
+<span>Platform &amp; Financial Reports Generation</span>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+<div class="detail-card">
+<h4>Farmer Directory Export</h4>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">Complete CSV dataset of all enrolled farmers, DFL capacities, and breeds.</p>
+<button class="btn btn-skin btn-sm" onclick="exportFarmersCsv()"><i data-lucide="download"></i> Download Farmers CSV</button>
+</div>
+<div class="detail-card">
+<h4>Sales &amp; Order Register</h4>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">Itemized orders with tax amounts, fulfillment dates, and customer details.</p>
+<button class="btn btn-skin btn-sm" onclick="exportOrdersCsv()"><i data-lucide="download"></i> Download Orders CSV</button>
+</div>
+<div class="detail-card">
+<h4>Telemetry Raw Stream Log</h4>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">Physical readings from Sensirion and Winsen hardware sensor arrays.</p>
+<button class="btn btn-skin btn-sm" onclick="exportAnalyticsReport('csv')"><i data-lucide="download"></i> Download Telemetry CSV</button>
+</div>
+</div>
+</section>
+<!-- ================= 19. VIEW: USER MANAGEMENT ================= -->
+<section class="view-section hidden" id="section-users">
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="shield"></i>
+<span>Platform Users &amp; Role Permissions</span>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="usersTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('usersTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('usersTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('usersTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('usersTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="usersTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('usersTable', this.checked)" type="checkbox"/></th>
+<th>Username</th>
+<th>Full Name</th>
+<th>Assigned Role</th>
+<th>Contact Phone</th>
+<th>Region</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="usersTableBody">
+<tr><td colspan="7" style="text-align: center; padding: 24px;">Loading users...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="usersPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('usersTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('usersTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('usersTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= NEW MODULE: EMPLOYEES & USERS ================= -->
+<section class="view-section hidden" id="section-employees">
+<div class="table-card">
+<div class="table-toolbar" style="flex-wrap: wrap; gap: 12px;">
+<div>
+<div class="table-title">
+<i data-lucide="user-cog"></i>
+<span>Employees &amp; User Administration</span>
+</div>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                  Enterprise personnel directory, time-limited onboarding invitations, department assignments, and resource access scopes.
+                </p>
+</div>
+<div class="table-actions" style="flex-wrap: wrap; gap: 8px;">
+<div class="search-input-wrap">
+<i data-lucide="search"></i>
+<input id="empSearchInput" oninput="debounceFilterEmployees(this.value)" placeholder="Search name, ID, email or username..." type="text"/>
+</div>
+<select id="empDeptFilter" onchange="loadEmployeesList()" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); font-size: 0.82rem;">
+<option value="">All Departments</option>
+</select>
+<select id="empRoleFilter" onchange="loadEmployeesList()" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); font-size: 0.82rem;">
+<option value="">All Roles</option>
+<option value="superadmin">Super Admin</option>
+<option value="company_admin">Company Admin</option>
+<option value="ceo">CEO / Executive</option>
+<option value="hr">HR / User Admin</option>
+<option value="operations_manager">Operations Manager</option>
+<option value="technician">Technician</option>
+<option value="sales">Sales &amp; Billing</option>
+<option value="support">Support Agent</option>
+<option value="analyst">Analyst</option>
+</select>
+<select id="empStatusFilter" onchange="loadEmployeesList()" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); font-size: 0.82rem;">
+<option value="">All Statuses</option>
+<option value="ACTIVE">Active</option>
+<option value="SUSPENDED">Suspended</option>
+<option value="PENDING_ACTIVATION">Pending Activation</option>
+</select>
+<button class="btn btn-primary btn-sm" onclick="openOnboardEmployeeModal()">
+<i data-lucide="user-plus"></i> Onboard Employee
+                </button>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="employeesTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('employeesTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('employeesTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('employeesTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('employeesTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="employeesTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('employeesTable', this.checked)" type="checkbox"/></th>
+<th>Employee Name &amp; ID</th>
+<th>Official Email</th>
+<th>Department</th>
+<th>Designation</th>
+<th>Reporting Manager</th>
+<th>Assigned Role</th>
+<th>Scope</th>
+<th>Status</th>
+<th>Invitation</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="employeesTableBody">
+<tr><td colspan="11" style="text-align: center; padding: 24px;">Loading employee directory...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="employeesPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('employeesTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('employeesTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('employeesTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+<!-- Pagination Bar -->
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-top: 1px solid var(--border-color); font-size: 0.82rem; color: var(--text-secondary);">
+<span id="empPaginationCount">Showing 0 of 0 employees</span>
+<div style="display: flex; gap: 8px;">
+<button class="btn btn-skin btn-sm" disabled="" id="btnEmpPrev" onclick="navigateEmpPage(-1)"><i data-lucide="chevron-left"></i> Previous</button>
+<button class="btn btn-skin btn-sm" disabled="" id="btnEmpNext" onclick="navigateEmpPage(1)">Next <i data-lucide="chevron-right"></i></button>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= NEW MODULE: ROLES & PERMISSIONS ================= -->
+<section class="view-section hidden" id="section-roles">
+<div class="table-card" style="margin-bottom: 24px;">
+<div class="table-toolbar">
+<div>
+<div class="table-title">
+<i data-lucide="shield-check"></i>
+<span>Standard System Role Templates (10 Configurable Personas)</span>
+</div>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                  Built-in operational role templates with granular permission categories and deny-by-default backend security.
+                </p>
+</div>
+<div class="table-actions">
+<button class="btn btn-primary btn-sm" onclick="openCreateCustomRoleModal()">
+<i data-lucide="plus"></i> Create Custom Role
+                </button>
+</div>
+</div>
+<div id="roleTemplatesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 18px;">
+<!-- Dynamically populated from /api/v1/roles -->
+</div>
+</div>
+<!-- Custom Organizational Roles Table -->
+<div class="table-card">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="key-round"></i>
+<span>Custom Roles &amp; Access Profiles</span>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="customRolesTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('customRolesTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('customRolesTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('customRolesTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('customRolesTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="customRolesTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('customRolesTable', this.checked)" type="checkbox"/></th>
+<th>Role Name</th>
+<th>Role Code</th>
+<th>Description</th>
+<th>Permissions Granted</th>
+<th>Assigned Users</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="customRolesTableBody">
+<tr><td colspan="7" style="text-align: center; padding: 20px;">Loading custom roles...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="customRolesPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('customRolesTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('customRolesTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('customRolesTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= NEW MODULE: DEPARTMENTS & TEAMS ================= -->
+<section class="view-section hidden" id="section-departments">
+<div class="table-card">
+<div class="table-toolbar">
+<div>
+<div class="table-title">
+<i data-lucide="network"></i>
+<span>Departments &amp; Reporting Hierarchy</span>
+</div>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                  Organizational unit structure, department heads, and strict cycle-prevention on reporting relationships.
+                </p>
+</div>
+<div class="table-actions">
+<button class="btn btn-primary btn-sm" onclick="openCreateDeptModal()">
+<i data-lucide="plus"></i> Add Department
+                </button>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="departmentsTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('departmentsTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('departmentsTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('departmentsTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('departmentsTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="departmentsTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('departmentsTable', this.checked)" type="checkbox"/></th>
+<th>Department Name</th>
+<th>Code</th>
+<th>Head of Department</th>
+<th>Assigned Employees</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="departmentsTableBody">
+<tr><td colspan="7" style="text-align: center; padding: 24px;">Loading departments...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="departmentsPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('departmentsTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('departmentsTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('departmentsTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 20. VIEW: ACCESS & AUDIT LOGS ================= -->
+<section class="view-section hidden" id="section-audit">
+<div class="table-card">
+<div class="table-toolbar" style="flex-wrap: wrap; gap: 12px;">
+<div>
+<div class="table-title">
+<i data-lucide="shield-alert"></i>
+<span>Immutable Security &amp; Operations Audit Trail</span>
+</div>
+<p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+                  Complete tamper-evident record of administrative changes, onboarding events, role assignments, and actuator triggers.
+                </p>
+</div>
+<div class="table-actions" style="flex-wrap: wrap; gap: 8px;">
+<div class="search-input-wrap">
+<i data-lucide="search"></i>
+<input id="auditSearchInput" oninput="debounceFilterAudit(this.value)" placeholder="Filter actor, resource or details..." type="text"/>
+</div>
+<select id="auditActionFilter" onchange="loadAuditRecords()" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); font-size: 0.82rem;">
+<option value="">All Actions</option>
+<option value="LOGIN">User Logins</option>
+<option value="INVITE_EMPLOYEE">Employee Invitations</option>
+<option value="INVITATION_ACCEPTED">Invitation Accepted</option>
+<option value="ACCOUNT_ACTIVATED">Account Activated</option>
+<option value="EMPLOYEE_STATUS_CHANGE">Status Changes</option>
+<option value="CREATE_CUSTOM_ROLE">Role Additions</option>
+<option value="CREATE_DEPARTMENT">Department Additions</option>
+<option value="EMERGENCY_CONTROL">Emergency Controls</option>
+</select>
+<button class="btn btn-skin btn-sm" onclick="loadAuditRecords()"><i data-lucide="refresh-cw"></i> Refresh</button>
+</div>
+</div>
+<div class="table-bulk-action-bar hidden" id="auditTable_bulkActionBar">
+<div class="bulk-info">
+<i data-lucide="check-square"></i>
+<span><strong class="bulk-count">0</strong> selected</span>
+</div>
+<div class="bulk-actions-buttons">
+<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('auditTable')" type="button">
+<i data-lucide="download"></i> Export Selected
+    </button>
+<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('auditTable')" type="button">
+<i data-lucide="archive"></i> Archive / Deactivate
+    </button>
+<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('auditTable')" type="button">
+<i data-lucide="trash-2"></i> Delete Selected
+    </button>
+<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('auditTable')" type="button">
+      Deselect All
+    </button>
+</div>
+</div><div class="table-wrap">
+<table class="data-table" id="auditTable">
+<thead>
+<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('auditTable', this.checked)" type="checkbox"/></th>
+<th>Timestamp (UTC)</th>
+<th>Actor Identity</th>
+<th>Action</th>
+<th>Target Resource</th>
+<th>Audit Details</th>
+<th>IP Address</th>
+</tr>
+</thead>
+<tbody id="auditTableBody">
+<tr><td colspan="7" style="text-align: center; padding: 24px;">Loading audit records...</td></tr>
+</tbody>
+</table>
+</div><div class="pagination-wrap" id="auditPaginationWrap">
+<div class="pagination-nav-group left-corner">
+<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('auditTable')" title="Previous Page" type="button">
+<i data-lucide="chevron-left"></i> Previous
+    </button>
+<span class="pagination-page-indicator">
+      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+</span>
+<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('auditTable')" title="Next Page" type="button">
+      Next Page <i data-lucide="chevron-right"></i>
+</button>
+</div>
+<div class="pagination-info">
+<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+</div>
+<div class="pagination-page-size">
+<label class="pagination-label">Show:</label>
+<select class="pagination-select" onchange="SetuTableManager.changePageSize('auditTable', this.value)">
+<option selected="" value="10">10 per page</option>
+<option value="20">20 per page</option>
+<option value="30">30 per page</option>
+<option value="50">50 per page</option>
+<option value="100">100 per page</option>
+<option value="all">All</option>
+</select>
+</div>
+</div>
+</div>
+</section>
+<!-- ================= 21. VIEW: INTEGRATIONS ================= -->
+<section class="view-section hidden" id="section-integrations">
+<div class="table-toolbar">
+<div class="table-title">
+<i data-lucide="plug"></i>
+<span>Third-Party Service &amp; Cloud Integrations</span>
+</div>
+</div>
+<div class="integrations-grid" id="integrationsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+<!-- Dynamically populated from integration_status table -->
+</div>
+</section>
+<!-- ================= 22. VIEW: PLATFORM SETTINGS ================= -->
+<section class="view-section hidden" id="section-settings">
+<div class="table-card" style="padding: 24px;">
+<div class="table-title">
+<i data-lucide="settings"></i>
+<span>Platform Security &amp; Environment Configuration</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 18px;">
+<div class="detail-card">
+<h4>Security &amp; Sessions</h4>
+<div class="detail-row"><span class="detail-label">JWT Token Expiry:</span><span class="detail-value">7 Days (10080 min)</span></div>
+<div class="detail-row"><span class="detail-label">Password Hashing:</span><span class="detail-value">Bcrypt (Salt rounds 12)</span></div>
+<div class="detail-row"><span class="detail-label">Brute-Force Rate Limiting:</span><span class="detail-value">30 req / min</span></div>
+<div class="detail-row"><span class="detail-label">Inactivity Timeout:</span><span class="detail-value">30 Minutes</span></div>
+</div>
+<div class="detail-card">
+<h4>IoT Safety Thresholds</h4>
+<div class="detail-row"><span class="detail-label">Hysteresis Temperature:</span><span class="detail-value">0.5°C</span></div>
+<div class="detail-row"><span class="detail-label">Hysteresis Humidity:</span><span class="detail-value">3.0%</span></div>
+<div class="detail-row"><span class="detail-label">Hardware Interlock:</span><span class="detail-value">Strict Exclusion (Heater != Cooler)</span></div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+<!-- ================= ACTIONABLE GLOBAL SEARCH COMMAND PALETTE ================= -->
+<div class="command-palette-backdrop hidden" id="commandPaletteModal" onclick="handleCommandPaletteBackdrop(event)">
+<div class="command-palette-card">
+<div class="command-search-header">
+<i data-lucide="search"></i>
+<input id="commandPaletteInput" oninput="debouncePaletteSearch(this.value)" placeholder="Search farmers, sheds, devices, tickets, orders (e.g. Ramesh, shed_01, ORD-)..." type="text"/>
+<button class="drawer-close-btn" onclick="closeCommandPalette()"><i data-lucide="x"></i></button>
+</div>
+<div class="command-results-body" id="commandResultsBody">
+<div style="padding: 32px 16px; text-align: center; color: var(--text-muted); font-size: 0.85rem;">
+          Type at least 2 characters to search across live platform records...
         </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-skin" onclick="closeEnrollModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">
-            <i data-lucide="check"></i> Enroll & Activate Farmer
+</div>
+<div class="command-palette-footer">
+<span>Press ESC to close</span>
+<span>Actionable Enterprise Search</span>
+</div>
+</div>
+</div>
+<!-- ================= CONTEXTUAL DETAIL DRAWER ================= -->
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeAppDrawer()"></div>
+<aside class="app-drawer" id="appDrawer">
+<div class="drawer-header">
+<h3 id="drawerTitle"><i data-lucide="info"></i> Detail Inspector</h3>
+<button class="drawer-close-btn" onclick="closeAppDrawer()"><i data-lucide="x"></i></button>
+</div>
+<div class="drawer-body" id="drawerBody">
+<!-- Dynamic Drawer Content -->
+</div>
+<div class="drawer-footer" id="drawerFooter">
+<button class="btn btn-skin btn-sm" onclick="closeAppDrawer()">Close</button>
+</div>
+</aside>
+<!-- ================= GENERAL APPLICATION MODAL ================= -->
+<div class="modal-backdrop hidden" id="appModalBackdrop">
+<div class="modal-card">
+<div class="modal-header">
+<h3 id="modalTitle">Modal Action</h3>
+<button class="drawer-close-btn" onclick="closeAppModal()"><i data-lucide="x"></i></button>
+</div>
+<div class="modal-body" id="modalBody">
+<!-- Dynamic Modal Body Content -->
+</div>
+<div class="modal-footer" id="modalFooter">
+<button class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
+</div>
+</div>
+</div>
+<!-- ================= EMPLOYEE ONBOARDING ACTIVATION MODAL ================= -->
+<div class="modal-backdrop hidden" id="invitationActivationModal">
+<div class="modal-card" style="max-width: 480px;">
+<div class="modal-header">
+<div style="display: flex; align-items: center; gap: 8px;">
+<div style="background: var(--brand-tint); color: var(--brand-primary); padding: 8px; border-radius: 50%;">
+<i data-lucide="shield-check"></i>
+</div>
+<div>
+<h3 style="margin: 0; font-size: 1.15rem;">Activate Your Account</h3>
+<span style="font-size: 0.76rem; color: var(--text-muted);">SeriCare / Setu Enterprise Platform</span>
+</div>
+</div>
+</div>
+<div class="modal-body" style="padding: 20px;">
+<div id="invitationVerifyLoading" style="text-align: center; padding: 24px;">
+<div class="pulse" style="display: inline-block;"><i data-lucide="loader" style="animation: spin 1s linear infinite;"></i></div>
+<p style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">Verifying secure onboarding token...</p>
+</div>
+<div class="alert-box error hidden" id="invitationVerifyError" style="margin-bottom: 14px;"></div>
+<form class="hidden" id="invitationActivationForm" onsubmit="handleAcceptInvitation(event)">
+<div style="background: var(--bg-subtle); padding: 12px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.82rem; border-left: 3px solid var(--brand-primary);">
+<div><strong>Invited Name:</strong> <span id="invModalName">--</span></div>
+<div><strong>Official Email:</strong> <span id="invModalEmail">--</span></div>
+<div><strong>Role Profile:</strong> <span class="brand-role-chip" id="invModalRole" style="display: inline-block; padding: 2px 8px; font-size: 0.7rem; margin-top: 4px;">--</span></div>
+</div>
+<div class="form-group" style="margin-bottom: 14px;">
+<label for="invPassword" style="font-size: 0.82rem; font-weight: 600;"><i data-lucide="lock"></i> Establish Your New Password</label>
+<input id="invPassword" minlength="8" placeholder="Minimum 8 characters" required="" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);" type="password"/>
+<span style="font-size: 0.72rem; color: var(--text-muted);">Must be at least 8 characters. Plaintext passwords are never emailed.</span>
+</div>
+<div class="form-group" style="margin-bottom: 14px;">
+<label for="invConfirmPassword" style="font-size: 0.82rem; font-weight: 600;"><i data-lucide="check-circle-2"></i> Confirm New Password</label>
+<input id="invConfirmPassword" minlength="8" placeholder="Re-enter password" required="" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);" type="password"/>
+</div>
+<div class="form-group" style="margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+<input id="invMfaCheckbox" style="width: 16px; height: 16px; accent-color: var(--brand-primary);" type="checkbox"/>
+<label for="invMfaCheckbox" style="font-size: 0.82rem; cursor: pointer;">Enable Multi-Factor Authentication (MFA) Policy</label>
+</div>
+<button class="btn btn-primary btn-full" id="btnActivateAccount" type="submit">
+<i data-lucide="shield-check"></i> Complete Activation &amp; Proceed to Login
           </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ================= FARMER COMPLETE DATA & HISTORY MODAL ================= -->
-  <div id="farmerDetailsModal" class="modal-backdrop hidden" onclick="if(event.target===this) closeFarmerDetailsModal()">
-    <div class="modal-dialog modal-xl">
-      <!-- Modal Header Banner -->
-      <div class="farmer-modal-header">
-        <div class="farmer-header-info">
-          <div class="farmer-avatar-circle" id="fdAvatar">HK</div>
-          <div>
-            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <h2 id="fdFullName" style="font-size:1.35rem; font-weight:800; color:var(--green-deep); margin:0;">Harshith Kd</h2>
-              <span id="fdStatusBadge" class="badge-status active">Active Rearing</span>
-              <span id="fdShedBadge" class="badge" style="background:#E8F5E9; color:#1B5E20; border:1px solid #A5D6A7; font-weight:700;">SHED_01</span>
-            </div>
-            <p id="fdSubline" style="font-size:0.85rem; color:var(--text-muted); margin:4px 0 0 0;">
-              @harshithkd032@gmail.com &bull; Farm: vfgt &bull; Region: Katteri, Mysore Division, India
-            </p>
-          </div>
-        </div>
-        <div class="farmer-header-actions">
-          <button class="btn btn-primary btn-sm" onclick="openEditFarmerFromDetails()">
-            <i data-lucide="edit-3"></i> Edit Info
-          </button>
-          <button class="btn-close-modal" onclick="closeFarmerDetailsModal()" title="Close">
-            <i data-lucide="x"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick KPI Ribbon -->
-      <div class="farmer-kpi-ribbon">
-        <div class="kpi-mini-card">
-          <div class="kpi-mini-label"><i data-lucide="git-commit"></i> Current Growth Stage</div>
-          <div class="kpi-mini-val" id="fdStageVal">III Instar</div>
-          <div class="kpi-mini-sub" id="fdStageSub">Active rearing cycle</div>
-        </div>
-        <div class="kpi-mini-card">
-          <div class="kpi-mini-label"><i data-lucide="thermometer"></i> Live Shed Climate</div>
-          <div class="kpi-mini-val" id="fdClimateVal">26.2°C &bull; 80% RH</div>
-          <div class="kpi-mini-sub" id="fdClimateStatus">Comfortable &bull; IDEAL</div>
-        </div>
-        <div class="kpi-mini-card">
-          <div class="kpi-mini-label"><i data-lucide="cloud-sun"></i> Ambient Weather</div>
-          <div class="kpi-mini-val" id="fdOutdoorVal">30.5°C &bull; 58% RH</div>
-          <div class="kpi-mini-sub" id="fdWeatherLoc">Katteri, Mysore Division</div>
-        </div>
-        <div class="kpi-mini-card">
-          <div class="kpi-mini-label"><i data-lucide="layers"></i> Batch & Capacity</div>
-          <div class="kpi-mini-val" id="fdBatchVal">200 DFL</div>
-          <div class="kpi-mini-sub" id="fdBatchId">SERI-2026-B01</div>
-        </div>
-      </div>
-
-      <!-- Tab Buttons -->
-      <div class="farmer-modal-tabs">
-        <button class="farmer-tab-btn active" id="btnTabPersonal" onclick="switchFarmerTab('personal')">
-          <i data-lucide="user"></i> Personal Profile
-        </button>
-        <button class="farmer-tab-btn" id="btnTabFarm" onclick="switchFarmerTab('farm')">
-          <i data-lucide="home"></i> Farm & Rearing Setup
-        </button>
-        <button class="farmer-tab-btn" id="btnTabClimate" onclick="switchFarmerTab('climate')">
-          <i data-lucide="activity"></i> Live Microclimate & Actuators
-        </button>
-        <button class="farmer-tab-btn" id="btnTabHistory" onclick="switchFarmerTab('history')">
-          <i data-lucide="history"></i> Telemetry History (Last 30)
-        </button>
-      </div>
-
-      <!-- Modal Body Content -->
-      <div class="modal-body" style="padding:20px 24px;">
-        <!-- TAB 1: PERSONAL & CONTACT -->
-        <div id="fdTabPersonal" class="farmer-tab-content">
-          <div class="detail-cards-grid">
-            <div class="detail-card">
-              <h4><i data-lucide="user-check"></i> Identity & Registration</h4>
-              <div class="detail-row">
-                <span class="detail-label">Full Name</span>
-                <span class="detail-value" id="fdDetFullName">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Username / Login ID</span>
-                <span class="detail-value" id="fdDetUsername">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Account Role</span>
-                <span class="detail-value" id="fdDetRole">Farmer (Rearer)</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Enrolled Date</span>
-                <span class="detail-value" id="fdDetCreatedAt">-</span>
-              </div>
-            </div>
-
-            <div class="detail-card">
-              <h4><i data-lucide="phone"></i> Contact & Communication</h4>
-              <div class="detail-row">
-                <span class="detail-label">Phone Number</span>
-                <span class="detail-value" id="fdDetPhone">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">WhatsApp Channel</span>
-                <span class="detail-value" id="fdDetWhatsApp">
-                  <span class="badge" style="background:#E8F5E9; color:#2E7D32;">Direct Alerts Active</span>
-                </span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Preferred Language</span>
-                <span class="detail-value" id="fdDetLang">English (en)</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Alert Notifications</span>
-                <span class="detail-value" style="color:var(--green-leaf); font-weight:700;">Automated Temp & Humidity Warnings</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 2: FARM & REARING SETUP -->
-        <div id="fdTabFarm" class="farmer-tab-content hidden">
-          <div class="detail-cards-grid">
-            <div class="detail-card">
-              <h4><i data-lucide="map-pin"></i> Farm & Shed Location</h4>
-              <div class="detail-row">
-                <span class="detail-label">Farm / Facility Name</span>
-                <span class="detail-value" id="fdDetFarmName">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Allocated Shed ID</span>
-                <span class="detail-value" id="fdDetShedId">SHED_01</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Region / Cluster</span>
-                <span class="detail-value" id="fdDetRegion">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">GPS Coordinates</span>
-                <span class="detail-value" id="fdDetCoordinates">Live Device GPS</span>
-              </div>
-            </div>
-
-            <div class="detail-card">
-              <h4><i data-lucide="sprout"></i> Silkworm Batch Specifications</h4>
-              <div class="detail-row">
-                <span class="detail-label">Active Batch Code</span>
-                <span class="detail-value" id="fdDetBatchId">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Silkworm Breed</span>
-                <span class="detail-value" id="fdDetBreed">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">DFL Capacity</span>
-                <span class="detail-value" id="fdDetDfl">-</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Rearing Growth Phase</span>
-                <span class="detail-value" id="fdDetGrowthStage" style="color:var(--green-leaf); font-weight:700;">III Instar</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 3: LIVE MICROCLIMATE & ACTUATORS -->
-        <div id="fdTabClimate" class="farmer-tab-content hidden">
-          <!-- 4 live metric boxes -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:12px; margin-bottom:16px;">
-            <div class="metric-card" style="margin:0;">
-              <div class="metric-header">
-                <span class="metric-title"><i data-lucide="thermometer"></i> Indoor Temp</span>
-                <span class="badge" id="fdLiveTempBadge" style="background:#E8F5E9; color:#1B5E20;">Target: 26.0°C</span>
-              </div>
-              <div class="metric-value-wrap">
-                <span class="metric-val" id="fdLiveTemp">26.2</span>
-                <span class="metric-unit">°C</span>
-              </div>
-            </div>
-
-            <div class="metric-card" style="margin:0;">
-              <div class="metric-header">
-                <span class="metric-title"><i data-lucide="droplets"></i> Indoor Humidity</span>
-                <span class="badge" id="fdLiveHumBadge" style="background:#E1F5FE; color:#0288D1;">Target: 80%</span>
-              </div>
-              <div class="metric-value-wrap">
-                <span class="metric-val" id="fdLiveHum">80</span>
-                <span class="metric-unit">% RH</span>
-              </div>
-            </div>
-
-            <div class="metric-card" style="margin:0;">
-              <div class="metric-header">
-                <span class="metric-title"><i data-lucide="wind"></i> Air Quality (CO2)</span>
-                <span class="badge" style="background:#FFF3E0; color:#E65100;">Target &ge; 80%</span>
-              </div>
-              <div class="metric-value-wrap">
-                <span class="metric-val" id="fdLiveAqi">88</span>
-                <span class="metric-unit">%</span>
-              </div>
-            </div>
-
-            <div class="metric-card" style="margin:0;">
-              <div class="metric-header">
-                <span class="metric-title"><i data-lucide="sun"></i> Light Target</span>
-                <span class="badge" style="background:#FFF8E1; color:#F57F17;">Photoperiod</span>
-              </div>
-              <div class="metric-value-wrap">
-                <span class="metric-val" id="fdLiveLux">25</span>
-                <span class="metric-unit">Lux</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Actuators Panel -->
-          <div class="detail-card">
-            <h4><i data-lucide="cpu"></i> Active Shed Actuators & Relays</h4>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; margin-top:8px;">
-              <div class="actuator-item" id="fdActCooler">
-                <span>❄️ Evaporative Cooler</span>
-                <strong class="act-state">OFF</strong>
-              </div>
-              <div class="actuator-item" id="fdActHeater">
-                <span>🔥 Infrared Heater</span>
-                <strong class="act-state">OFF</strong>
-              </div>
-              <div class="actuator-item" id="fdActFan">
-                <span>🌀 Ventilation Exhaust</span>
-                <strong class="act-state">OFF</strong>
-              </div>
-              <div class="actuator-item" id="fdActLight">
-                <span>💡 Research Photoperiod</span>
-                <strong class="act-state">OFF</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 4: TELEMETRY HISTORY -->
-        <div id="fdTabHistory" class="farmer-tab-content hidden">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-            <p style="margin:0; font-size:0.85rem; color:var(--text-muted);">
-              Recent historical timeseries recorded from ESP32 IoT node / farmer app for this shed.
-            </p>
-            <button class="btn btn-outline btn-sm" onclick="exportCurrentFarmerTelemetry()">
-              <i data-lucide="download"></i> Export CSV
-            </button>
-          </div>
-          <div class="table-responsive" style="max-height:360px; overflow-y:auto;">
-            <table class="data-table" style="font-size:0.82rem;">
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Indoor Temp</th>
-                  <th>Indoor Hum</th>
-                  <th>Air Quality</th>
-                  <th>Light Lux</th>
-                  <th>Cooler</th>
-                  <th>Heater</th>
-                  <th>Fan</th>
-                  <th>Mode</th>
-                </tr>
-              </thead>
-              <tbody id="fdHistoryTableBody">
-                <tr><td colspan="9" style="text-align:center; padding:24px;">Loading telemetry history...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal Footer -->
-      <div class="modal-footer" style="background:#FAF8F5;">
-        <span style="margin-right:auto; font-size:0.8rem; color:var(--text-muted);" id="fdLastUpdated">Last sync: just now</span>
-        <button class="btn btn-skin" onclick="closeFarmerDetailsModal()">Close Window</button>
-        <button class="btn btn-primary" onclick="openEditFarmerFromDetails()">
-          <i data-lucide="edit-3"></i> Edit Farmer Profile
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= EDIT FARMER PERSONAL & FARM INFO MODAL ================= -->
-  <div id="editFarmerModal" class="modal-backdrop hidden" onclick="if(event.target===this) closeEditFarmerModal()">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h3><i data-lucide="edit-3"></i> Edit Farmer Personal & Farm Details</h3>
-        <button class="btn-close-modal" onclick="closeEditFarmerModal()"><i data-lucide="x"></i></button>
-      </div>
-
-      <form id="editFarmerForm" onsubmit="handleEditFarmerSubmit(event)">
-        <input type="hidden" id="editFarmerId">
-        <div class="modal-body">
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="editFullName">Full Name *</label>
-              <input type="text" id="editFullName" required placeholder="e.g. Harshith Kd">
-            </div>
-            <div class="form-group">
-              <label for="editPhone">Phone / WhatsApp Number *</label>
-              <input type="text" id="editPhone" required placeholder="e.g. +91 80889 15514">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="editFarmName">Shed / Farm Name *</label>
-              <input type="text" id="editFarmName" required placeholder="e.g. vfgt or Green Valley Silk">
-            </div>
-            <div class="form-group">
-              <label for="editRegion">Region / Location Cluster *</label>
-              <input type="text" id="editRegion" required placeholder="e.g. Katteri, Mysore Division, India">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="editBatchId">Active Batch ID *</label>
-              <input type="text" id="editBatchId" required placeholder="e.g. SERI-2026-B01">
-            </div>
-            <div class="form-group">
-              <label for="editDfl">DFL Capacity</label>
-              <input type="text" id="editDfl" placeholder="e.g. 200 DFL">
-            </div>
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-group">
-              <label for="editBreed">Silkworm Breed</label>
-              <select id="editBreed">
-                <option value="Double Hybrid (FC1 x FC2)">Double Hybrid (FC1 x FC2)</option>
-                <option value="Bivoltine Double Hybrid (CSR2 x CSR4)">Bivoltine Double Hybrid (CSR2 x CSR4)</option>
-                <option value="Cross Breed (PM x CSR2)">Cross Breed (PM x CSR2)</option>
-                <option value="Pure Mysore">Pure Mysore</option>
-                <option value="Multivoltine">Multivoltine</option>
-                <option value="Other">Other / Custom</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="editGrowthStage">Silkworm Rearing Stage</label>
-              <select id="editGrowthStage">
-                <option value="1">I Instar (Chawki Stage 1)</option>
-                <option value="2">II Instar (Chawki Stage 2)</option>
-                <option value="3">III Instar (Late Stage 3)</option>
-                <option value="4">IV Instar (Late Stage 4)</option>
-                <option value="5">V Instar & Cocooning</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="editLang">Preferred Language</label>
-            <select id="editLang">
-              <option value="en">English (Default)</option>
-              <option value="kn">Kannada (ಕನ್ನಡ)</option>
-              <option value="te">Telugu (తెలుగు)</option>
-            </select>
-          </div>
-
-          <div id="editFarmerError" class="alert-box error hidden"></div>
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-skin" onclick="closeEditFarmerModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="editSubmitBtn">
-            <i data-lucide="save"></i> Save Changes
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Toast Notification Container -->
-  <div id="toastContainer" class="toast-container"></div>
-
-  <!-- Application Logic -->
-  <script src="app.js"></script>
+</form>
+</div>
+<div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+<button class="btn btn-skin btn-sm" onclick="closeInvitationModal()" type="button">Cancel</button>
+</div>
+</div>
+</div>
+<!-- Toast Notification Container -->
+<div class="toast-container" id="toastContainer"></div>
+<!-- Application Controller -->
+<script src="/admin/table-manager.js"></script><script src="/admin/app.js"></script>
 </body>
 </html>

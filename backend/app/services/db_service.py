@@ -219,7 +219,6 @@ def init_db():
         CREATE TABLE IF NOT EXISTS devices (
             device_id VARCHAR(64) PRIMARY KEY,
             shed_id VARCHAR(64) NOT NULL,
-            organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org',
             device_name VARCHAR(128),
             device_key_hash VARCHAR(255),
             cert_fingerprint_sha256 VARCHAR(64),
@@ -231,8 +230,8 @@ def init_db():
             created_at TIMESTAMPTZ NOT NULL
         );
         """)
+        cursor.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org';")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_shed ON devices (shed_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_org ON devices (organization_id);")
 
         # Dynamic migration for devices columns
         cursor.execute("""
@@ -250,14 +249,14 @@ def init_db():
         # Pre-seed default hardware nodes for demo sheds
         now_dt = datetime.now(timezone.utc)
         default_devices = [
-            ("esp32_shed_01", "shed_01", "default_org", "Shed 01 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-            ("esp32_shed_02", "shed_02", "default_org", "Shed 02 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-            ("esp32_shed_03", "shed_03", "default_org", "Shed 03 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
+            ("esp32_shed_01", "shed_01", "Shed 01 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
+            ("esp32_shed_02", "shed_02", "Shed 02 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
+            ("esp32_shed_03", "shed_03", "Shed 03 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
         ]
         for dev in default_devices:
             cursor.execute("""
-            INSERT INTO devices (device_id, shed_id, organization_id, device_name, firmware_version, status, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO devices (device_id, shed_id, device_name, firmware_version, status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
             ON CONFLICT (device_id) DO NOTHING;
             """, dev)
 
@@ -265,7 +264,6 @@ def init_db():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS device_commands (
             command_id VARCHAR(64) PRIMARY KEY,
-            organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org',
             device_id VARCHAR(64) NOT NULL,
             shed_id VARCHAR(64) NOT NULL,
             requested_by VARCHAR(64) NOT NULL,
@@ -283,6 +281,7 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_device_status ON device_commands (device_id, status);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_created ON device_commands (created_at DESC);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_shed ON device_commands (shed_id);")
+        cursor.execute("ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org';")
 
         # 4. Audit Logs Table
         cursor.execute("""
@@ -360,6 +359,41 @@ def init_db():
 
         # 7. Partitioned Telemetry Storage (Scale-out)
         _ensure_telemetry_partitions(cursor)
+
+        # 8. Token Revocation / Blacklist Table (ASVS V3.3 & V3.4 / OWASP A07)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS revoked_tokens (
+            jti VARCHAR(128) PRIMARY KEY,
+            token_hash VARCHAR(64) UNIQUE,
+            revoked_by VARCHAR(64),
+            expires_at TIMESTAMPTZ NOT NULL,
+            revoked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens (expires_at);")
+
+        # 9. Server-Side User Sessions Management (Multi-Account & Per-Tab Isolation)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            session_id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            username VARCHAR(64) NOT NULL,
+            role VARCHAR(32) NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_activity TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMPTZ NOT NULL,
+            is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
+            revoked_at TIMESTAMPTZ,
+            revocation_reason VARCHAR(128),
+            user_agent TEXT,
+            ip_address VARCHAR(45)
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
+        CREATE INDEX IF NOT EXISTS idx_user_sessions_is_revoked ON user_sessions (is_revoked);
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_correlation ON device_commands (correlation_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);")
 
         # Pre-seed Stage Thresholds if empty
         cursor.execute("SELECT COUNT(*) FROM stage_thresholds")
@@ -471,6 +505,21 @@ def init_db():
                 "300 DFL",
                 "Bivoltine White (FC1 x FC2)"
             ),
+            (
+                "usr_004",
+                "suresh_farmer",
+                "setu2026",
+                "Suresh Patil",
+                "+91 98450 77889",
+                "kn",
+                "farmer",
+                "Patil Bivoltine Farm",
+                "Mandya Silk Zone, KA",
+                "shed_03",
+                "SERI-2026-M06",
+                "250 DFL",
+                "Double Hybrid (FC1 x FC2)"
+            ),
         ]
 
         seed_demo = os.getenv("SEED_DEMO_FARMERS", "false").lower() in ("true", "1") or "pytest" in sys.modules or bool(os.getenv("PYTEST_CURRENT_TEST"))
@@ -509,7 +558,7 @@ def ensure_unique_farmer_sheds():
             cursor.execute("""
                 SELECT id, shed_id 
                 FROM users 
-                WHERE role != 'superadmin' 
+                WHERE role = 'farmer' 
                 ORDER BY created_at ASC
             """)
             rows = cursor.fetchall()
@@ -653,10 +702,27 @@ def save_shed_settings(
 
 def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
     clean_id = identifier.strip()
+    candidates = [clean_id, clean_id.lower()]
+    digits = "".join(ch for ch in clean_id if ch.isdigit())
+    if digits:
+        candidates.extend([digits, f"+{digits}"])
+        if len(digits) == 10:
+            candidates.extend([f"+91{digits}", f"+91 {digits}", f"91{digits}"])
+        elif len(digits) == 12 and digits.startswith("91"):
+            candidates.extend([digits[2:], f"+{digits}", f"+91 {digits[2:]}"])
+    unique_candidates = list(dict.fromkeys(candidates))
+
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute(
-            "SELECT * FROM users WHERE username = %s OR phone = %s OR whatsapp_number = %s",
-            (clean_id, clean_id, clean_id),
+            """
+            SELECT * FROM users 
+            WHERE username = ANY(%s) 
+               OR phone = ANY(%s) 
+               OR whatsapp_number = ANY(%s) 
+               OR official_email = ANY(%s)
+            LIMIT 1
+            """,
+            (unique_candidates, unique_candidates, unique_candidates, unique_candidates),
         )
         row = cursor.fetchone()
         if row:
@@ -780,7 +846,7 @@ def get_all_farmers() -> List[Dict[str, Any]]:
                    farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at,
                    COALESCE(current_stage, 3) as current_stage
             FROM users 
-            WHERE role != 'superadmin' 
+            WHERE role = 'farmer' 
             ORDER BY created_at DESC
         """)
         rows = cursor.fetchall()
@@ -934,10 +1000,67 @@ def update_user_status(user_id: str, is_active: bool) -> bool:
 
 def delete_user(user_id: str) -> bool:
     with get_db_cursor(commit=True) as cursor:
-        cursor.execute("DELETE FROM users WHERE id = %s OR username = %s", (user_id, user_id))
+        cursor.execute("SELECT id FROM users WHERE id = %s OR username = %s", (user_id, user_id))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        resolved_id = row[0]
+
+        # 1. User sessions & tokens
+        try:
+            cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (resolved_id,))
+        except Exception:
+            pass
+
+        # 2. Employees, invitations, manager references, department head
+        try:
+            cursor.execute("DELETE FROM employee_invitations WHERE user_id = %s", (resolved_id,))
+            cursor.execute("UPDATE employees SET reporting_manager_id = NULL WHERE reporting_manager_id = %s", (resolved_id,))
+            cursor.execute("DELETE FROM employees WHERE user_id = %s", (resolved_id,))
+            cursor.execute("UPDATE departments SET head_employee_id = NULL WHERE head_employee_id = %s", (resolved_id,))
+        except Exception:
+            pass
+
+        # 3. Support system
+        try:
+            cursor.execute("DELETE FROM support_messages WHERE sender_id = %s", (resolved_id,))
+            cursor.execute("UPDATE support_tickets SET assigned_to = NULL WHERE assigned_to = %s", (resolved_id,))
+            cursor.execute("DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = %s)", (resolved_id,))
+            cursor.execute("DELETE FROM support_tickets WHERE user_id = %s", (resolved_id,))
+        except Exception:
+            pass
+
+        # 4. Installation jobs
+        try:
+            cursor.execute("UPDATE installation_jobs SET technician_id = NULL WHERE technician_id = %s", (resolved_id,))
+            cursor.execute("DELETE FROM installation_events WHERE job_id IN (SELECT id FROM installation_jobs WHERE farmer_id = %s)", (resolved_id,))
+            cursor.execute("DELETE FROM installation_jobs WHERE farmer_id = %s", (resolved_id,))
+        except Exception:
+            pass
+
+        # 5. Orders, invoices, payments, subscriptions
+        try:
+            cursor.execute("DELETE FROM payments WHERE user_id = %s", (resolved_id,))
+            cursor.execute("DELETE FROM payments WHERE invoice_id IN (SELECT id FROM invoices WHERE user_id = %s)", (resolved_id,))
+            cursor.execute("DELETE FROM invoices WHERE user_id = %s", (resolved_id,))
+            cursor.execute("DELETE FROM subscriptions WHERE user_id = %s", (resolved_id,))
+            cursor.execute("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = %s)", (resolved_id,))
+            cursor.execute("DELETE FROM orders WHERE user_id = %s", (resolved_id,))
+        except Exception:
+            pass
+
+        # 6. Nullify general assignments
+        try:
+            cursor.execute("UPDATE alerts SET assigned_to = NULL WHERE assigned_to = %s", (resolved_id,))
+            cursor.execute("UPDATE enquiries SET assigned_to = NULL WHERE assigned_to = %s", (resolved_id,))
+        except Exception:
+            pass
+
+        # 7. Delete the user
+        cursor.execute("DELETE FROM users WHERE id = %s", (resolved_id,))
     return True
 
-def log_audit(actor: str, action: str, details: str):
+def log_audit(actor: str, action: str, details: str, **kwargs):
     try:
         with get_db_cursor(commit=True) as cursor:
             cursor.execute("""
@@ -959,9 +1082,33 @@ def log_audit(actor: str, action: str, details: str):
     except Exception:
         pass
 
-def get_audit_logs(limit: int = 50) -> List[Dict[str, Any]]:
+def get_audit_logs(
+    limit: int = 50,
+    action: Optional[str] = None,
+    actor: Optional[str] = None,
+    org_id: Optional[str] = None,
+    search: Optional[str] = None,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
+    where_clauses = []
+    params = []
+    if action:
+        where_clauses.append("action = %s")
+        params.append(action.strip().upper())
+    if actor:
+        where_clauses.append("actor ILIKE %s")
+        params.append(f"%{actor.strip()}%")
+
+    if search:
+        p = f"%{search.strip()}%"
+        where_clauses.append("(details ILIKE %s OR target_resource ILIKE %s OR actor ILIKE %s)")
+        params.extend([p, p, p])
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    params.extend([limit, offset])
+
     with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT %s", (limit,))
+        cursor.execute(f"SELECT * FROM audit_logs {where_sql} ORDER BY id DESC LIMIT %s OFFSET %s", tuple(params))
         rows = cursor.fetchall()
         result = []
         for r in rows:
@@ -1290,30 +1437,29 @@ def get_telemetry_history_from_db(shed_id: str, limit: int = 50) -> List[Dict[st
 def register_device(
     device_id: str,
     shed_id: str,
-    organization_id: str = "default_org",
     device_name: Optional[str] = None,
     device_key: Optional[str] = None,
     firmware_version: str = "1.0.0",
     cert_fingerprint_sha256: Optional[str] = None,
     auth_mode: str = "API_KEY",
+    **kwargs
 ) -> Dict[str, Any]:
     """Registers an IoT hardware node or updates its metadata."""
     key_hash = get_password_hash(device_key) if device_key else None
     now_dt = datetime.now(timezone.utc)
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
-        INSERT INTO devices (device_id, shed_id, organization_id, device_name, device_key_hash, cert_fingerprint_sha256, auth_mode, firmware_version, status, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'ONLINE', %s)
+        INSERT INTO devices (device_id, shed_id, device_name, device_key_hash, cert_fingerprint_sha256, auth_mode, firmware_version, status, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 'ONLINE', %s)
         ON CONFLICT (device_id) DO UPDATE SET
             shed_id = EXCLUDED.shed_id,
-            organization_id = EXCLUDED.organization_id,
             device_name = COALESCE(EXCLUDED.device_name, devices.device_name),
             device_key_hash = COALESCE(EXCLUDED.device_key_hash, devices.device_key_hash),
             cert_fingerprint_sha256 = COALESCE(EXCLUDED.cert_fingerprint_sha256, devices.cert_fingerprint_sha256),
             auth_mode = EXCLUDED.auth_mode,
             firmware_version = EXCLUDED.firmware_version
-        RETURNING device_id, shed_id, organization_id, device_name, firmware_version, status, cert_fingerprint_sha256, auth_mode, created_at;
-        """, (device_id, shed_id, organization_id, device_name or f"Device {device_id}", key_hash, cert_fingerprint_sha256, auth_mode, firmware_version, now_dt))
+        RETURNING device_id, shed_id, device_name, firmware_version, status, cert_fingerprint_sha256, auth_mode, created_at;
+        """, (device_id, shed_id, device_name or f"Device {device_id}", key_hash, cert_fingerprint_sha256, auth_mode, firmware_version, now_dt))
         row = cursor.fetchone()
         return dict(row) if row else {}
 
@@ -1361,7 +1507,7 @@ def create_device_command(
     command_payload: Dict[str, Any],
     expires_in_seconds: int = 300,
     correlation_id: Optional[str] = None,
-    organization_id: str = "default_org",
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Creates a new command in REQUESTED state following the safe lifecycle:
@@ -1376,13 +1522,12 @@ def create_device_command(
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
         INSERT INTO device_commands (
-            command_id, organization_id, device_id, shed_id, requested_by,
+            command_id, device_id, shed_id, requested_by,
             command_type, command_payload, status, created_at, expires_at, correlation_id
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'QUEUED', %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, 'QUEUED', %s, %s, %s)
         RETURNING *;
         """, (
             command_id,
-            organization_id,
             device_id,
             shed_id,
             requested_by,
@@ -1456,3 +1601,227 @@ def get_device_command_by_id(command_id: str) -> Optional[Dict[str, Any]]:
         cursor.execute("SELECT * FROM device_commands WHERE command_id = %s", (command_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+
+
+# ==============================================================================
+# TOKEN REVOCATION & BLACKLIST MANAGEMENT (ASVS V3.3 & V3.4 / OWASP A07)
+# ==============================================================================
+
+_revoked_tokens_cache = set()
+_revoked_tokens_lock = threading.Lock()
+
+def revoke_token(jti: Optional[str], token_hash: Optional[str], expires_at: datetime, revoked_by: Optional[str] = None, user_id: Optional[str] = None, reason: Optional[str] = None) -> bool:
+    """
+    Revokes an active JWT token and persists to revoked_tokens table.
+    Enforces immediate session termination across instances (OWASP A07 / ASVS V3.3).
+    """
+    if not jti and not token_hash:
+        return False
+    primary_key = jti or token_hash
+    with _revoked_tokens_lock:
+        if jti:
+            _revoked_tokens_cache.add(jti)
+        if token_hash:
+            _revoked_tokens_cache.add(token_hash)
+
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+        INSERT INTO revoked_tokens (jti, token_hash, revoked_by, expires_at)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (jti) DO NOTHING;
+        """, (primary_key, token_hash, revoked_by, expires_at))
+    return True
+
+def is_token_revoked(jti: Optional[str], token_hash: Optional[str]) -> bool:
+    """
+    Checks if a token's JTI or SHA-256 hash has been revoked.
+    Uses L1 thread-safe set cache followed by database query.
+    """
+    if not jti and not token_hash:
+        return False
+    with _revoked_tokens_lock:
+        if jti and jti in _revoked_tokens_cache:
+            return True
+        if token_hash and token_hash in _revoked_tokens_cache:
+            return True
+
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("""
+        SELECT 1 FROM revoked_tokens
+        WHERE (jti = %s OR token_hash = %s) AND expires_at > CURRENT_TIMESTAMP
+        LIMIT 1;
+        """, (jti or "", token_hash or ""))
+        row = cursor.fetchone()
+        if row:
+            with _revoked_tokens_lock:
+                if jti:
+                    _revoked_tokens_cache.add(jti)
+                if token_hash:
+                    _revoked_tokens_cache.add(token_hash)
+            return True
+    return False
+
+
+# ==============================================================================
+# SERVER-SIDE SESSION MANAGEMENT (PER-TAB CONCURRENT MULTI-ACCOUNT SESSIONS)
+# ==============================================================================
+
+_revoked_sessions_cache = set()
+_sessions_cache_lock = threading.Lock()
+
+def create_user_session(
+    session_id: str,
+    user_id: str,
+    username: str,
+    role: str,
+    expires_at: datetime = None,
+    user_agent: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    **kwargs
+) -> dict:
+    """
+    Registers an isolated server-side session for multi-account / multi-tab support.
+    """
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+        INSERT INTO user_sessions (
+            session_id, user_id, username, role,
+            expires_at, user_agent, ip_address, created_at, last_activity, is_revoked
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
+        ON CONFLICT (session_id) DO UPDATE SET
+            expires_at = EXCLUDED.expires_at,
+            last_activity = CURRENT_TIMESTAMP,
+            is_revoked = FALSE;
+        """, (session_id, user_id, username, role, expires_at, user_agent, ip_address))
+
+    with _sessions_cache_lock:
+        _revoked_sessions_cache.discard(session_id)
+
+    return {
+        "session_id": session_id,
+        "user_id": user_id,
+        "username": username,
+        "role": role,
+        "expires_at": expires_at.isoformat() if hasattr(expires_at, "isoformat") else str(expires_at)
+    }
+
+def get_user_session(session_id: str) -> Optional[dict]:
+    """Fetches authoritative session record by session_id."""
+    if not session_id:
+        return None
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("""
+        SELECT session_id, user_id, username, role,
+               created_at, last_activity, expires_at, is_revoked,
+               revoked_at, revocation_reason, user_agent, ip_address
+        FROM user_sessions
+        WHERE session_id = %s;
+        """, (session_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+def is_session_valid(session_id: str) -> bool:
+    """
+    Validates whether a session exists, is not revoked, and is not expired.
+    Uses an in-memory L1 cache for fast rejection of revoked sessions.
+    """
+    if not session_id:
+        return False
+    with _sessions_cache_lock:
+        if session_id in _revoked_sessions_cache:
+            return False
+
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("""
+        SELECT is_revoked, expires_at
+        FROM user_sessions
+        WHERE session_id = %s;
+        """, (session_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        if row["is_revoked"]:
+            with _sessions_cache_lock:
+                _revoked_sessions_cache.add(session_id)
+            return False
+        now = datetime.now(timezone.utc)
+        exp = row["expires_at"]
+        if exp and exp < now:
+            return False
+        return True
+
+def update_session_activity(session_id: str) -> None:
+    """Updates last_activity timestamp for an active session."""
+    if not session_id:
+        return
+    try:
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("""
+            UPDATE user_sessions
+            SET last_activity = CURRENT_TIMESTAMP
+            WHERE session_id = %s AND is_revoked = FALSE;
+            """, (session_id,))
+    except Exception:
+        pass
+
+def renew_user_session(session_id: str, new_expires_at: datetime) -> bool:
+    """Extends session expiry and refreshes activity."""
+    if not session_id:
+        return False
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+        UPDATE user_sessions
+        SET expires_at = %s, last_activity = CURRENT_TIMESTAMP
+        WHERE session_id = %s AND is_revoked = FALSE;
+        """, (new_expires_at, session_id))
+        return cursor.rowcount > 0
+
+def revoke_user_session(session_id: str, reason: str = "User logout") -> bool:
+    """
+    Revokes ONLY this specific tab session.
+    All other sessions for this user or other users remain unaffected.
+    """
+    if not session_id:
+        return False
+    with _sessions_cache_lock:
+        _revoked_sessions_cache.add(session_id)
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+        UPDATE user_sessions
+        SET is_revoked = TRUE, revoked_at = CURRENT_TIMESTAMP, revocation_reason = %s
+        WHERE session_id = %s;
+        """, (reason, session_id))
+    return True
+
+def revoke_all_user_sessions(user_id: str, reason: str = "Logout all sessions") -> int:
+    """Revokes all active sessions for a user across all tabs and devices."""
+    if not user_id:
+        return 0
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("""
+        UPDATE user_sessions
+        SET is_revoked = TRUE, revoked_at = CURRENT_TIMESTAMP, revocation_reason = %s
+        WHERE user_id = %s AND is_revoked = FALSE;
+        """, (reason, user_id))
+        count = cursor.rowcount
+    with _sessions_cache_lock:
+        with get_db_cursor(dict_cursor=True) as cur2:
+            cur2.execute("SELECT session_id FROM user_sessions WHERE user_id = %s", (user_id,))
+            for r in cur2.fetchall():
+                _revoked_sessions_cache.add(r["session_id"])
+    return count
+
+def list_user_sessions(user_id: str) -> list:
+    """Returns active unexpired sessions for user_id."""
+    if not user_id:
+        return []
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("""
+        SELECT session_id, user_id, username, role, organization_id,
+               created_at, last_activity, expires_at, is_revoked,
+               user_agent, ip_address
+        FROM user_sessions
+        WHERE user_id = %s AND is_revoked = FALSE AND expires_at > CURRENT_TIMESTAMP
+        ORDER BY last_activity DESC;
+        """, (user_id,))
+        return [dict(r) for r in cursor.fetchall()]

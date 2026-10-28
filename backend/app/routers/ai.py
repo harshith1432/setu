@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from app.models.schemas import AIExplanation
 from app.services.telemetry_service import telemetry_service
 from app.services.ai_explainer import ai_explainer
-from app.core.security import get_current_user_payload
+from app.routers.sheds import verify_shed_access
 
 router = APIRouter(prefix="/ai", tags=["Explainable AI"])
 
@@ -10,11 +10,12 @@ router = APIRouter(prefix="/ai", tags=["Explainable AI"])
 def get_ai_explanation(
     shed_id: str,
     lang: str = Query("en", pattern="^(en|kn|te)$"),
-    payload: dict = Depends(get_current_user_payload)
+    payload: dict = Depends(verify_shed_access)
 ):
     """
     Get explainable AI rationale for why cooling/heating is running, target limits, and farmer tips.
     Supports English, Kannada, and Telugu.
+    Enforces shed ownership & BOLA/IDOR protection (OWASP Top 10 A01 / ASVS V4.1).
     """
     shed = telemetry_service.get_shed_overview(shed_id)
     return ai_explainer.generate_explanation(

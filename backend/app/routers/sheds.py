@@ -17,7 +17,7 @@ def verify_shed_access(
     Superadmins and cluster operators are permitted across all sheds.
     """
     role = payload.get("role")
-    if role in ["admin", "superadmin"]:
+    if role in ["admin", "superadmin", "company_admin", "ceo", "operations_manager", "technician", "support", "sales", "analyst"]:
         return payload
 
     username = payload.get("sub") or payload.get("user_id")
@@ -36,6 +36,7 @@ def verify_shed_access(
     )
 
 @router.get("/{shed_id}", response_model=ShedOverview)
+@router.get("/{shed_id}/overview", response_model=ShedOverview)
 def get_shed_status(
     shed_id: str,
     lat: Optional[float] = None,

@@ -124,7 +124,7 @@ def export_csv(
     Protected with Broken Object-Level Authorization (BOLA / IDOR) check.
     """
     role = payload.get("role")
-    if role not in ["admin", "superadmin"]:
+    if role not in ["admin", "superadmin", "company_admin", "ceo", "operations_manager", "technician", "support", "sales", "analyst"]:
         from app.services.db_service import get_user_by_username, get_user_by_id
         username = payload.get("sub") or payload.get("user_id")
         user = get_user_by_username(username) or get_user_by_id(username) if username else None
@@ -143,6 +143,7 @@ def export_csv(
     )
 
 @router.get("/sse/{shed_id}")
+@router.get("/live-stream/{shed_id}")
 async def sse_telemetry_stream(
     shed_id: str,
     token: Optional[str] = Query(None),
@@ -167,7 +168,7 @@ async def sse_telemetry_stream(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token for SSE stream")
 
     role = user_payload.get("role")
-    if role not in ["admin", "superadmin"]:
+    if role not in ["admin", "superadmin", "company_admin", "ceo", "operations_manager", "technician", "support", "sales", "analyst"]:
         from app.services.db_service import get_user_by_username, get_user_by_id
         username = user_payload.get("sub") or user_payload.get("user_id")
         user = get_user_by_username(username) or get_user_by_id(username) if username else None
@@ -213,7 +214,7 @@ async def websocket_telemetry_stream(
         return
 
     role = payload.get("role")
-    if role not in ["admin", "superadmin"]:
+    if role not in ["admin", "superadmin", "company_admin", "ceo", "operations_manager", "technician", "support", "sales", "analyst"]:
         from app.services.db_service import get_user_by_username, get_user_by_id
         username = payload.get("sub") or payload.get("user_id")
         user = get_user_by_username(username) or get_user_by_id(username) if username else None

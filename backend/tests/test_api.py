@@ -22,6 +22,15 @@ async def test_health_check(async_client):
     assert "Dynamic" in data.get("mode", "") or "Global" in data.get("network", "")
 
 @pytest.mark.anyio
+async def test_docs_endpoints_disabled_404(async_client):
+    r_docs = await async_client.get("/docs")
+    assert r_docs.status_code == 404
+    r_redoc = await async_client.get("/redoc")
+    assert r_redoc.status_code == 404
+    r_openapi = await async_client.get("/openapi.json")
+    assert r_openapi.status_code == 404
+
+@pytest.mark.anyio
 async def test_login_success_and_jwt(async_client):
     response = await async_client.post(
         "/api/v1/auth/login",
@@ -212,13 +221,14 @@ async def test_farmer_registration_persistence_and_subsequent_login(async_client
 
     test_uname = f"farmer_test_{int(time.time())}"
     test_pwd = "securepassword123"
+    test_phone = f"+91 98{int(time.time()) % 100000000:08d}"
 
     # 1. Sign up new user
     reg_payload = {
         "username": test_uname,
         "password": test_pwd,
         "full_name": "Siddappa Gowda",
-        "phone": "+91 98801 23456",
+        "phone": test_phone,
         "farm_name": "Kolar Silk Valley Farm",
         "region": "Karnataka, India",
         "batch_id": "SERI-2026-N01",

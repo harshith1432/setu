@@ -34,7 +34,7 @@ def verify_shed_control_access(
     Verifies that the caller is either an admin/superadmin OR is assigned to the target shed.
     """
     role = user_payload.get("role")
-    if role in ["admin", "superadmin"]:
+    if role in ["admin", "superadmin", "company_admin", "operations_manager", "technician"]:
         return user_payload
 
     username = user_payload.get("sub")
@@ -136,10 +136,12 @@ def get_command_status(
     command_id: str,
     user_payload: dict = Depends(get_current_user_payload)
 ):
-    """Farmer/operator endpoint to inspect exact lifecycle state of an issued command."""
+    """Farmer/operator endpoint to inspect exact lifecycle state of an issued command.
+    Enforces object-level authorization (SEC-06 / BOLA / OWASP A01)."""
     cmd = get_device_command_by_id(command_id)
     if not cmd:
         raise HTTPException(status_code=404, detail="Command not found")
+    verify_shed_control_access(cmd.get("shed_id", "shed_01"), user_payload)
     return cmd
 
 
