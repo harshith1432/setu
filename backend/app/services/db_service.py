@@ -201,6 +201,9 @@ def init_db():
             batch_id VARCHAR(64) NOT NULL DEFAULT 'SERI-2026-M04',
             dfl_capacity VARCHAR(64) NOT NULL DEFAULT '200 DFL',
             breed VARCHAR(128) NOT NULL DEFAULT 'Double Hybrid (FC1 x FC2)',
+            current_stage INT DEFAULT 3,
+            official_email VARCHAR(255),
+            organization_id VARCHAR(64) DEFAULT 'default_org',
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at TIMESTAMPTZ NOT NULL
         );
@@ -212,7 +215,10 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_verified BOOLEAN NOT NULL DEFAULT FALSE")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_stage INT DEFAULT 3")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_shed_id ON users (shed_id);")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS official_email VARCHAR(255)")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org'")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_official_email ON users (official_email);")
 
         # 2. IoT Device Registry
         cursor.execute("""
@@ -713,17 +719,28 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
     unique_candidates = list(dict.fromkeys(candidates))
 
     with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            SELECT * FROM users 
-            WHERE username = ANY(%s) 
-               OR phone = ANY(%s) 
-               OR whatsapp_number = ANY(%s) 
-               OR official_email = ANY(%s)
-            LIMIT 1
-            """,
-            (unique_candidates, unique_candidates, unique_candidates, unique_candidates),
-        )
+        try:
+            cursor.execute(
+                """
+                SELECT * FROM users 
+                WHERE username = ANY(%s) 
+                   OR phone = ANY(%s) 
+                   OR whatsapp_number = ANY(%s) 
+                   OR official_email = ANY(%s)
+                LIMIT 1
+                """,
+                (unique_candidates, unique_candidates, unique_candidates, unique_candidates),
+            )
+        except Exception:
+            cursor.execute(
+                """
+                SELECT * FROM users 
+                WHERE username = ANY(%s) 
+                   OR phone = ANY(%s) 
+                LIMIT 1
+                """,
+                (unique_candidates, unique_candidates),
+            )
         row = cursor.fetchone()
         if row:
             invalidate_user_cache()
@@ -935,9 +952,9 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         INSERT INTO users (
             id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
             preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
-            dfl_capacity, breed, is_active, created_at
+            dfl_capacity, breed, official_email, organization_id, is_active, created_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             user_data["id"],
             user_data["username"],
@@ -956,6 +973,8 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
             user_data.get("batch_id", "SERI-2026-M04"),
             user_data.get("dfl_capacity", "200 DFL"),
             user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
+            user_data.get("official_email"),
+            user_data.get("organization_id", "default_org"),
             True,
             created_at_dt
         ))
@@ -968,7 +987,8 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
     allowed = [
         "full_name", "phone", "whatsapp_number", "whatsapp_verified",
         "preferred_language", "farm_name", "region", "latitude", "longitude",
-        "shed_id", "batch_id", "dfl_capacity", "breed", "current_stage"
+        "shed_id", "batch_id", "dfl_capacity", "breed", "current_stage",
+        "official_email", "organization_id"
     ]
     for k in allowed:
         if k in updates and updates[k] is not None:
