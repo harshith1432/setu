@@ -1933,3 +1933,10 @@ def accept_invitation_and_activate(
         
         "message": "Account successfully activated. You may now log in to the platform."
     }
+
+
+# Initialize org employee tables safely on import
+try:
+    init_org_employee_tables()
+except Exception:
+    pass

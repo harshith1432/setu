@@ -438,7 +438,7 @@ def init_enterprise_tables():
 def _seed_enterprise_users(cursor, now_dt):
     """Ensures test accounts for all standard enterprise roles exist."""
     role_accounts = [
-        ("usr_ceo", "ceo", "ceo2026", "Vikramaditya Hegde", "+91 98450 11001", "en", "ceo", None, "Bengaluru Central", None),
+        ("usr_ceo", "ceo", "ceo2026", "Vikramaditya Hegde", "+91 98450 11001", "en", "ceo", "Setu Executive Office", "Bengaluru Central", "shed_01"),
         ("usr_ops_01", "ops_manoj", "ops2026", "Manoj Gowda (Operations Manager)", "+91 98450 11005", "en", "operations_manager", "Central Operations Hub", "Karnataka Central", "shed_01"),
         ("usr_technician_01", "tech_kiran", "tech2026", "Kiran Kumar (Field Lead)", "+91 98450 22002", "kn", "technician", "Mysuru Field Hub", "Mysuru Region", "shed_01"),
         ("usr_support_01", "support_priya", "support2026", "Priya Sharma (Support Specialist)", "+91 98450 33003", "en", "support", "Hubballi Support Desk", "Hubballi Cluster", "shed_01"),
@@ -451,7 +451,7 @@ def _seed_enterprise_users(cursor, now_dt):
             cursor.execute("""
             INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'SERI-2026', '250 DFL', 'Double Hybrid (FC1 x FC2)', TRUE, %s)
-            """, (uid, uname, get_password_hash(pwd), name, phone, lang, role, farm, reg, sid, now_dt))
+            """, (uid, uname, get_password_hash(pwd), name, phone, lang, role, farm or "Setu Executive Office", reg or "Bengaluru HQ", sid or "shed_01", now_dt))
 
 
 def _seed_products_catalogue(cursor, now_dt):
@@ -2539,3 +2539,10 @@ def update_invoice_status(invoice_id: str, new_status: str) -> bool:
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("UPDATE invoices SET status = %s WHERE id = %s", (new_status, invoice_id))
         return cursor.rowcount > 0
+
+
+# Initialize enterprise tables safely on import
+try:
+    init_enterprise_tables()
+except Exception:
+    pass

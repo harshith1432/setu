@@ -1,3 +1,11 @@
+from app.services.db_service import init_db
+from app.services.enterprise_db import init_enterprise_tables
+from app.services.org_employee_db import init_org_employee_tables
+
+init_db()
+init_enterprise_tables()
+init_org_employee_tables()
+
 import pytest
 import httpx
 from app.main import app
