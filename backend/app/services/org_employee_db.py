@@ -377,7 +377,7 @@ def init_org_employee_tables():
             cursor.execute("""
             INSERT INTO departments (id, name, code, description, created_at, updated_at)
             VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (code) DO UPDATE SET
+            ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 description = EXCLUDED.description;
             """, (*dept, now_dt))
@@ -497,10 +497,10 @@ def _seed_all_role_employees(cursor, now_dt):
             VALUES (%s, %s, %s, %s, %s, %s, 'en', %s, 'SeriCare Cluster Facility', 'Central Hub', 'shed_01', 'SERI-2026', '250 DFL', 'Double Hybrid (FC1 x FC2)', TRUE, %s)
             """, (acc["uid"], acc["uname"], get_password_hash(acc["pwd"]), acc["name"], acc["phone"], acc["email"], acc["role"], now_dt))
         else:
-            # Sync role and email
+            # Sync role, password hash and email
             cursor.execute("""
-            UPDATE users SET official_email = %s WHERE username = %s;
-            """, (acc["email"], acc["uname"]))
+            UPDATE users SET official_email = %s, hashed_password = %s, role = %s WHERE username = %s;
+            """, (acc["email"], get_password_hash(acc["pwd"]), acc["role"], acc["uname"]))
 
     # 2nd Pass: Create employee records
     for acc in accounts:
@@ -508,6 +508,10 @@ def _seed_all_role_employees(cursor, now_dt):
         role_id = f"role_{acc['role']}"
         res_json = json.dumps(acc["resources"])
         
+        cursor.execute("SELECT id FROM users WHERE username = %s", (acc["uname"],))
+        u_row = cursor.fetchone()
+        actual_uid = u_row[0] if u_row else acc["uid"]
+
         cursor.execute("SELECT id FROM employees WHERE id = %s OR employee_id = %s", (emp_db_id, acc["emp_id"]))
         existing_emp = cursor.fetchone()
         if not existing_emp:
@@ -520,7 +524,7 @@ def _seed_all_role_employees(cursor, now_dt):
             )
             VALUES (%s, %s, %s, %s, %s, %s, NULL, %s, %s, %s, %s::jsonb, 'ACTIVE', 'ACCEPTED', %s, %s)
             """, (
-                emp_db_id, acc["uid"], acc["emp_id"], acc["email"],
+                emp_db_id, actual_uid, acc["emp_id"], acc["email"],
                 acc["dept_id"], acc["desig"], acc["role"], role_id,
                 acc["scope"], res_json, now_dt, now_dt
             ))

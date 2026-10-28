@@ -3,6 +3,18 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/admin/(.*)",
+      "destination": "/$1"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/register",
+      "destination": "/register.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/$1"
     }

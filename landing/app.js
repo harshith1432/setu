@@ -874,6 +874,9 @@ async function openBuyProductModal(productId) {
 function closeCheckoutModal() {
   const modal = document.getElementById('productCheckoutModal');
   if (modal) modal.classList.remove('open');
+  sessionStorage.removeItem('setu_pending_checkout');
+  sessionStorage.removeItem('setu_checkout_product_id');
+  localStorage.removeItem('setu_pending_checkout');
 }
 
 function adjustCheckoutQty(delta) {
@@ -1296,20 +1299,42 @@ window.submitCheckoutOrder = submitCheckoutOrder;
 async function checkPendingCheckoutOnLoad() {
   const urlParams = new URLSearchParams(window.location.search);
   const buyParam = urlParams.get('buy');
+  const redirectParam = urlParams.get('redirect');
+  const productIdParam = urlParams.get('product_id');
+
+  // STRICT CHECK: Only resume checkout if explicit URL parameter was provided by an intentional redirect
+  const isExplicitResume = Boolean(buyParam || (redirectParam === 'checkout' && productIdParam));
+  if (!isExplicitResume) {
+    // Purge any stale leftover checkout data from storage so refresh never opens automatically
+    try {
+      sessionStorage.removeItem('setu_pending_checkout');
+      sessionStorage.removeItem('setu_checkout_product_id');
+      localStorage.removeItem('setu_pending_checkout');
+    } catch (_) {}
+    return;
+  }
+
   const pendingRaw = sessionStorage.getItem('setu_pending_checkout') || localStorage.getItem('setu_pending_checkout');
   let pending = null;
   if (pendingRaw) {
     try { pending = JSON.parse(pendingRaw); } catch (e) {}
   }
 
-  const targetProductId = buyParam || (pending ? pending.product_id : null);
+  // Immediately clear storage so refreshing the page NEVER re-opens the modal
+  try {
+    sessionStorage.removeItem('setu_pending_checkout');
+    sessionStorage.removeItem('setu_checkout_product_id');
+    localStorage.removeItem('setu_pending_checkout');
+  } catch (_) {}
+
+  const targetProductId = buyParam || productIdParam || (pending ? pending.product_id : null);
   if (!targetProductId) return;
 
   // Clean URL query param so refresh doesn't reopen indefinitely
-  if (buyParam) {
+  try {
     const cleanUrl = window.location.pathname + window.location.hash;
     window.history.replaceState({}, document.title, cleanUrl);
-  }
+  } catch (_) {}
 
   // Ensure products are loaded first
   if (typeof allProducts === 'undefined' || allProducts.length === 0) {

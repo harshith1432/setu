@@ -7,7 +7,7 @@
 <title>Setu | Super Admin &amp; Platform Management</title>
 <meta content="Setu Platform (SeriCare)" name="application-name"/>
 <!-- Brand Favicon -->
-<link href="/admin/assets/logo.png" rel="icon" type="image/png"/>
+<link href="assets/logo.png" rel="icon" type="image/png"/>
 <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
@@ -19,14 +19,18 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="/admin/style.css?v=3.2" rel="stylesheet"/>
+<link href="style.css?v=3.3" rel="stylesheet"/>
+  <style>
+    .hidden { display: none !important; }
+    body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
+  </style>
 </head>
 <body>
 <!-- ================= INITIAL LOADING GATEWAY ================= -->
 <div class="loading-gateway" id="loadingGateway">
 <div class="loading-gateway-card">
 <div class="loading-logo-box">
-<img alt="Setu Logo" class="pulse" src="/admin/assets/logo.png"/>
+<img alt="Setu Logo" class="pulse" src="assets/logo.png"/>
 </div>
 <h3>Setu Enterprise Platform</h3>
 <p>Verifying secure administrative session &amp; RBAC credentials...</p>
@@ -40,7 +44,7 @@
 <div class="auth-card">
 <div class="auth-brand-header">
 <div class="auth-logo-wrap">
-<img alt="Setu Logo" class="auth-logo-img" src="/admin/assets/logo.png"/>
+<img alt="Setu Logo" class="auth-logo-img" src="assets/logo.png"/>
 </div>
 <div class="auth-brand-badge">
 <i data-lucide="shield-check"></i>
@@ -111,7 +115,7 @@
 <div class="brand-crest">
 <div class="brand-crest-left" onclick="refreshPlatform()" onkeydown="if(event.key==='Enter'||event.key===' '){refreshPlatform();}" role="button" style="cursor: pointer;" tabindex="0" title="Click to refresh Setu Platform">
 <div class="sidebar-logo-box">
-<img alt="Setu Logo" class="sidebar-logo-img" src="/admin/assets/logo.png"/>
+<img alt="Setu Logo" class="sidebar-logo-img" src="assets/logo.png"/>
 </div>
 <div class="brand-title-wrap">
 <h1>Setu <span class="brand-sub">Platform</span></h1>
@@ -2451,6 +2455,6 @@
 <!-- Toast Notification Container -->
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="/admin/table-manager.js?v=3.2"></script><script src="/admin/app.js?v=3.2" charset="UTF-8"></script>
+<script src="table-manager.js?v=3.3"></script><script src="app.js?v=3.3" charset="UTF-8"></script>
 </body>
 </html>

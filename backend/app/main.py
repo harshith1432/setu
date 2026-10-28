@@ -206,6 +206,20 @@ def serve_root_app_js():
         return FileResponse(js_path, media_type="application/javascript; charset=utf-8")
     return Response(status_code=404)
 
+@app.get("/table-manager.js")
+def serve_root_table_manager():
+    tm_path = os.path.join(admin_web_dir, "table-manager.js")
+    if os.path.exists(tm_path):
+        return FileResponse(tm_path, media_type="application/javascript; charset=utf-8")
+    return Response(status_code=404)
+
+@app.get("/register.html")
+def serve_root_register_html():
+    reg_path = os.path.join(admin_web_dir, "register.html")
+    if os.path.exists(reg_path):
+        return FileResponse(reg_path, media_type="text/html; charset=utf-8")
+    return Response(status_code=404)
+
 @app.get("/health")
 def liveness_probe():
     """Liveness probe for orchestrators (Kubernetes / Render / Nomad)."""
