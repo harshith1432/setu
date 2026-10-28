@@ -19,7 +19,7 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="style.css?v=3.3" rel="stylesheet"/>
+<link href="/admin/style.css?v=4.0" rel="stylesheet"/>
   <style>
     .hidden { display: none !important; }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
@@ -2179,12 +2179,12 @@
 <table class="data-table" id="departmentsTable">
 <thead>
 <tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('departmentsTable', this.checked)" type="checkbox"/></th>
-<th>Department Name</th>
-<th>Code</th>
-<th>Head of Department</th>
-<th>Assigned Employees</th>
-<th>Status</th>
-<th>Actions</th>
+<th style="min-width: 240px;">Department Name</th>
+<th style="width: 100px;">Code</th>
+<th style="min-width: 180px;">Head of Department</th>
+<th style="width: 160px;">Assigned Employees</th>
+<th style="width: 100px;">Status</th>
+<th style="width: 70px; text-align: center;">Actions</th>
 </tr>
 </thead>
 <tbody id="departmentsTableBody">
@@ -2455,6 +2455,6 @@
 <!-- Toast Notification Container -->
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="table-manager.js?v=3.3"></script><script src="app.js?v=3.3" charset="UTF-8"></script>
+<script src="/admin/table-manager.js?v=4.0"></script><script src="/admin/app.js?v=4.0" charset="UTF-8"></script>
 </body>
 </html>

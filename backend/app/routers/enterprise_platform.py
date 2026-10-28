@@ -52,6 +52,7 @@ from app.services.enterprise_db import (
     add_ticket_message,
     update_ticket_status,
     list_installation_jobs,
+    get_installation_job,
     create_installation_job,
     update_installation_job,
     list_guidance_articles,
@@ -546,33 +547,60 @@ def get_orders(
     return list_orders(user_id=user_id, status=status, limit=limit)
 
 
-@router.post("/orders")
-def place_order(
-    payload: CustomerOrderCreatePayload,
-    user: dict = Depends(get_current_user_payload)
-):
-    uid = user.get("user_id") or user.get("sub")
-    if not uid:
-        raise HTTPException(status_code=401, detail="Authentication required to place an order")
-    
-    from app.services.db_service import get_user_by_id, get_user_by_username
-    target_user = get_user_by_id(uid) or get_user_by_username(uid)
-    if not target_user:
-        raise HTTPException(status_code=404, detail="User account not found")
-
-    try:
-        order = create_customer_order(
-            user_id=target_user["id"],
-            items=[item.model_dump() for item in payload.items],
-            shipping_address=payload.shipping_address,
-            payment_method=payload.payment_method,
-            notes=payload.notes
-        )
-        return order
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
+@router.post("/orders")
+
+def place_order(
+
+    payload: CustomerOrderCreatePayload,
+
+    user: dict = Depends(get_current_user_payload)
+
+):
+
+    uid = user.get("user_id") or user.get("sub")
+
+    if not uid:
+
+        raise HTTPException(status_code=401, detail="Authentication required to place an order")
+
+    
+
+    from app.services.db_service import get_user_by_id, get_user_by_username
+
+    target_user = get_user_by_id(uid) or get_user_by_username(uid)
+
+    if not target_user:
+
+        raise HTTPException(status_code=404, detail="User account not found")
+
+
+
+    try:
+
+        order = create_customer_order(
+
+            user_id=target_user["id"],
+
+            items=[item.model_dump() for item in payload.items],
+
+            shipping_address=payload.shipping_address,
+
+            payment_method=payload.payment_method,
+
+            notes=payload.notes
+
+        )
+
+        return order
+
+    except ValueError as e:
+
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+
+
 @router.post("/orders")
 def place_order(
     payload: CustomerOrderCreatePayload,
@@ -831,6 +859,19 @@ def get_installation_team(
         ORDER BY u.full_name ASC
         """)
         return [dict(r) for r in cur.fetchall()]
+
+
+@router.get("/installations/{job_id}")
+def get_installation_job_detail(job_id: str, user: dict = Depends(get_current_user_payload)):
+    job = get_installation_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Installation job not found")
+    role = user.get("role", "farmer")
+    if role == "farmer":
+        farmer_uid = user.get("user_id") or user.get("sub")
+        if job.get("farmer_id") != farmer_uid:
+            raise HTTPException(status_code=403, detail="Access denied to this installation job")
+    return job
 
 
 # ==============================================================================
@@ -1197,3 +1238,89 @@ def patch_product_publication(
         raise HTTPException(status_code=404, detail="Product not found")
     log_audit(actor, "PRODUCT_PUBLICATION_UPDATE", f"Updated product {product_id} publication to {payload.publication_status}")
     return updated
+
+
+# ==============================================================================
+# BULK / RECORD DELETION & ARCHIVAL ENDPOINTS
+# ==============================================================================
+
+@router.delete("/orders/{order_id}")
+def remove_order(
+    order_id: str,
+    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "operations_manager"]))
+):
+    from app.services.enterprise_db import delete_order
+    success = delete_order(order_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Order not found")
+    log_audit(user.get("sub", "admin"), "DELETE_ORDER", f"Permanently deleted order {order_id}")
+    return {"status": "success", "message": f"Order {order_id} deleted successfully"}
+
+
+@router.delete("/subscriptions/{subscription_id}")
+def remove_subscription(
+    subscription_id: str,
+    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "operations_manager"]))
+):
+    from app.services.enterprise_db import delete_subscription
+    success = delete_subscription(subscription_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    log_audit(user.get("sub", "admin"), "DELETE_SUBSCRIPTION", f"Permanently deleted subscription {subscription_id}")
+    return {"status": "success", "message": f"Subscription {subscription_id} deleted successfully"}
+
+
+@router.delete("/invoices/{invoice_id}")
+def remove_invoice(
+    invoice_id: str,
+    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "operations_manager"]))
+):
+    from app.services.enterprise_db import delete_invoice
+    success = delete_invoice(invoice_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    log_audit(user.get("sub", "admin"), "DELETE_INVOICE", f"Permanently deleted invoice {invoice_id}")
+    return {"status": "success", "message": f"Invoice {invoice_id} deleted successfully"}
+
+
+@router.delete("/support/tickets/{ticket_id}")
+def remove_support_ticket(
+    ticket_id: str,
+    user: dict = Depends(require_roles(["superadmin", "admin", "operations_manager"]))
+):
+    from app.services.enterprise_db import delete_support_ticket
+    success = delete_support_ticket(ticket_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    log_audit(user.get("sub", "admin"), "DELETE_TICKET", f"Permanently deleted support ticket {ticket_id}")
+    return {"status": "success", "message": f"Support ticket {ticket_id} deleted successfully"}
+
+
+@router.patch("/subscriptions/{subscription_id}/status")
+def patch_subscription_status(
+    subscription_id: str,
+    payload: dict,
+    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "operations_manager"]))
+):
+    from app.services.enterprise_db import update_subscription_status
+    new_status = payload.get("status", "INACTIVE")
+    success = update_subscription_status(subscription_id, new_status)
+    if not success:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    log_audit(user.get("sub", "admin"), "UPDATE_SUBSCRIPTION_STATUS", f"Updated subscription {subscription_id} to {new_status}")
+    return {"status": "success", "subscription_id": subscription_id, "new_status": new_status}
+
+
+@router.patch("/invoices/{invoice_id}/status")
+def patch_invoice_status(
+    invoice_id: str,
+    payload: dict,
+    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "operations_manager"]))
+):
+    from app.services.enterprise_db import update_invoice_status
+    new_status = payload.get("status", "CANCELLED")
+    success = update_invoice_status(invoice_id, new_status)
+    if not success:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    log_audit(user.get("sub", "admin"), "UPDATE_INVOICE_STATUS", f"Updated invoice {invoice_id} to {new_status}")
+    return {"status": "success", "invoice_id": invoice_id, "new_status": new_status}

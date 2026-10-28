@@ -16,7 +16,10 @@ class SetuProvider with ChangeNotifier {
   static const _secureStorage = FlutterSecureStorage();
   final ApiService _apiService = ApiService();
   final LocationWeatherService _weatherService = LocationWeatherService();
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com',
+    scopes: ['email', 'profile'],
+  );
 
   LiveWeatherData? _liveWeather;
   bool _isLoadingWeather = false;
@@ -426,29 +429,11 @@ class SetuProvider with ChangeNotifier {
 
   User? _pendingGoogleUser;
   User? get pendingGoogleUser => _pendingGoogleUser;
+  String? _pendingGoogleName;
+  String? _pendingGoogleEmail;
+  String? _pendingGoogleId;
 
   Future<({bool success, bool needsFarmSetup, String message, String? defaultName, String? email})> signInWithGoogle() async {
-    if (!isFirebaseReady) {
-      return (
-        success: false,
-        needsFarmSetup: false,
-        message: 'Firebase is not configured yet. Add google-services.json under mobile/android/app and rebuild.',
-        defaultName: null,
-        email: null,
-      );
-    }
-
-    final firebaseAuth = _firebaseAuthSafe;
-    if (firebaseAuth == null) {
-      return (
-        success: false,
-        needsFarmSetup: false,
-        message: 'Firebase is not configured for this platform.',
-        defaultName: null,
-        email: null,
-      );
-    }
-
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -461,33 +446,46 @@ class SetuProvider with ChangeNotifier {
         );
       }
 
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+      String? googleEmail = (googleUser.email.trim().isNotEmpty) ? googleUser.email.trim() : null;
+      String googleName = (googleUser.displayName?.trim().isNotEmpty == true) ? googleUser.displayName!.trim() : 'Farmer';
+      String googleId = (googleUser.id.trim().isNotEmpty) ? googleUser.id.trim() : 'usr_';
 
-      final userCredential = await firebaseAuth.signInWithCredential(credential);
-      final user = userCredential.user;
-      if (user == null) {
-        return (
-          success: false,
-          needsFarmSetup: false,
-          message: 'Google sign-in did not return a user.',
-          defaultName: null,
-          email: null,
-        );
+      // Attempt optional Firebase Auth session linking without blocking backend OAuth
+      try {
+        if (_firebaseAuthSafe != null) {
+          final googleAuth = await googleUser.authentication;
+          if (googleAuth.idToken != null || googleAuth.accessToken != null) {
+            final credential = GoogleAuthProvider.credential(
+              accessToken: googleAuth.accessToken,
+              idToken: googleAuth.idToken,
+            );
+            final userCredential = await _firebaseAuthSafe!.signInWithCredential(credential);
+            final fbUser = userCredential.user;
+            if (fbUser != null) {
+              _pendingGoogleUser = fbUser;
+              googleEmail = fbUser.email ?? googleEmail;
+              googleName = (fbUser.displayName?.trim().isNotEmpty == true) ? fbUser.displayName!.trim() : googleName;
+              googleId = fbUser.uid;
+            }
+          }
+        }
+      } catch (fbErr) {
+        debugPrint('[Auth] Firebase credential linking skipped/optional: ');
       }
 
-      final lookupKey = (user.email?.trim().isNotEmpty == true) ? user.email!.trim().toLowerCase() : user.uid;
+      _pendingGoogleName = googleName;
+      _pendingGoogleEmail = googleEmail;
+      _pendingGoogleId = googleId;
+
+      final lookupKey = (googleEmail != null && googleEmail.isNotEmpty) ? googleEmail.toLowerCase() : googleId;
       final check = await _apiService.checkFarmer(lookupKey);
 
       if (check != null && check['exists'] == true && check['has_profile'] == true) {
         // Existing registered farmer with completed profile -> sync immediately
         final syncRes = await _apiService.googleSync(
-          fullName: user.displayName ?? '',
-          email: user.email,
-          googleId: user.uid,
+          fullName: googleName,
+          email: googleEmail,
+          googleId: googleId,
           preferredLanguage: _locale.languageCode,
         );
         if (syncRes['success'] == true && syncRes['data'] != null) {
@@ -496,9 +494,9 @@ class SetuProvider with ChangeNotifier {
           _authToken = data['access_token'];
           _apiService.setToken(_authToken);
           _isLoggedIn = true;
-          _userId = userMap['id'] ?? user.uid;
+          _userId = userMap['id'] ?? googleId;
           _username = userMap['username'] ?? lookupKey;
-          _userName = userMap['full_name'] ?? (user.displayName ?? 'Farmer');
+          _userName = userMap['full_name'] ?? googleName;
           _userPhone = userMap['phone'] ?? '';
           _farmName = userMap['farm_name'] ?? '';
           _region = userMap['region'] ?? 'Local Rearing Shed';
@@ -506,27 +504,28 @@ class SetuProvider with ChangeNotifier {
           _dflCapacity = userMap['dfl_capacity'] ?? '';
           _breed = userMap['breed'] ?? 'Double Hybrid (FC1 x FC2)';
           await _saveSessionToPreferences(token: _authToken!, userMap: userMap);
+          startAutoRefresh(interval: const Duration(seconds: 3));
           notifyListeners();
           return (
             success: true,
             needsFarmSetup: false,
-            message: 'Welcome back, $_userName!',
+            message: 'Welcome back, !',
             defaultName: _userName,
-            email: user.email,
+            email: googleEmail,
           );
         }
       }
 
       // New farmer or profile incomplete -> Needs farm data input
-      _pendingGoogleUser = user;
       return (
         success: true,
         needsFarmSetup: true,
         message: 'Please complete your farm details.',
-        defaultName: user.displayName ?? '',
-        email: user.email,
+        defaultName: googleName,
+        email: googleEmail,
       );
     } catch (e) {
+      debugPrint('[Auth] Google sign-in failed: ');
       return (
         success: false,
         needsFarmSetup: false,
@@ -546,12 +545,11 @@ class SetuProvider with ChangeNotifier {
     String? region,
     String? breed,
   }) async {
-    final user = _pendingGoogleUser ?? _firebaseAuthSafe?.currentUser;
-    final email = user?.email;
-    final googleId = user?.uid;
+    final email = _pendingGoogleEmail ?? _pendingGoogleUser?.email ?? _firebaseAuthSafe?.currentUser?.email;
+    final googleId = _pendingGoogleId ?? _pendingGoogleUser?.uid ?? _firebaseAuthSafe?.currentUser?.uid;
 
     final syncRes = await _apiService.googleSync(
-      fullName: fullName.trim(),
+      fullName: fullName.trim().isNotEmpty ? fullName.trim() : (_pendingGoogleName ?? 'Farmer'),
       email: email,
       googleId: googleId,
       phone: phone.trim(),
@@ -579,6 +577,9 @@ class SetuProvider with ChangeNotifier {
       _dflCapacity = userMap['dfl_capacity'] ?? dflCapacity.trim();
       _breed = userMap['breed'] ?? 'Double Hybrid (FC1 x FC2)';
       _pendingGoogleUser = null;
+      _pendingGoogleName = null;
+      _pendingGoogleEmail = null;
+      _pendingGoogleId = null;
 
       await _saveSessionToPreferences(token: _authToken!, userMap: userMap);
       startAutoRefresh(interval: const Duration(seconds: 3));
@@ -880,7 +881,7 @@ class SetuProvider with ChangeNotifier {
     final res = await _apiService.register(
       username: cleanUname,
       password: cleanPwd,
-      fullName: fullName.trim(),
+      fullName: fullName.trim().isNotEmpty ? fullName.trim() : (_pendingGoogleName ?? 'Farmer'),
       phone: phone.trim(),
       preferredLanguage: _locale.languageCode,
       farmName: farmName?.trim(),

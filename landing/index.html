@@ -46,13 +46,13 @@
 
         <!-- Navigation CTAs -->
         <div class="nav-actions">
-          <a href="/login" class="btn btn-outline" title="Get Started with Setu">
-            <i data-lucide="arrow-right"></i>
-            <span>Get Started</span>
+          <a href="/login" class="btn btn-outline" title="Sign In to Setu">
+            <i data-lucide="log-in"></i>
+            <span>Sign In</span>
           </a>
-          <a href="#demo-request" class="btn btn-primary" title="Schedule an On-Site or Virtual Demonstration">
-            <i data-lucide="calendar"></i>
-            <span>Request a Demo</span>
+          <a href="/register" class="btn btn-primary" title="Register as a Farmer">
+            <i data-lucide="user-plus"></i>
+            <span>Farmer Register</span>
           </a>
           <button class="hamburger-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu">
             <i data-lucide="menu"></i>
@@ -74,11 +74,15 @@
         <a href="#demo-request" class="mobile-nav-item">Contact</a>
       </div>
       <div style="display: flex; flex-direction: column; gap: 10px;">
-        <a href="/login" class="btn btn-outline" style="width: 100%;">
-          <i data-lucide="arrow-right"></i>
-          <span>Get Started</span>
+        <a href="/login" class="btn btn-primary mobile-nav-item" style="width: 100%;">
+          <i data-lucide="log-in"></i>
+          <span>Sign In</span>
         </a>
-        <a href="#demo-request" class="btn btn-primary mobile-nav-item" style="width: 100%;">
+        <a href="/register" class="btn btn-outline mobile-nav-item" style="width: 100%;">
+          <i data-lucide="user-plus"></i>
+          <span>Register as a Farmer</span>
+        </a>
+        <a href="#demo-request" class="btn btn-outline mobile-nav-item" style="width: 100%;">
           <i data-lucide="calendar"></i>
           <span>Request a Demo</span>
         </a>
@@ -1066,6 +1070,8 @@
         <div class="footer-legal-links">
           <a href="javascript:void(0)" id="privacyModalTrigger">Privacy Policy</a>
           <a href="javascript:void(0)" id="termsModalTrigger">Terms of Service</a>
+          <a href="/login">Sign In</a>
+          <a href="/register">Farmer Registration</a>
           <a href="/admin">Platform Management</a>
         </div>
       </div>
@@ -1370,3 +1376,4 @@
   <script src="/landing/app.js?v=3.2" charset="UTF-8"></script>
 </body>
 </html>
+

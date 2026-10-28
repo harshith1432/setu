@@ -28,12 +28,21 @@ if (!tabId) {
   TAB_STORAGE.setItem('setu_tab_id', tabId);
 }
 
-// Global Application State - Initialized strictly from this tab's isolated storage
-let adminToken = TAB_STORAGE.getItem('setu_tab_token') || null;
+// Global Application State - Tab-isolated with persistent fallback
+let adminToken = TAB_STORAGE.getItem('setu_tab_token') ||
+  localStorage.getItem('setu_token') ||
+  localStorage.getItem('setu_admin_token') ||
+  null;
+if (adminToken && !TAB_STORAGE.getItem('setu_tab_token')) {
+  try { TAB_STORAGE.setItem('setu_tab_token', adminToken); } catch (_) {}
+}
 window.adminToken = adminToken;
 window.API_BASE_URL = API_BASE_URL;
 let currentSessionId = TAB_STORAGE.getItem('setu_tab_session_id') || null;
-let currentUser = JSON.parse(TAB_STORAGE.getItem('setu_tab_user') || 'null');
+let currentUser = JSON.parse(TAB_STORAGE.getItem('setu_tab_user') || localStorage.getItem('setu_user') || 'null');
+if (currentUser && !TAB_STORAGE.getItem('setu_tab_user')) {
+  try { TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser)); } catch (_) {}
+}
 let currentTab = TAB_STORAGE.getItem('setu_tab_nav') || 'overview';
 let selectedShedId = TAB_STORAGE.getItem('setu_tab_shed') || 'shed_01';
 
@@ -3871,26 +3880,30 @@ function renderDepartmentsTable(depts) {
   if (!tbody) return;
 
   if (!depts.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="honest-empty-state"><i data-lucide="network"></i><h4>No Departments Registered</h4><p>Create departments to structure teams and managerial hierarchy.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7"><div class="honest-empty-state"><i data-lucide="network"></i><h4>No Departments Registered</h4><p>Create departments to structure teams and managerial hierarchy.</p></div></td></tr>';
     if (window.lucide) lucide.createIcons();
+    if (window.SetuTableManager) SetuTableManager.syncTable('departmentsTable');
     return;
   }
 
   tbody.innerHTML = depts.map(d => `
-    <tr>
-      <td>
-        <div style="font-weight: 700; color: var(--text-main);">${d.name}</div>
-        <div style="font-size: 0.72rem; color: var(--text-muted);">${d.description || 'Operational team'}</div>
+    <tr data-id="${d.id}">
+      <td class="td-bulk-select" style="text-align: center; width: 44px;">
+        <input type="checkbox" class="row-select-checkbox" data-row-id="${d.id}" aria-label="Select Department" onchange="SetuTableManager.handleRowCheck('departmentsTable', '${d.id}', this)">
       </td>
-      <td><span class="font-mono" style="background: var(--bg-subtle); padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">${d.code}</span></td>
-      <td>
-        <span style="font-size: 0.8rem; font-weight: 600;">${d.head_name ? `<i data-lucide="user-check" style="width: 12px; height: 12px; display: inline-block;"></i> ${d.head_name}` : '<em style="color:var(--text-muted);">Vacant</em>'}</span>
+      <td style="max-width: 280px;">
+        <div style="font-weight: 700; color: var(--text-main); font-size: 0.88rem; line-height: 1.3;">${escapeHtml(d.name)}</div>
+        <div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.3; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(d.description || '')}">${escapeHtml(d.description || 'Operational team')}</div>
       </td>
-      <td><strong>${d.employee_count || 0}</strong> employees</td>
+      <td><span class="font-mono" style="background: var(--bg-subtle); padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">${escapeHtml(d.code)}</span></td>
       <td>
-        <span class="status-pill ${d.status === 'ACTIVE' ? 'active' : 'danger'}">${d.status}</span>
+        <span style="font-size: 0.82rem; font-weight: 600;">${d.head_name ? `<i data-lucide="user-check" style="width: 13px; height: 13px; display: inline-block; vertical-align: middle; margin-right: 4px; color: var(--brand-primary);"></i> ${escapeHtml(d.head_name)}` : '<em style="color:var(--text-muted);">Vacant</em>'}</span>
       </td>
+      <td style="font-size: 0.82rem;"><strong>${d.employee_count || 0}</strong> employees</td>
       <td>
+        <span class="status-pill ${d.status === 'ACTIVE' ? 'active' : 'danger'}">${escapeHtml(d.status)}</span>
+      </td>
+      <td style="text-align: center;">
         <div class="row-action-dropdown">
           <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'dept-${d.id}')" title="Actions" aria-label="Department Actions">
             <i data-lucide="more-vertical"></i>
@@ -3912,6 +3925,7 @@ function renderDepartmentsTable(depts) {
     </tr>
   `).join('');
 
+  if (window.SetuTableManager) SetuTableManager.syncTable('departmentsTable');
   if (window.lucide) lucide.createIcons();
 }
 
@@ -4399,14 +4413,22 @@ async function loadProducts(statusFilter = 'ALL') {
   tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading catalogue...</td></tr>';
 
   try {
-    const res = await fetch(`${API_BASE_URL}/products`, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
-    });
-    if (!res.ok) throw new Error('Failed to load products');
+    const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+    let res = null;
+    if (token) {
+      res = await fetch(`${API_BASE_URL}/products`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    }
+    if (!res || !res.ok) {
+      res = await fetch(`${API_BASE_URL}/public/products`);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load products`);
     allProductsList = await res.json();
     filterProducts(statusFilter);
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Failed to load products: ${escapeHtml(err.message)}</td></tr>`;
+    if (window.SetuTableManager) SetuTableManager.syncTable('productsTable');
   }
 }
 
@@ -4634,15 +4656,17 @@ async function loadOrders(statusFilter = '') {
   tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading orders...</td></tr>';
 
   try {
+    const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
     const url = statusFilter ? `${API_BASE_URL}/orders?status=${encodeURIComponent(statusFilter)}` : `${API_BASE_URL}/orders`;
     const res = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${adminToken}` }
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
     });
-    if (!res.ok) throw new Error('Failed to load orders');
+    if (!res.ok) throw new Error(`Server returned ${res.status}: ${res.statusText}`);
     allOrdersList = await res.json();
     renderOrdersTable(allOrdersList);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Unable to load orders: ${escapeHtml(err.message)}</td></tr>`;
+    if (window.SetuTableManager) SetuTableManager.syncTable('ordersTable');
   }
 }
 
@@ -4738,21 +4762,35 @@ async function loadBilling() {
   if (invBody) invBody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px;">Loading invoices...</td></tr>';
 
   try {
+    const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
     const [subsRes, invRes] = await Promise.all([
-      fetch(`${API_BASE_URL}/subscriptions`, { headers: { 'Authorization': `Bearer ${adminToken}` } }),
-      fetch(`${API_BASE_URL}/invoices`, { headers: { 'Authorization': `Bearer ${adminToken}` } })
+      fetch(`${API_BASE_URL}/subscriptions`, { headers }),
+      fetch(`${API_BASE_URL}/invoices`, { headers })
     ]);
 
-    if (subsRes.ok && subsBody) {
-      allSubsList = await subsRes.json();
-      renderSubsTable(allSubsList);
+    if (subsBody) {
+      if (subsRes.ok) {
+        allSubsList = await subsRes.json();
+        renderSubsTable(allSubsList);
+      } else {
+        subsBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 20px;">Subscriptions (${subsRes.status}): ${subsRes.statusText}</td></tr>`;
+        if (window.SetuTableManager) SetuTableManager.syncTable('subsTable');
+      }
     }
-    if (invRes.ok && invBody) {
-      allInvoicesList = await invRes.json();
-      renderInvoicesTable(allInvoicesList);
+    if (invBody) {
+      if (invRes.ok) {
+        allInvoicesList = await invRes.json();
+        renderInvoicesTable(allInvoicesList);
+      } else {
+        invBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 20px;">Invoices (${invRes.status}): ${invRes.statusText}</td></tr>`;
+        if (window.SetuTableManager) SetuTableManager.syncTable('invoicesTable');
+      }
     }
   } catch (err) {
-    if (subsBody) subsBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 20px;">Failed to load billing: ${escapeHtml(err.message)}</td></tr>`;
+    if (subsBody) subsBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 20px;">Failed to load subscriptions: ${escapeHtml(err.message)}</td></tr>`;
+    if (invBody) invBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 20px;">Failed to load invoices: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -4841,6 +4879,7 @@ async function loadSupportTickets(statusFilter = '') {
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${adminToken}` } });
     if (!res.ok) throw new Error('Failed to load tickets');
     const tickets = await res.json();
+    allTicketsCache = tickets;
 
     if (tickets.length === 0) {
       tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 28px; color: var(--text-muted);">No support tickets recorded.</td></tr>';
@@ -4849,7 +4888,7 @@ async function loadSupportTickets(statusFilter = '') {
     }
 
     tbody.innerHTML = tickets.map(t => `
-      <tr data-id="${t.id}">
+      <tr data-id="${t.id}" style="cursor: pointer;" onclick="if (!event.target.closest('input, button, a')) openTicketDetailsModal('${escapeHtml(t.id)}')">
         <td class="td-bulk-select" style="text-align: center;">
           <input type="checkbox" class="row-select-checkbox" data-row-id="${t.id}" aria-label="Select Ticket" onchange="SetuTableManager.handleRowCheck('ticketsTable', '${t.id}', this)">
         </td>
@@ -4857,11 +4896,11 @@ async function loadSupportTickets(statusFilter = '') {
         <td style="font-weight: 600;">${escapeHtml(t.subject)}</td>
         <td>${escapeHtml(t.farmer_name || 'Farmer')}</td>
         <td><span class="badge badge-info">${escapeHtml(t.category)}</span></td>
-        <td><span class="badge ${t.priority === 'HIGH' ? 'badge-danger' : 'badge-warning'}">${escapeHtml(t.priority)}</span></td>
+        <td><span class="badge ${t.priority === 'HIGH' || t.priority === 'CRITICAL' ? 'badge-danger' : 'badge-warning'}">${escapeHtml(t.priority)}</span></td>
         <td><span class="badge ${t.status === 'RESOLVED' ? 'badge-success' : 'badge-warning'}">${escapeHtml(t.status)}</span></td>
         <td>${escapeHtml(t.agent_name || 'Field Lead')}</td>
         <td>
-          <button type="button" class="btn btn-outline btn-xs" onclick="showToast('Ticket detail: ' + '${escapeHtml(t.subject)}')">View</button>
+          <button type="button" class="btn btn-outline btn-xs" onclick="event.stopPropagation(); openTicketDetailsModal('${escapeHtml(t.id)}')">View</button>
         </td>
       </tr>
     `).join('');
@@ -4882,6 +4921,7 @@ async function loadInstallations() {
     const res = await fetch(`${API_BASE_URL}/installations`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
     if (!res.ok) throw new Error('Failed to load installations');
     const jobs = await res.json();
+    allInstallationsCache = jobs;
 
     if (jobs.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 28px; color: var(--text-muted);">No installation jobs recorded.</td></tr>';
@@ -4890,7 +4930,7 @@ async function loadInstallations() {
     }
 
     tbody.innerHTML = jobs.map(j => `
-      <tr data-id="${j.id}">
+      <tr data-id="${j.id}" style="cursor: pointer;" onclick="if (!event.target.closest('input, button, a')) openInstallationJobDetails('${escapeHtml(j.id)}')">
         <td class="td-bulk-select" style="text-align: center;">
           <input type="checkbox" class="row-select-checkbox" data-row-id="${j.id}" aria-label="Select Job" onchange="SetuTableManager.handleRowCheck('installationsTable', '${j.id}', this)">
         </td>
@@ -4899,9 +4939,9 @@ async function loadInstallations() {
         <td><span class="badge badge-info">${escapeHtml(j.shed_id)}</span></td>
         <td>${escapeHtml(j.technician_name || 'Kiran Kumar')}</td>
         <td>${j.scheduled_date ? new Date(j.scheduled_date).toLocaleDateString() : '--'}</td>
-        <td><span class="badge ${j.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}">${escapeHtml(j.status)}</span></td>
+        <td><span class="badge ${j.status === 'COMPLETED' ? 'badge-success' : (j.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning')}">${escapeHtml(j.status)}</span></td>
         <td>
-          <button type="button" class="btn btn-outline btn-xs" onclick="showToast('Job assigned to ' + '${escapeHtml(j.technician_name || 'tech')}')">Details</button>
+          <button type="button" class="btn btn-outline btn-xs" onclick="event.stopPropagation(); openInstallationJobDetails('${escapeHtml(j.id)}')">Details</button>
         </td>
       </tr>
     `).join('');
@@ -4912,6 +4952,316 @@ async function loadInstallations() {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 20px;">Failed to load installations: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
+
+let allInstallationsCache = [];
+let allTicketsCache = [];
+
+async function openInstallationJobDetails(jobId) {
+  let job = allInstallationsCache.find(j => j.id === jobId || j.job_number === jobId);
+  if (!job) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/installations/${encodeURIComponent(jobId)}`, {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (res.ok) job = await res.json();
+    } catch (e) {}
+  }
+
+  if (!job) {
+    showToast('Installation job record could not be found.', 'error');
+    return;
+  }
+
+  const statusBadgeClass = job.status === 'COMPLETED' 
+    ? 'badge-success' 
+    : (job.status === 'IN_PROGRESS' ? 'badge-info' : (job.status === 'CANCELLED' ? 'badge-danger' : 'badge-warning'));
+
+  const scheduledStr = job.scheduled_date ? new Date(job.scheduled_date).toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }) : 'Scheduled slot pending';
+
+  const completedStr = job.completed_at ? new Date(job.completed_at).toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  }) : (job.status === 'COMPLETED' ? 'Verified & Completed' : 'Pending Field Verification');
+
+  const standardChecklistItems = [
+    { id: 'power', label: 'Rearing Shed AC Power & 12V 5A DIN-Rail Power Supply Verification', defaultDone: job.status === 'COMPLETED' },
+    { id: 'gateway', label: 'Setu Industrial IoT Edge Gateway Enclosure Mounting & Antenna Orientation', defaultDone: job.status === 'COMPLETED' },
+    { id: 'sensors', label: 'Multi-Probe Environmental Sensor Daisy-Chain (SHT31 Temp/RH & MQ-135 Gas)', defaultDone: job.status === 'COMPLETED' || job.status === 'IN_PROGRESS' },
+    { id: 'relays', label: 'Actuator Safety Interlock Relays (Exhaust Fan, Mist Fogger, PTC Heater)', defaultDone: job.status === 'COMPLETED' },
+    { id: 'uplink', label: 'Edge-to-Cloud Telemetry Stream & Realtime SSE Synchronization Verified', defaultDone: job.status === 'COMPLETED' },
+    { id: 'mobile', label: 'Farmer Mobile App Paired & Instar Microclimate Thresholds Commissioned', defaultDone: job.status === 'COMPLETED' }
+  ];
+
+  const currentChecklist = Array.isArray(job.checklist_completed) ? job.checklist_completed : [];
+  
+  const checklistHtml = standardChecklistItems.map((item, idx) => {
+    const isChecked = currentChecklist.includes(item.id) || item.defaultDone;
+    return `
+      <div style="display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 8px;">
+        <input type="checkbox" id="chk_${item.id}" value="${item.id}" ${isChecked ? 'checked' : ''} style="margin-top: 3px; accent-color: var(--brand-primary); cursor: pointer;" onchange="updateJobChecklist('${job.id}')">
+        <label for="chk_${item.id}" style="font-size: 0.84rem; color: var(--text-main); font-weight: 500; cursor: pointer; flex: 1;">
+          <span style="font-weight: 700; color: var(--text-muted); margin-right: 4px;">Step ${idx + 1}:</span>
+          ${item.label}
+        </label>
+        <span style="font-size: 0.72rem; font-weight: 700; color: ${isChecked ? 'var(--status-success)' : 'var(--text-muted)'}; white-space: nowrap;">
+          ${isChecked ? '<i data-lucide="check" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Verified' : 'Pending'}
+        </span>
+      </div>
+    `;
+  }).join('');
+
+  const modalHtml = `
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Top Overview Banner -->
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 18px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 800; color: var(--brand-primary);">${escapeHtml(job.job_number)}</span>
+            <span class="badge ${statusBadgeClass}" id="detailJobStatusBadge">${escapeHtml(job.status)}</span>
+            <span class="badge badge-info"><i data-lucide="home" style="width: 12px; height: 12px; margin-right: 3px;"></i>${escapeHtml(job.shed_id)}</span>
+          </div>
+          <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: block;">
+            Job ID: <code style="font-size: 0.76rem;">${escapeHtml(job.id)}</code> &middot; Scheduled: ${scheduledStr}
+          </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${job.status !== 'COMPLETED' ? `
+            <button type="button" class="btn btn-primary btn-sm" onclick="advanceJobStatus('${job.id}', 'COMPLETED')">
+              <i data-lucide="check-circle-2" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+              <span>Complete Verification</span>
+            </button>
+          ` : `
+            <span style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: var(--status-success);">
+              <i data-lucide="shield-check" style="width: 18px; height: 18px;"></i>
+              <span>Hardware Commissioned &amp; Certified</span>
+            </span>
+          `}
+        </div>
+      </div>
+
+      <!-- 2-Column Info Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+        <!-- Card 1: Farmer & Rearing Shed Facility -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+            <i data-lucide="user" style="width: 16px; height: 16px; color: var(--brand-primary);"></i>
+            <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: var(--text-main);">Farmer &amp; Shed Facility</h4>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Farmer Name:</span>
+              <strong style="color: var(--text-main);">${escapeHtml(job.farmer_name || 'Harshith Kd')}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Farm / Shed Name:</span>
+              <strong style="color: var(--text-main);">${escapeHtml(job.farm_name || 'Setu Smart Farm')}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Region / Cluster:</span>
+              <span>${escapeHtml(job.region || 'Karnataka Sericulture Zone')}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Registered Contact:</span>
+              <span style="font-family: var(--font-mono); font-weight: 600;">${escapeHtml(job.farmer_phone || '+91 98450 12345')}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Field Technician & Schedule -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+            <i data-lucide="wrench" style="width: 16px; height: 16px; color: var(--brand-primary);"></i>
+            <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: var(--text-main);">Field Technician Assignment</h4>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem;">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Assigned Lead:</span>
+              <strong style="color: var(--text-main);">${escapeHtml(job.technician_name || 'Kiran Kumar (Field Lead)')}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Technician Helpline:</span>
+              <span style="font-family: var(--font-mono); font-weight: 600;">${escapeHtml(job.technician_phone || '+91 94480 55678')}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Scheduled Date:</span>
+              <span>${scheduledStr}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-muted);">Verification Status:</span>
+              <span style="font-weight: 700; color: ${job.status === 'COMPLETED' ? 'var(--status-success)' : 'var(--status-warning)'};">${completedStr}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scope of Hardware & Technical Notes -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <i data-lucide="clipboard-list" style="width: 16px; height: 16px; color: var(--brand-primary);"></i>
+          <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: var(--text-main);">Technical Scope &amp; Deployment Notes</h4>
+        </div>
+        <p style="font-size: 0.84rem; color: var(--text-main); line-height: 1.5; margin: 0 0 10px 0; background: var(--bg-hover); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 3px solid var(--brand-primary);">
+          ${escapeHtml(job.technician_notes || 'Full Setu Automation Hub & 4-Sensor Daisy Chain Setup with emergency actuator override interlocks.')}
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <span class="badge" style="background: var(--bg-hover); border: 1px solid var(--border-color); font-size: 0.74rem;"><i data-lucide="cpu" style="width: 12px; height: 12px; margin-right: 4px;"></i>Edge Gateway (ESP32-S3)</span>
+          <span class="badge" style="background: var(--bg-hover); border: 1px solid var(--border-color); font-size: 0.74rem;"><i data-lucide="thermometer" style="width: 12px; height: 12px; margin-right: 4px;"></i>Dual SHT31 Temp/RH Probe</span>
+          <span class="badge" style="background: var(--bg-hover); border: 1px solid var(--border-color); font-size: 0.74rem;"><i data-lucide="wind" style="width: 12px; height: 12px; margin-right: 4px;"></i>MQ-135 Gas &amp; Freshness Sensor</span>
+          <span class="badge" style="background: var(--bg-hover); border: 1px solid var(--border-color); font-size: 0.74rem;"><i data-lucide="zap" style="width: 12px; height: 12px; margin-right: 4px;"></i>Zero-Crossing Actuator Relays</span>
+        </div>
+      </div>
+
+      <!-- Installation & Commissioning Checklist -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="check-square" style="width: 16px; height: 16px; color: var(--brand-primary);"></i>
+            <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: var(--text-main);">Hardware Commissioning &amp; Safety Checklist</h4>
+          </div>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Step-by-step verification protocol</span>
+        </div>
+        <div id="jobChecklistContainer">
+          ${checklistHtml}
+        </div>
+      </div>
+
+      <!-- Modal Footer Action Bar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border-color); margin-top: 4px;">
+        <div style="display: flex; gap: 8px;">
+          ${job.status === 'SCHEDULED' ? `
+            <button type="button" class="btn btn-outline btn-sm" onclick="advanceJobStatus('${job.id}', 'IN_PROGRESS')">
+              <i data-lucide="play" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+              <span>Start Field Work</span>
+            </button>
+          ` : ''}
+          ${job.status === 'IN_PROGRESS' ? `
+            <button type="button" class="btn btn-primary btn-sm" onclick="advanceJobStatus('${job.id}', 'COMPLETED')">
+              <i data-lucide="check" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+              <span>Verify &amp; Complete Job</span>
+            </button>
+          ` : ''}
+          <button type="button" class="btn btn-outline btn-sm" onclick="showToast('Printing official Field Installation Sheet for ' + '${escapeHtml(job.job_number)}', 'info'); window.print();">
+            <i data-lucide="printer" style="width: 14px; height: 14px; margin-right: 4px;"></i>
+            <span>Print Job Sheet</span>
+          </button>
+        </div>
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
+      </div>
+    </div>
+  `;
+
+  openAppModal(`Field Installation Job: ${job.job_number}`, modalHtml, 'lg');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function advanceJobStatus(jobId, newStatus) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/installations/${jobId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: newStatus,
+        remarks: `Updated by technician in admin console to ${newStatus}`
+      })
+    });
+    if (!res.ok) throw new Error('Failed to update installation job status');
+    showToast(`Installation job ${newStatus === 'COMPLETED' ? 'completed and verified!' : 'marked in progress.'}`, 'success');
+    closeAppModal();
+    loadInstallations();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function updateJobChecklist(jobId) {
+  const container = document.getElementById('jobChecklistContainer');
+  if (!container) return;
+  const checked = Array.from(container.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+  try {
+    await fetch(`${API_BASE_URL}/installations/${jobId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: checked.length === 6 ? 'COMPLETED' : 'IN_PROGRESS',
+        checklist_completed: checked,
+        remarks: `Checklist updated: ${checked.length} of 6 tasks verified`
+      })
+    });
+    showToast(`Checklist saved (${checked.length}/6 verified)`, 'info');
+  } catch (e) {
+    console.error('Checklist autosave failed:', e);
+  }
+}
+
+function openTicketDetailsModal(ticketId) {
+  const ticket = allTicketsCache.find(t => t.id === ticketId || t.ticket_number === ticketId);
+  if (!ticket) {
+    showToast('Ticket record not found.', 'error');
+    return;
+  }
+
+  const priorityClass = ticket.priority === 'HIGH' || ticket.priority === 'CRITICAL' ? 'badge-danger' : (ticket.priority === 'MEDIUM' ? 'badge-warning' : 'badge-info');
+  const statusClass = ticket.status === 'RESOLVED' ? 'badge-success' : (ticket.status === 'IN_PROGRESS' ? 'badge-info' : 'badge-warning');
+
+  const modalHtml = `
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 16px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; color: var(--brand-primary);">${escapeHtml(ticket.ticket_number)}</span>
+            <span class="badge ${statusClass}">${escapeHtml(ticket.status)}</span>
+            <span class="badge ${priorityClass}">${escapeHtml(ticket.priority)} PRIORITY</span>
+          </div>
+          <span style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: block;">
+            Category: <strong>${escapeHtml(ticket.category)}</strong> &middot; Opened: ${ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '--'}
+          </span>
+        </div>
+      </div>
+
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+        <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; font-weight: 700; color: var(--text-main);">${escapeHtml(ticket.subject)}</h4>
+        <p style="margin: 0; font-size: 0.85rem; color: var(--text-main); line-height: 1.6; background: var(--bg-hover); padding: 12px; border-radius: var(--radius-sm);">
+          ${escapeHtml(ticket.description || 'No detailed issue description entered.')}
+        </p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; font-size: 0.82rem;">
+          <div style="font-weight: 700; margin-bottom: 6px; color: var(--text-muted);">Farmer Facility</div>
+          <div><strong>${escapeHtml(ticket.farmer_name || 'Farmer')}</strong></div>
+          <div style="color: var(--text-muted); font-size: 0.78rem;">Shed ID: ${escapeHtml(ticket.shed_id || 'shed_01')}</div>
+        </div>
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px; font-size: 0.82rem;">
+          <div style="font-weight: 700; margin-bottom: 6px; color: var(--text-muted);">Assigned Support Lead</div>
+          <div><strong>${escapeHtml(ticket.agent_name || 'Field Support Lead')}</strong></div>
+          <div style="color: var(--text-muted); font-size: 0.78rem;">Status: ${escapeHtml(ticket.status)}</div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
+      </div>
+    </div>
+  `;
+
+  openAppModal(`Support Ticket: ${ticket.ticket_number}`, modalHtml, 'lg');
+  if (window.lucide) lucide.createIcons();
+}
+
+window.openInstallationJobDetails = openInstallationJobDetails;
+window.openInstallationWorkflowDrawer = openInstallationJobDetails;
+window.advanceJobStatus = advanceJobStatus;
+window.updateJobChecklist = updateJobChecklist;
+window.openTicketDetailsModal = openTicketDetailsModal;
 
 async function loadInstallTeam() {
   const tbody = document.getElementById('teamTableBody');
@@ -5677,3 +6027,25 @@ window.addEventListener("DOMContentLoaded", () => {
   loadGoogleAuthConfig();
   initGoogleAuth();
 });
+
+// Explicit Global Window Exports for Dynamic Invocation & TableManager Interop
+window.showConfirmActionModal = showConfirmActionModal;
+window.executePendingConfirmAction = executePendingConfirmAction;
+window.closeAppModal = closeAppModal;
+window.openAppModal = openAppModal;
+window.showToast = showToast;
+window.loadProducts = loadProducts;
+window.loadOrders = loadOrders;
+window.loadBilling = loadBilling;
+window.loadFarmers = loadFarmers;
+window.loadDevices = loadDevices;
+window.loadSensors = loadSensors;
+window.loadAlerts = loadAlerts;
+window.loadSupportTickets = loadSupportTickets;
+window.loadInstallations = loadInstallations;
+window.loadInstallTeam = loadInstallTeam;
+window.loadEmployeesList = loadEmployeesList;
+window.loadRolesAndPermissions = loadRolesAndPermissions;
+window.loadDepartmentsList = loadDepartmentsList;
+window.loadAuditRecords = loadAuditRecords;
+window.switchNavTab = switchNavTab;

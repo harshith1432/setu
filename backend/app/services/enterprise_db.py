@@ -1515,6 +1515,21 @@ def list_orders(user_id: Optional[str] = None, status: Optional[str] = None, lim
         return [dict(r) for r in cursor.fetchall()]
 
 
+def get_installation_job(job_id: str) -> Optional[Dict[str, Any]]:
+    with get_db_cursor(dict_cursor=True) as cursor:
+        query = """
+        SELECT j.*, f.full_name as farmer_name, f.phone as farmer_phone, f.farm_name, f.region,
+               tech.full_name as technician_name, tech.phone as technician_phone
+        FROM installation_jobs j
+        JOIN users f ON j.farmer_id = f.id
+        LEFT JOIN users tech ON j.technician_id = tech.id
+        WHERE j.id = %s OR j.job_number = %s
+        """
+        cursor.execute(query, (job_id, job_id))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+
 def get_order_detail(order_id: str) -> Optional[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
@@ -2485,3 +2500,42 @@ def search_platform_entities(query: str, limit: int = 5, organization_id: Option
             logger.warning("Search alerts error: %s", e)
 
     return results
+
+
+def delete_order(order_id: str) -> bool:
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("DELETE FROM order_items WHERE order_id = %s", (order_id,))
+        cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
+        return cursor.rowcount > 0
+
+
+def delete_subscription(subscription_id: str) -> bool:
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("DELETE FROM subscriptions WHERE id = %s", (subscription_id,))
+        return cursor.rowcount > 0
+
+
+def delete_invoice(invoice_id: str) -> bool:
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("DELETE FROM payments WHERE invoice_id = %s", (invoice_id,))
+        cursor.execute("DELETE FROM invoices WHERE id = %s", (invoice_id,))
+        return cursor.rowcount > 0
+
+
+def delete_support_ticket(ticket_id: str) -> bool:
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("DELETE FROM support_messages WHERE ticket_id = %s", (ticket_id,))
+        cursor.execute("DELETE FROM support_tickets WHERE id = %s", (ticket_id,))
+        return cursor.rowcount > 0
+
+
+def update_subscription_status(subscription_id: str, new_status: str) -> bool:
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("UPDATE subscriptions SET status = %s WHERE id = %s", (new_status, subscription_id))
+        return cursor.rowcount > 0
+
+
+def update_invoice_status(invoice_id: str, new_status: str) -> bool:
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("UPDATE invoices SET status = %s WHERE id = %s", (new_status, invoice_id))
+        return cursor.rowcount > 0

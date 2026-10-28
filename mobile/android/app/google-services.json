@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:756971197809:android:2cb1c5c9279d434f442725",
         "android_client_info": {
-          "package_name": "com.example.setu"
+          "package_name": "io.sericare.setu"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "756971197809-mn9qdoqof2o91fg7b58u1384k8cei6qh.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.setu",
+            "package_name": "io.sericare.setu",
             "certificate_hash": "f4ee47e7873252ae0304bf658f2e7c5fb11b414b"
           }
         },

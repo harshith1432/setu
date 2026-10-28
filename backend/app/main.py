@@ -40,6 +40,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "connect-src 'self' https: wss:;"
         )
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+        
+        # Enforce zero-cache on platform assets and admin pages
+        path = request.url.path
+        if any(path.endswith(ext) for ext in [".js", ".css", ".html"]) or path.startswith("/admin") or path in ["/login", "/register"]:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         return response
 
 # SEC-10: Abuse & Brute-Force Rate Limiting Middleware
@@ -166,18 +173,22 @@ def root_check(request: Request):
     }
 
 @app.get("/home")
-def home_page():
+@app.get("/landing")
+def home_landing_page():
     if os.path.exists(landing_index):
         return FileResponse(landing_index)
-    return {"message": "Landing page available at /landing"}
+    return {"message": "Landing page available at /"}
 
 @app.get("/login")
 def unified_login_page():
     """Unified Official Authentication Gateway for all roles."""
-    login_html = os.path.join(admin_web_dir, "index.html")
+    login_html = os.path.join(admin_web_dir, "login.html")
     if os.path.exists(login_html):
         return FileResponse(login_html)
-    return {"message": "Login portal available at /admin"}
+    admin_html = os.path.join(admin_web_dir, "admin.html")
+    if os.path.exists(admin_html):
+        return FileResponse(admin_html)
+    return {"message": "Login portal available at /login"}
 
 @app.get("/register")
 def farmer_registration_page():
@@ -185,7 +196,30 @@ def farmer_registration_page():
     register_html = os.path.join(admin_web_dir, "register.html")
     if os.path.exists(register_html):
         return FileResponse(register_html)
+    return FileResponse(os.path.join(admin_web_dir, "login.html"))
+
+@app.get("/admin")
+@app.get("/admin/")
+def admin_portal_page():
+    """Super Admin & Enterprise Platform Console."""
+    admin_html = os.path.join(admin_web_dir, "admin.html")
+    if os.path.exists(admin_html):
+        return FileResponse(admin_html)
     return FileResponse(os.path.join(admin_web_dir, "index.html"))
+
+@app.get("/admin.html")
+def serve_root_admin_html():
+    admin_path = os.path.join(admin_web_dir, "admin.html")
+    if os.path.exists(admin_path):
+        return FileResponse(admin_path, media_type="text/html; charset=utf-8")
+    return Response(status_code=404)
+
+@app.get("/login.html")
+def serve_root_login_html():
+    login_path = os.path.join(admin_web_dir, "login.html")
+    if os.path.exists(login_path):
+        return FileResponse(login_path, media_type="text/html; charset=utf-8")
+    return Response(status_code=404)
 
 # Root-level static fallback handlers for standalone /login & /register portals
 admin_assets_dir = os.path.join(admin_web_dir, "assets")

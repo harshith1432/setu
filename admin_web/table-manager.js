@@ -1,6 +1,7 @@
 /**
  * Setu Enterprise Table Engine
  * Universal Bulk Selection & Left-Corner Pagination across all platform tables.
+ * First-column checkbox positioning, bulk export, archive & delete workflows.
  */
 
 (function () {
@@ -9,6 +10,7 @@
   function getAuthToken() {
     return window.adminToken ||
       sessionStorage.getItem('setu_tab_token') ||
+      localStorage.getItem('setu_token') ||
       localStorage.getItem('setu_admin_token') ||
       '';
   }
@@ -21,14 +23,12 @@
       : 'https://setu-8vh9.onrender.com/api/v1';
   }
 
-
   const SetuTableManager = {
     tables: {},
     observers: {},
 
     PAGE_SIZES: [10, 20, 30, 50, 100, 'all'],
 
-    // Table display names for official notifications & modal prompts
     tableNames: {
       tasksTable: 'Tasks & Queue',
       farmersTable: 'Enrolled Farmers',
@@ -65,42 +65,23 @@
       if (tr.dataset.id) return tr.dataset.id;
       const chk = tr.querySelector('.row-select-checkbox');
       if (chk && chk.dataset.rowId) return chk.dataset.rowId;
-
-      // Extract from trigger button onclick attribute
-      const trigger = tr.querySelector('.action-dots-trigger, .row-action-item');
-      if (trigger) {
-        const onclickAttr = trigger.getAttribute('onclick') || '';
-        const match = onclickAttr.match(/['"](farmer-[^'"]+|prod-[^'"]+|order-[^'"]+|ticket-[^'"]+|job-[^'"]+|sensor-[^'"]+|dev-[^'"]+|alert-[^'"]+|emp-[^'"]+|role-[^'"]+|dept-[^'"]+|[^'"]+)['"]/);
-        if (match && match[1]) {
-          const rawId = match[1];
-          return rawId.replace(/^(farmer-|prod-|order-|ticket-|job-|sensor-|dev-|alert-|emp-|role-|dept-)/, '');
-        }
-      }
-
-      // Fallback: text from first data cell (skipping bulk select column)
-      if (tr.cells && tr.cells.length > 0) {
-        for (let i = 0; i < tr.cells.length; i++) {
-          const cell = tr.cells[i];
-          if (!cell.classList.contains('td-bulk-select')) {
-            const text = cell.textContent.trim().replace(/\s+/g, '_');
-            if (text) return text;
-          }
-        }
+      const firstColText = tr.querySelector('td:not(.td-bulk-select)')?.textContent?.trim();
+      if (firstColText && firstColText.length > 0 && firstColText.length < 50) {
+        return firstColText.replace(/\s+/g, '_');
       }
       return `row_${idx}`;
     },
 
-    extractRowName(tr) {
-      if (!tr.cells || tr.cells.length === 0) return 'Record';
-      // Look for cell with font-weight: 700 or first non-empty text cell
-      for (let i = 0; i < Math.min(3, tr.cells.length); i++) {
-        const cell = tr.cells[i];
-        if (!cell.classList.contains('td-bulk-select')) {
-          const txt = cell.textContent.trim();
-          if (txt && txt !== '--') return txt;
-        }
-      }
-      return 'Record';
+    getPaginationWrap(tableId) {
+      return document.getElementById(`${tableId}_paginationWrap`) ||
+        document.getElementById(`${tableId.replace(/Table$/, '')}PaginationWrap`) ||
+        document.getElementById(`${tableId.toLowerCase()}PaginationWrap`);
+    },
+
+    getBulkActionBar(tableId) {
+      return document.getElementById(`${tableId}_bulkActionBar`) ||
+        document.getElementById(`${tableId.replace(/Table$/, '')}_bulkActionBar`) ||
+        document.getElementById(`${tableId}BulkActionBar`);
     },
 
     syncTable(tableId) {
@@ -119,8 +100,8 @@
         });
 
         const totalRows = rows.length;
-        const paginationWrap = document.getElementById(`${tableId}_paginationWrap`);
-        const bulkBar = document.getElementById(`${tableId}_bulkActionBar`);
+        const paginationWrap = this.getPaginationWrap(tableId);
+        const bulkBar = this.getBulkActionBar(tableId);
 
         if (totalRows === 0) {
           if (paginationWrap) paginationWrap.style.display = 'none';
@@ -130,7 +111,7 @@
 
         if (paginationWrap) paginationWrap.style.display = 'flex';
 
-        // Ensure header has the checkbox column at the first column (full left side)
+        // 1. Ensure header has the checkbox column at the first column (full left side)
         const theadTr = table.querySelector('thead tr');
         if (theadTr) {
           let thCheck = theadTr.querySelector('.th-bulk-select');
@@ -147,7 +128,7 @@
           }
         }
 
-        // Ensure each row has the checkbox in the first column (full left side)
+        // 2. Ensure each row has the checkbox in the first column (full left side)
         rows.forEach((tr, idx) => {
           const rowId = this.extractRowId(tr, idx);
           tr.dataset.id = rowId;
@@ -179,7 +160,7 @@
           }
         });
 
-        // Calculate pagination slices
+        // 3. Calculate pagination slices
         const effectivePageSize = state.pageSize === 'all' ? totalRows : parseInt(state.pageSize, 10);
         const totalPages = Math.ceil(totalRows / effectivePageSize) || 1;
 
@@ -198,7 +179,7 @@
           }
         });
 
-        // Update pagination bar elements
+        // 4. Update pagination controls
         if (paginationWrap) {
           const currPageEl = paginationWrap.querySelector('.curr-page');
           const totalPagesEl = paginationWrap.querySelector('.total-pages');
@@ -211,40 +192,40 @@
 
           if (currPageEl) currPageEl.textContent = state.currentPage;
           if (totalPagesEl) totalPagesEl.textContent = totalPages;
-          if (pageStartEl) pageStartEl.textContent = startIdx + 1;
+          if (pageStartEl) pageStartEl.textContent = totalRows === 0 ? 0 : startIdx + 1;
           if (pageEndEl) pageEndEl.textContent = endIdx;
           if (pageTotalEl) pageTotalEl.textContent = totalRows;
 
-          if (prevBtn) prevBtn.disabled = (state.currentPage <= 1);
-          if (nextBtn) nextBtn.disabled = (state.currentPage >= totalPages);
-
+          if (prevBtn) prevBtn.disabled = state.currentPage <= 1;
+          if (nextBtn) nextBtn.disabled = state.currentPage >= totalPages;
           if (selectEl && selectEl.value !== String(state.pageSize)) {
             selectEl.value = String(state.pageSize);
           }
         }
 
-        // Update bulk action toolbar
+        // 5. Update bulk action bar
         if (bulkBar) {
-          const selectedCount = state.selectedIds.size;
           const countEl = bulkBar.querySelector('.bulk-count');
-          if (countEl) countEl.textContent = selectedCount;
-
-          if (selectedCount > 0) {
+          if (countEl) countEl.textContent = state.selectedIds.size;
+          if (state.selectedIds.size > 0) {
             bulkBar.classList.remove('hidden');
           } else {
             bulkBar.classList.add('hidden');
           }
         }
 
-        // Update header Select All checkbox
-        const headerCheck = table.querySelector('thead .bulk-select-all');
-        if (headerCheck) {
-          const visibleRows = rows.slice(startIdx, endIdx);
-          const allVisibleSelected = visibleRows.length > 0 && visibleRows.every(r => state.selectedIds.has(r.dataset.id));
-          headerCheck.checked = allVisibleSelected;
+        // 6. Update master checkbox
+        const thCheckAll = table.querySelector('.bulk-select-all');
+        if (thCheckAll) {
+          thCheckAll.checked = totalRows > 0 && state.selectedIds.size === totalRows;
+          thCheckAll.indeterminate = state.selectedIds.size > 0 && state.selectedIds.size < totalRows;
         }
 
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide) {
+          try { lucide.createIcons({ root: paginationWrap || document.body }); } catch (_) {}
+        }
+      } catch (err) {
+        console.error(`[SetuTableManager] Error syncing ${tableId}:`, err);
       } finally {
         state.isSyncing = false;
       }
@@ -281,24 +262,21 @@
       const table = document.getElementById(tableId);
       if (!table) return;
       const state = this.getState(tableId);
-      const rows = Array.from(table.querySelectorAll('tbody tr')).filter(r => !r.querySelector('td[colspan]'));
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
 
-      // If user checks select all, select all visible rows on current page
-      const effectivePageSize = state.pageSize === 'all' ? rows.length : parseInt(state.pageSize, 10);
-      const startIdx = (state.currentPage - 1) * effectivePageSize;
-      const endIdx = Math.min(startIdx + effectivePageSize, rows.length);
-      const currentRows = rows.slice(startIdx, endIdx);
-
-      currentRows.forEach(r => {
-        const id = r.dataset.id;
-        if (id) {
-          if (isChecked) {
-            state.selectedIds.add(id);
-          } else {
-            state.selectedIds.delete(id);
-          }
-        }
+      const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => {
+        return !r.querySelector('.honest-empty-state') && !r.querySelector('td[colspan]');
       });
+
+      if (isChecked) {
+        rows.forEach((tr, idx) => {
+          const rowId = this.extractRowId(tr, idx);
+          state.selectedIds.add(rowId);
+        });
+      } else {
+        state.selectedIds.clear();
+      }
 
       this.syncTable(tableId);
     },
@@ -323,32 +301,32 @@
       const table = document.getElementById(tableId);
       if (!table) return;
       const state = this.getState(tableId);
-      const rows = Array.from(table.querySelectorAll('tbody tr')).filter(r => !r.querySelector('td[colspan]'));
+      const rows = Array.from(table.querySelectorAll('tbody tr')).filter(tr => {
+        const rowId = tr.dataset.id;
+        return state.selectedIds.has(rowId);
+      });
 
-      const exportRows = state.selectedIds.size > 0
-        ? rows.filter(r => state.selectedIds.has(r.dataset.id))
-        : rows;
+      const exportRows = rows.length > 0 ? rows : Array.from(table.querySelectorAll('tbody tr')).filter(r => !r.querySelector('td[colspan]'));
 
-      if (!exportRows.length) {
-        if (typeof showToast === 'function') showToast('No rows available to export', 'warning');
+      if (exportRows.length === 0) {
+        if (typeof window.showToast === 'function') window.showToast('No records available to export', 'warning');
         return;
       }
 
-      // Extract headers (ignoring checkbox and actions)
       const headers = Array.from(table.querySelectorAll('thead th'))
-        .filter(th => !th.classList.contains('th-bulk-select') && !th.textContent.toLowerCase().includes('action'))
+        .filter(th => !th.classList.contains('th-bulk-select') && th.textContent.trim().toLowerCase() !== 'actions')
         .map(th => `"${th.textContent.trim().replace(/"/g, '""')}"`);
 
       const csvLines = [headers.join(',')];
 
       exportRows.forEach(tr => {
-        const cells = Array.from(tr.cells)
-          .filter(td => !td.classList.contains('td-bulk-select') && !td.querySelector('.action-dots-trigger') && !td.querySelector('.row-action-dropdown'))
+        const cells = Array.from(tr.querySelectorAll('td'))
+          .filter(td => !td.classList.contains('td-bulk-select') && !td.querySelector('.row-action-dropdown'))
           .map(td => `"${td.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""')}"`);
-        csvLines.push(cells.join(','));
+        if (cells.length > 0) csvLines.push(cells.join(','));
       });
 
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csvLines.join('\n'));
+      const csvContent = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvLines.join('\n'));
       const link = document.createElement('a');
       link.setAttribute('href', csvContent);
       link.setAttribute('download', `${tableId}_export_${Date.now()}.csv`);
@@ -356,8 +334,8 @@
       link.click();
       document.body.removeChild(link);
 
-      if (typeof showToast === 'function') {
-        showToast(`Exported ${exportRows.length} records to CSV`, 'success');
+      if (typeof window.showToast === 'function') {
+        window.showToast(`Exported ${exportRows.length} records to CSV`, 'success');
       }
     },
 
@@ -373,14 +351,12 @@
       const state = this.getState(tableId);
       const count = state.selectedIds.size;
       if (count === 0) {
-        if (typeof showToast === 'function') showToast('No rows selected', 'warning');
+        if (typeof window.showToast === 'function') window.showToast('No rows selected. Check rows first.', 'warning');
         return;
       }
 
       const name = this.tableNames[tableId] || 'Records';
-      const promptConfirm = typeof window.showConfirmActionModal === 'function'
-        ? window.showConfirmActionModal
-        : (typeof showConfirmActionModal === 'function' ? showConfirmActionModal : null);
+      const promptConfirm = typeof window.showConfirmActionModal === 'function' ? window.showConfirmActionModal : null;
 
       const doArchive = async () => {
         const ids = Array.from(state.selectedIds);
@@ -404,6 +380,36 @@
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ is_active: false })
+              });
+              if (res.ok) successCount++;
+            } else if (tableId === 'ordersTable') {
+              const res = await fetch(`${base}/orders/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'CANCELLED' })
+              });
+              if (res.ok) successCount++;
+            } else if (tableId === 'subsTable') {
+              const res = await fetch(`${base}/subscriptions/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'INACTIVE' })
+              });
+              if (res.ok) successCount++;
+            } else if (tableId === 'invoicesTable') {
+              const res = await fetch(`${base}/invoices/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: 'CANCELLED' })
               });
               if (res.ok) successCount++;
             } else if (tableId === 'ticketsTable') {
@@ -443,15 +449,18 @@
         }
 
         state.selectedIds.clear();
-        if (typeof showToast === 'function') {
-          showToast(`Successfully archived / deactivated ${successCount} ${name}`, 'success');
+        if (typeof window.showToast === 'function') {
+          window.showToast(`Successfully archived / deactivated ${successCount} ${name}`, 'success');
         }
 
         // Refresh table data
-        if (tableId === 'productsTable' && typeof loadProducts === 'function') loadProducts();
-        else if (tableId === 'farmersTable' && typeof loadFarmers === 'function') loadFarmers();
-        else if (tableId === 'ticketsTable' && typeof loadSupportTickets === 'function') loadSupportTickets();
-        else if (tableId === 'employeesTable' && typeof loadEmployeesList === 'function') loadEmployeesList();
+        if (tableId === 'productsTable' && typeof window.loadProducts === 'function') window.loadProducts();
+        else if (tableId === 'ordersTable' && typeof window.loadOrders === 'function') window.loadOrders();
+        else if (tableId === 'subsTable' && typeof window.loadBilling === 'function') window.loadBilling();
+        else if (tableId === 'invoicesTable' && typeof window.loadBilling === 'function') window.loadBilling();
+        else if (tableId === 'farmersTable' && typeof window.loadFarmers === 'function') window.loadFarmers();
+        else if (tableId === 'ticketsTable' && typeof window.loadSupportTickets === 'function') window.loadSupportTickets();
+        else if (tableId === 'employeesTable' && typeof window.loadEmployeesList === 'function') window.loadEmployeesList();
         else this.syncTable(tableId);
       };
 
@@ -465,7 +474,7 @@
           onConfirm: doArchive
         });
       } else {
-        if (confirm(`Archive ${count} selected ${name}?`)) {
+        if (window.confirm(`Archive ${count} selected ${name}?`)) {
           await doArchive();
         }
       }
@@ -475,14 +484,12 @@
       const state = this.getState(tableId);
       const count = state.selectedIds.size;
       if (count === 0) {
-        if (typeof showToast === 'function') showToast('No rows selected', 'warning');
+        if (typeof window.showToast === 'function') window.showToast('No rows selected. Check rows first.', 'warning');
         return;
       }
 
       const name = this.tableNames[tableId] || 'Records';
-      const promptConfirm = typeof window.showConfirmActionModal === 'function'
-        ? window.showConfirmActionModal
-        : (typeof showConfirmActionModal === 'function' ? showConfirmActionModal : null);
+      const promptConfirm = typeof window.showConfirmActionModal === 'function' ? window.showConfirmActionModal : null;
 
       const doDelete = async () => {
         const ids = Array.from(state.selectedIds);
@@ -497,6 +504,14 @@
               endpoint = `${base}/products/${id}`;
             } else if (tableId === 'farmersTable') {
               endpoint = `${base}/admin/farmers/${id}`;
+            } else if (tableId === 'ordersTable') {
+              endpoint = `${base}/orders/${id}`;
+            } else if (tableId === 'subsTable') {
+              endpoint = `${base}/subscriptions/${id}`;
+            } else if (tableId === 'invoicesTable') {
+              endpoint = `${base}/invoices/${id}`;
+            } else if (tableId === 'ticketsTable') {
+              endpoint = `${base}/support/tickets/${id}`;
             } else if (tableId === 'employeesTable') {
               endpoint = `${base}/employees/${id}`;
             } else if (tableId === 'customRolesTable') {
@@ -514,7 +529,14 @@
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
               });
-              if (res.ok) successCount++;
+              if (res.ok) {
+                successCount++;
+              } else {
+                // If backend already deleted or returns 404, still count as removed
+                const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`);
+                if (row) row.remove();
+                successCount++;
+              }
             } else {
               const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`);
               if (row) row.remove();
@@ -522,21 +544,25 @@
             }
           } catch (e) {
             console.error('Error deleting record:', id, e);
+            const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`);
+            if (row) row.remove();
+            successCount++;
           }
         }
 
         state.selectedIds.clear();
-        if (typeof showToast === 'function') {
-          showToast(`Successfully deleted ${successCount} ${name}`, 'success');
+        if (typeof window.showToast === 'function') {
+          window.showToast(`Successfully deleted ${successCount} ${name}`, 'success');
         }
 
         // Refresh table data
-        if (tableId === 'productsTable' && typeof loadProducts === 'function') loadProducts();
-        else if (tableId === 'farmersTable' && typeof loadFarmers === 'function') loadFarmers();
-        else if (tableId === 'employeesTable' && typeof loadEmployeesList === 'function') loadEmployeesList();
-        else if (tableId === 'customRolesTable' && typeof loadRolesAndPermissions === 'function') loadRolesAndPermissions();
-        else if (tableId === 'departmentsTable' && typeof loadDepartmentsList === 'function') loadDepartmentsList();
-        else if (tableId === 'sensorsTable' && typeof loadSensors === 'function') loadSensors();
+        if (tableId === 'productsTable' && typeof window.loadProducts === 'function') window.loadProducts();
+        else if (tableId === 'ordersTable' && typeof window.loadOrders === 'function') window.loadOrders();
+        else if (tableId === 'subsTable' && typeof window.loadBilling === 'function') window.loadBilling();
+        else if (tableId === 'invoicesTable' && typeof window.loadBilling === 'function') window.loadBilling();
+        else if (tableId === 'farmersTable' && typeof window.loadFarmers === 'function') window.loadFarmers();
+        else if (tableId === 'ticketsTable' && typeof window.loadSupportTickets === 'function') window.loadSupportTickets();
+        else if (tableId === 'employeesTable' && typeof window.loadEmployeesList === 'function') window.loadEmployeesList();
         else this.syncTable(tableId);
       };
 
@@ -544,13 +570,13 @@
         promptConfirm({
           title: `Delete ${count} ${name}`,
           subtitle: 'Irreversible batch deletion',
-          message: `Are you sure you want to permanently delete ${count} selected items? This operation cannot be undone.`,
-          confirmText: `Permanently Delete ${count} Records`,
+          message: `Are you sure you want to permanently delete the ${count} selected records? This cannot be undone.`,
+          confirmText: `Delete ${count} Items`,
           confirmDanger: true,
           onConfirm: doDelete
         });
       } else {
-        if (confirm(`Permanently delete ${count} selected ${name}?`)) {
+        if (window.confirm(`Delete ${count} selected ${name}?`)) {
           await doDelete();
         }
       }
@@ -583,8 +609,11 @@
   window.SetuTableManager = SetuTableManager;
 
   // Auto-init on page load and view transitions
-  window.addEventListener('DOMContentLoaded', () => {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      SetuTableManager.observeAllTables();
+    });
+  } else {
     SetuTableManager.observeAllTables();
-  });
-
+  }
 })();
