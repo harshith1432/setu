@@ -227,7 +227,7 @@ function updateTopBarControlsVisibility() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.lucide) lucide.createIcons();
-  if (typeof initFirebaseAuthRedirect === 'function') { initFirebaseAuthRedirect(); }
+  if (typeof setupFirebaseAuthListeners === 'function') { setupFirebaseAuthListeners(); }
 
   // Check for onboarding invitation token in URL hash or search params
   const hash = window.location.hash;
@@ -453,10 +453,12 @@ async function handleLogin(e) {
     currentSessionId = data.session_id || null;
     currentUser = data.user;
 
-    // Persist strictly to this tab's sessionStorage
+    // Persist to tab sessionStorage AND localStorage fallback
     TAB_STORAGE.setItem('setu_tab_token', adminToken);
     if (currentSessionId) TAB_STORAGE.setItem('setu_tab_session_id', currentSessionId);
     TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+    localStorage.setItem('setu_token', adminToken);
+    localStorage.setItem('setu_user', JSON.stringify(currentUser));
     localStorage.setItem('setu_token', adminToken);
     localStorage.setItem('setu_user', JSON.stringify(currentUser));
 
@@ -564,6 +566,9 @@ async function completeGoogleLogin(googleUserData) {
     closeAppModal();
     showToast(`Signed in with Google as ${currentUser.full_name || currentUser.username}!`, 'success');
     showDashboardView();
+    if (window.location.pathname.startsWith('/login') && window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, '/admin');
+    }
   } catch (err) {
     if (errorEl) {
       errorEl.innerHTML = `<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>${err.message}</span>`;
@@ -672,49 +677,74 @@ function redirectToGoogleOAuth() {
   }
 }
 
-// Firebase Authentication Redirect Handler (processes mobile & popup-fallback logins)
-async function initFirebaseAuthRedirect() {
+let isCompletingGoogleAuth = false;
+let hasSetupFirebaseAuthListeners = false;
+
+// Firebase Authentication Listener (handles redirect return & active auth sessions)
+function setupFirebaseAuthListeners() {
+  if (hasSetupFirebaseAuthListeners) return;
   if (typeof firebase === 'undefined' || !firebase.auth) return;
-  try {
-    const auth = firebase.auth();
-    const result = await auth.getRedirectResult();
-    if (result && result.user) {
-      const u = result.user;
-      const googleBtn = document.getElementById('googleSignInBtn');
-      if (googleBtn) {
-        googleBtn.disabled = true;
-        googleBtn.innerHTML = '<span>Verifying Google account...</span>';
-      }
-      showToast('Verified with Google! Connecting to Setu...', 'info');
+  hasSetupFirebaseAuthListeners = true;
+  const auth = firebase.auth();
+
+  const handleFirebaseUser = async (u) => {
+    if (!u || adminToken || isCompletingGoogleAuth) return;
+    isCompletingGoogleAuth = true;
+    console.info('[FirebaseAuth] User authenticated session detected:', u.email);
+
+    const googleBtn = document.getElementById('googleSignInBtn');
+    if (googleBtn) {
+      googleBtn.disabled = true;
+      googleBtn.innerHTML = '<span>Signing in to Setu...</span>';
+    }
+    showToast('Verified with Google! Connecting to Setu...', 'info');
+
+    try {
       await completeGoogleLogin({
         email: u.email || '',
         full_name: u.displayName || 'Google User',
         google_id: u.uid
       });
+    } catch (e) {
+      isCompletingGoogleAuth = false;
+      console.error('[FirebaseAuth] completeGoogleLogin error:', e);
     }
-  } catch (err) {
-    console.warn('[FirebaseAuth] Redirect result notice:', err);
-    const errorEl = document.getElementById('loginError');
-    if (err.code === 'auth/unauthorized-domain') {
-      if (errorEl) {
-        errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
-        errorEl.classList.remove('hidden');
-        if (window.lucide) lucide.createIcons();
-      }
-    } else if (err.message) {
-      if (errorEl) {
-        errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>' + escapeHtml(err.message) + '</span>';
-        errorEl.classList.remove('hidden');
-        if (window.lucide) lucide.createIcons();
-      }
-    }
-  }
-}
-window.initFirebaseAuthRedirect = initFirebaseAuthRedirect;
+  };
 
-// Auto-check redirect result as soon as script evaluates
+  // 1. Process getRedirectResult()
+  try {
+    auth.getRedirectResult().then((result) => {
+      if (result && result.user) {
+        handleFirebaseUser(result.user);
+      }
+    }).catch((err) => {
+      console.warn('[FirebaseAuth] getRedirectResult notice:', err);
+      if (err && err.code === 'auth/unauthorized-domain') {
+        const errorEl = document.getElementById('loginError');
+        if (errorEl) {
+          errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
+          errorEl.classList.remove('hidden');
+          if (window.lucide) lucide.createIcons();
+        }
+      }
+    });
+  } catch (_) {}
+
+  // 2. Persistent auth state listener (catches user if already returned from redirect)
+  try {
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        handleFirebaseUser(user);
+      }
+    });
+  } catch (_) {}
+}
+window.setupFirebaseAuthListeners = setupFirebaseAuthListeners;
+window.initFirebaseAuthRedirect = setupFirebaseAuthListeners;
+
+// Auto-register listener as soon as SDK is available
 if (typeof firebase !== 'undefined' && firebase.auth) {
-  try { initFirebaseAuthRedirect(); } catch (_) {}
+  try { setupFirebaseAuthListeners(); } catch (_) {}
 }
 
 async function handleGoogleSignIn() {

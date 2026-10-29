@@ -36,6 +36,9 @@
     auth = firebase.auth();
     isInitialized = true;
     console.info('[SetuFirebase] Cloud Firestore initialized for project:', firebaseConfig.projectId);
+    if (typeof window.setupFirebaseAuthListeners === 'function') {
+      window.setupFirebaseAuthListeners();
+    }
     return true;
   }
 
