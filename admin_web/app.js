@@ -499,7 +499,7 @@ async function handleLogin(e) {
     showToast(`Welcome back, ${currentUser.full_name || currentUser.username}!`, 'success');
     showDashboardView();
   } catch (err) {
-    errorEl.innerHTML = `<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>${err.message}</span>`;
+    errorEl.innerHTML = `<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>${escapeHtml(err.message)}</span>`;
     errorEl.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
   } finally {
@@ -594,7 +594,7 @@ async function completeGoogleLogin(googleUserData) {
     }
   } catch (err) {
     if (errorEl) {
-      errorEl.innerHTML = `<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>${err.message}</span>`;
+      errorEl.innerHTML = `<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>${escapeHtml(err.message)}</span>`;
       errorEl.classList.remove('hidden');
       if (window.lucide) lucide.createIcons();
     } else {
@@ -1985,7 +1985,7 @@ async function loadFarmers() {
 
     renderFarmersTable(allFarmersData);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--rose); padding: 24px;">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--rose); padding: 24px;">Error: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -2987,7 +2987,7 @@ async function loadEnquiries() {
 
     if (window.lucide) lucide.createIcons();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--rose);">Error loading website leads: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--rose);">Error loading website leads: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -3661,7 +3661,7 @@ async function loadEmployeesList() {
 
     renderEmployeesTable(allEmployeesData);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--status-danger); padding: 24px;">Failed to load employees: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--status-danger); padding: 24px;">Failed to load employees: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
@@ -3737,7 +3737,7 @@ function renderEmployeesTable(employees) {
               <i data-lucide="${e.employment_status === 'ACTIVE' ? 'user-x' : 'user-check'}"></i>
               <span>${e.employment_status === 'ACTIVE' ? 'Suspend Employee' : 'Activate Employee'}</span>
             </button>
-            <button type="button" class="row-action-item danger-item" onclick="deleteSingleEmployee('${e.id}', '${(e.full_name || e.employee_id).replace(/'/g, "\\'")}'); closeAllRowActionMenus();">
+            <button type="button" class="row-action-item danger-item" onclick="deleteSingleEmployee('${escapeHtml(e.id)}'); closeAllRowActionMenus();">
               <i data-lucide="trash-2"></i> <span>Delete Employee</span>
             </button>
           </div>
@@ -3840,9 +3840,28 @@ async function openOnboardEmployeeModal() {
           <input type="text" id="onboardSheds" placeholder="shed_01, shed_02" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
         </div>
       </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 700;">Account Password *</label>
+          <div style="position: relative;">
+            <input type="password" id="onboardPassword" required value="Welcome@123" placeholder="Welcome@123" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('onboardPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide Password">
+              <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
+          <span style="font-size: 0.70rem; color: var(--text-muted); margin-top: 2px; display: block;">Default is <strong>Welcome@123</strong>. Employee can change it after login.</span>
+        </div>
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 700;">Initial Access Status</label>
+          <div style="padding: 8px 10px; border-radius: var(--radius-sm); border: 1px dashed var(--border-color); background: var(--bg-surface); font-size: 0.74rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; height: 38px;">
+            <i data-lucide="key-round" style="width: 14px; height: 14px; color: var(--brand-primary); flex-shrink: 0;"></i>
+            <span>Active on creation. Immediate login enabled.</span>
+          </div>
+        </div>
+      </div>
       <div style="background: var(--bg-subtle); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 0.74rem; color: var(--text-secondary); line-height: 1.4;">
         <i data-lucide="shield-check" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
-        A single-use, time-limited activation invitation will be safely generated. Plaintext passwords are never emailed.
+        Account will be provisioned with the initial password (default: <code>Welcome@123</code>). The employee can log in immediately or activate via the secure invitation URL and update their password at any time.
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
         <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
@@ -3866,6 +3885,7 @@ async function submitOnboardEmployee(e) {
   const access_scope = document.getElementById('onboardScope').value;
   const shedsRaw = document.getElementById('onboardSheds').value.trim();
   const sheds = shedsRaw ? shedsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const password = document.getElementById('onboardPassword')?.value.trim() || 'Welcome@123';
 
   try {
     const res = await fetch(`${API_BASE_URL}/employees`, {
@@ -3884,7 +3904,9 @@ async function submitOnboardEmployee(e) {
         reporting_manager_id,
         role_code,
         access_scope,
-        assigned_resources: { sheds, devices: [] }
+        assigned_resources: { sheds, devices: [] },
+        password: password,
+        initial_password: password
       })
     });
     const data = await res.json();
@@ -3893,21 +3915,34 @@ async function submitOnboardEmployee(e) {
     closeAppModal();
     loadEmployeesList();
 
-    // Display the generated invitation link modal
+    // Display the generated invitation and initial credentials modal
     const invBody = `
       <div style="display: flex; flex-direction: column; gap: 14px;">
         <div style="display: flex; align-items: center; gap: 10px; color: var(--brand-primary);">
           <div style="background: var(--brand-tint); padding: 8px; border-radius: 50%;"><i data-lucide="check-circle"></i></div>
-          <h4 style="margin: 0; font-size: 1rem;">Employee Onboarded Successfully</h4>
+          <div>
+            <h4 style="margin: 0; font-size: 1rem; font-weight: 800;">Employee Onboarded Successfully</h4>
+            <span style="font-size: 0.74rem; color: var(--text-muted);">Account ready for immediate access</span>
+          </div>
         </div>
         <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
-          A single-use onboarding token has been issued for <strong>${full_name}</strong> (${official_email}).
+          Corporate profile created for <strong>${full_name}</strong> (${official_email}). The employee can log in immediately or use their single-use activation URL.
         </p>
-        <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-          <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Secure Activation URL</label>
-          <div style="display: flex; gap: 8px; margin-top: 4px;">
-            <input type="text" id="genInvUrl" readonly value="${data.activation_url}" style="width: 100%; font-size: 0.78rem; font-family: var(--font-mono); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
-            <button class="btn btn-primary btn-sm" onclick="copyToClipboard('${data.activation_url}')"><i data-lucide="copy"></i> Copy</button>
+        <div style="background: var(--bg-subtle); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 10px;">
+          <div>
+            <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Initial Login Password</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <input type="text" id="genEmpPwd" readonly value="${data.initial_password || password}" style="width: 100%; font-size: 0.82rem; font-family: var(--font-mono); font-weight: 700; padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--brand-primary);">
+              <button type="button" class="btn btn-outline btn-sm" onclick="copyToClipboard('${data.initial_password || password}'); showToast('Password copied to clipboard', 'success');"><i data-lucide="copy"></i> Copy</button>
+            </div>
+            <span style="font-size: 0.70rem; color: var(--text-muted); margin-top: 2px; display: block;">The employee can log in with their email/username and this password, then change it in their profile.</span>
+          </div>
+          <div>
+            <label style="font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Secure Activation URL</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <input type="text" id="genInvUrl" readonly value="${data.activation_url}" style="width: 100%; font-size: 0.78rem; font-family: var(--font-mono); padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+              <button type="button" class="btn btn-primary btn-sm" onclick="copyToClipboard('${data.activation_url}'); showToast('Activation URL copied to clipboard', 'success');"><i data-lucide="copy"></i> Copy</button>
+            </div>
           </div>
         </div>
         <div style="font-size: 0.74rem; color: var(--text-muted);">
@@ -4087,7 +4122,19 @@ function toggleEmployeeStatus(empId, currStatus) {
   });
 }
 
-async function deleteSingleEmployee(empId, empName) {
+window.handleProductCardImgFallback = function(img, prodId) {
+  if (!img) return;
+  img.onerror = null;
+  const prod = (typeof allProductsCache !== 'undefined' ? allProductsCache : []).find(x => x.id === prodId) || { id: prodId, name: '', sku: '' };
+  const parent = img.parentElement;
+  if (parent) {
+    parent.innerHTML = getProductIllustrationSvg(prod);
+  }
+};
+
+async function deleteSingleEmployee(empId, optionalName) {
+  const empObj = (typeof allEmployeesData !== 'undefined' ? allEmployeesData : []).find(x => x.id === empId);
+  const empName = optionalName || (empObj ? (empObj.full_name || empObj.employee_id) : empId);
   const promptConfirm = typeof window.showConfirmActionModal === 'function' ? window.showConfirmActionModal : null;
   const doDel = async () => {
     try {
@@ -4569,7 +4616,7 @@ async function loadDepartmentsList() {
     // Populate department dropdown filter in Employees section
     const empDeptFilter = document.getElementById('empDeptFilter');
     if (empDeptFilter) {
-      empDeptFilter.innerHTML = '<option value="">All Departments</option>' + allDepartmentsData.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+      empDeptFilter.innerHTML = '<option value="">All Departments</option>' + allDepartmentsData.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}</option>`).join('');
     }
 
     renderDepartmentsTable(allDepartmentsData);
@@ -5048,7 +5095,7 @@ async function terminateSession(sessionId) {
     loadActiveSessions();
     loadAuditRecords();
   } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
+    showToast(`Error: ${escapeHtml(err.message)}`, 'error');
   }
 }
 
@@ -5271,7 +5318,7 @@ async function executeAuditPurge() {
     showToast(data.message || 'Audit logs retention purge completed successfully');
     loadAuditRecords();
   } catch (err) {
-    showToast(`Purge Error: ${err.message}`, 'error');
+    showToast(`Purge Error: ${escapeHtml(err.message)}`, 'error');
   }
 }
 
@@ -5961,7 +6008,7 @@ function renderStoreProductGrid() {
 
     const hasCustomImage = (p.images && p.images.length > 0 && p.images[0]);
     const imageHtml = hasCustomImage
-      ? `<img src="${p.images[0]}" alt="${escapeHtml(p.name)}" class="amazon-product-img" onerror="this.onerror=null; this.parentElement.innerHTML=getProductIllustrationSvg(${JSON.stringify(p).replace(/"/g, '&quot;')});">`
+      ? `<img src="${escapeHtml(p.images[0])}" alt="${escapeHtml(p.name)}" class="amazon-product-img" onerror="handleProductCardImgFallback(this, '${escapeHtml(p.id)}')">`
       : `<div class="amazon-hardware-illustration">${getProductIllustrationSvg(p)}</div>`;
 
     // Badges
@@ -7985,7 +8032,7 @@ async function applyStageToSelectedShed(stageId) {
     await loadStageThresholds();
     await loadShedsFleet();
   } catch (err) {
-    showNotification(`Error: ${err.message}`, 'error');
+    showNotification(`Error: ${escapeHtml(err.message)}`, 'error');
   }
 }
 window.applyStageToSelectedShed = applyStageToSelectedShed;
@@ -8114,7 +8161,7 @@ function promptSwitchShedStage(shedId) {
     loadStageThresholds();
   })
   .catch(err => {
-    showNotification(`Error: ${err.message}`, 'error');
+    showNotification(`Error: ${escapeHtml(err.message)}`, 'error');
   });
 }
 window.promptSwitchShedStage = promptSwitchShedStage;
@@ -8712,5 +8759,82 @@ async function toggleAdminAccountStatus(userId, currentIsActive) {
     }
   } catch (err) {
     showToast('Network error updating admin status', 'error');
+  }
+}
+
+
+function openChangePasswordModal() {
+  const body = `
+    <form id="changePasswordForm" onsubmit="submitChangePassword(event)" style="display: flex; flex-direction: column; gap: 14px;">
+      <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
+        Update your account password below. Enter your current password (e.g. <code>Welcome@123</code> if newly onboarded) and choose a new secure password.
+      </p>
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 700;">Current Password *</label>
+        <div style="position: relative;">
+          <input type="password" id="cpCurrentPassword" required placeholder="Enter current password" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+          <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cpCurrentPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide">
+            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 700;">New Password *</label>
+        <div style="position: relative;">
+          <input type="password" id="cpNewPassword" required minlength="6" placeholder="At least 6 characters" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+          <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cpNewPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide">
+            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 700;">Confirm New Password *</label>
+        <div style="position: relative;">
+          <input type="password" id="cpConfirmPassword" required minlength="6" placeholder="Re-enter new password" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+          <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cpConfirmPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide">
+            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+          </button>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="check"></i> Update Password</button>
+      </div>
+    </form>
+  `;
+  openAppModal('Change Account Password', body);
+}
+
+async function submitChangePassword(e) {
+  e.preventDefault();
+  const current_password = document.getElementById('cpCurrentPassword').value;
+  const new_password = document.getElementById('cpNewPassword').value;
+  const confirm_password = document.getElementById('cpConfirmPassword').value;
+
+  if (new_password !== confirm_password) {
+    showToast('New passwords do not match', 'error');
+    return;
+  }
+  if (new_password.length < 6) {
+    showToast('New password must be at least 6 characters', 'error');
+    return;
+  }
+
+  try {
+    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : localStorage.getItem('token'));
+    const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ current_password, new_password, confirm_password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to update password');
+    showToast('Password updated successfully!', 'success');
+    closeAppModal();
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 }

@@ -1510,9 +1510,12 @@ def create_employee_with_invitation(
         cursor.execute("SELECT id FROM users WHERE username = %s", (base_username,))
         uname = base_username if not cursor.fetchone() else f"{base_username}_{secrets.token_hex(2)}"
 
-        # Generate provisional user identity with unguessable random password (awaiting onboarding activation)
+        # Initial account password: uses configured password or defaults to "Welcome@123"
+        raw_password = (data.get("initial_password") or data.get("password") or "Welcome@123").strip()
+        if len(raw_password) < 6:
+            raw_password = "Welcome@123"
+        initial_password_hash = get_password_hash(raw_password)
         user_id = f"usr_{secrets.token_hex(6)}"
-        provisional_password_hash = get_password_hash(secrets.token_urlsafe(32))
 
         cursor.execute("""
         INSERT INTO users (
@@ -1520,15 +1523,15 @@ def create_employee_with_invitation(
             preferred_language, role, farm_name, region, shed_id,
             batch_id, dfl_capacity, breed, is_active, mfa_enabled, created_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, 'en', %s, 'SeriCare Operations', 'Regional Hub', 'shed_01', 'SERI-2026', 'N/A', 'N/A', FALSE, FALSE, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, 'en', %s, 'SeriCare Operations', 'Regional Hub', 'shed_01', 'SERI-2026', 'N/A', 'N/A', TRUE, FALSE, %s)
         RETURNING *
         """, (
-            user_id, uname, provisional_password_hash, full_name,
+            user_id, uname, initial_password_hash, full_name,
             data.get("phone", "+91 98000 00000"), email, role_code, now_dt
         ))
         created_user = cursor.fetchone()
 
-        # Create employee record in PENDING_ACTIVATION state
+        # Create employee record in ACTIVE employment state with PENDING invitation status
         role_id = f"role_{role_code}"
         cursor.execute("""
         INSERT INTO employees (
@@ -1537,7 +1540,7 @@ def create_employee_with_invitation(
             role_code, role_id, access_scope, assigned_resources,
             employment_status, invitation_status, created_by, created_at, updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, 'PENDING_ACTIVATION', 'PENDING', %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, 'ACTIVE', 'PENDING', %s, %s, %s)
         RETURNING *
         """, (
             temp_emp_id, user_id, emp_code, email,
@@ -1583,6 +1586,7 @@ def create_employee_with_invitation(
         "user_id": user_id,
         "official_email": email,
         "full_name": full_name,
+        "initial_password": raw_password,
         "role_code": role_code,
         "invitation_token": inv_token,
         "activation_url": activation_url,

@@ -1,3 +1,5 @@
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel
 import urllib.parse
 from fastapi.responses import RedirectResponse
 import uuid
@@ -631,6 +633,47 @@ def get_current_user(payload: dict = Depends(get_current_user_payload)):
         breed=user.get("breed", "Double Hybrid (FC1 x FC2)"),
         is_active=bool(user.get("is_active", 1))
     )
+
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: Optional[str] = None
+
+@router.post("/change-password")
+def change_user_password(
+    payload: ChangePasswordRequest,
+    current_user_payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Allows any authenticated user (employee, admin, farmer) to update their password.
+    Verifies current password before applying the change.
+    """
+    user_id = current_user_payload.get("user_id") or current_user_payload.get("sub")
+    username = current_user_payload.get("sub")
+    user = get_user_by_id(user_id) if user_id else None
+    if not user and username:
+        user = get_user_by_username_or_phone(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found")
+
+    if not verify_password(payload.current_password, user["hashed_password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(payload.new_password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    if payload.confirm_password and payload.new_password.strip() != payload.confirm_password.strip():
+        raise HTTPException(status_code=400, detail="New passwords do not match")
+
+    new_hash = get_password_hash(payload.new_password.strip())
+    from app.services.db_service import get_db_cursor
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("UPDATE users SET hashed_password = %s WHERE id = %s", (new_hash, user["id"]))
+
+    log_audit(user["username"], "PASSWORD_CHANGE", "User successfully changed their account password")
+    return {"status": "success", "message": "Password changed successfully."}
 
 @router.put("/profile", response_model=UserOut)
 def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_current_user_payload)):

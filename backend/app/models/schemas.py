@@ -284,6 +284,8 @@ class EmployeeCreate(BaseModel):
     access_scope: Optional[str] = "GLOBAL"
     assigned_resources: Optional[Dict[str, Any]] = None
     send_invitation: Optional[bool] = True
+    password: Optional[str] = "Welcome@123"
+    initial_password: Optional[str] = "Welcome@123"
 
     @model_validator(mode="before")
     @classmethod
@@ -293,6 +295,10 @@ class EmployeeCreate(BaseModel):
                 data["employee_id"] = data["employee_code"]
             if not data.get("role_code") and data.get("role_id"):
                 data["role_code"] = data["role_id"]
+            if not data.get("initial_password") and data.get("password"):
+                data["initial_password"] = data["password"]
+            elif not data.get("initial_password"):
+                data["initial_password"] = "Welcome@123"
         return data
 
 class EmployeeUpdate(BaseModel):

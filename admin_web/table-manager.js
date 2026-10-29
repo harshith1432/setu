@@ -121,7 +121,13 @@
             thCheck.style.width = '44px';
             thCheck.style.textAlign = 'center';
             thCheck.title = 'Select All Rows';
-            thCheck.innerHTML = `<input type="checkbox" class="bulk-select-all" aria-label="Select All" onchange="SetuTableManager.toggleSelectAll('${tableId}', this.checked)">`;
+            thCheck.textContent = '';
+            const allCheck = document.createElement('input');
+            allCheck.type = 'checkbox';
+            allCheck.className = 'bulk-select-all';
+            allCheck.setAttribute('aria-label', 'Select All');
+            allCheck.onchange = (e) => { SetuTableManager.toggleSelectAll(tableId, e.target.checked); };
+            thCheck.appendChild(allCheck);
             theadTr.insertBefore(thCheck, theadTr.firstElementChild);
           } else if (theadTr.firstElementChild !== thCheck) {
             theadTr.insertBefore(thCheck, theadTr.firstElementChild);
@@ -139,7 +145,13 @@
             checkCell.className = 'td-bulk-select';
             checkCell.style.textAlign = 'center';
             checkCell.style.verticalAlign = 'middle';
-            checkCell.innerHTML = `<input type="checkbox" class="row-select-checkbox" data-row-id="${rowId}" aria-label="Select Row">`;
+            checkCell.textContent = '';
+            const rowCheck = document.createElement('input');
+            rowCheck.type = 'checkbox';
+            rowCheck.className = 'row-select-checkbox';
+            rowCheck.dataset.rowId = String(rowId);
+            rowCheck.setAttribute('aria-label', 'Select Row');
+            checkCell.appendChild(rowCheck);
             tr.insertBefore(checkCell, tr.firstElementChild);
           } else if (tr.firstElementChild !== checkCell) {
             tr.insertBefore(checkCell, tr.firstElementChild);
