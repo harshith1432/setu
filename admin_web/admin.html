@@ -19,7 +19,7 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="/admin/style.css?v=4.5" rel="stylesheet"/>
+<link href="/admin/style.css?v=4.6" rel="stylesheet"/>
   <style>
     .hidden { display: none !important; }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
@@ -2323,99 +2323,235 @@
 </section>
 <!-- ================= 20. VIEW: ACCESS & AUDIT LOGS ================= -->
 <section class="view-section hidden" id="section-audit">
-<div class="table-card">
-<div class="table-toolbar" style="flex-wrap: wrap; gap: 12px;">
-<div>
-<div class="table-title">
-<i data-lucide="shield-alert"></i>
-<span>Immutable Security &amp; Operations Audit Trail</span>
-</div>
-<p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
-                  Complete tamper-evident record of administrative changes, onboarding events, role assignments, and actuator triggers.
-                </p>
-</div>
-<div class="table-actions" style="flex-wrap: wrap; gap: 8px;">
-<div class="search-input-wrap">
-<i data-lucide="search"></i>
-<input id="auditSearchInput" oninput="debounceFilterAudit(this.value)" placeholder="Filter actor, resource or details..." type="text"/>
-</div>
-<select id="auditActionFilter" onchange="loadAuditRecords()" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); font-size: 0.82rem;">
-<option value="">All Actions</option>
-<option value="LOGIN">User Logins</option>
-<option value="INVITE_EMPLOYEE">Employee Invitations</option>
-<option value="INVITATION_ACCEPTED">Invitation Accepted</option>
-<option value="ACCOUNT_ACTIVATED">Account Activated</option>
-<option value="EMPLOYEE_STATUS_CHANGE">Status Changes</option>
-<option value="CREATE_CUSTOM_ROLE">Role Additions</option>
-<option value="CREATE_DEPARTMENT">Department Additions</option>
-<option value="EMERGENCY_CONTROL">Emergency Controls</option>
-</select>
-<button class="btn btn-skin btn-sm" onclick="loadAuditRecords()"><i data-lucide="refresh-cw"></i> Refresh</button>
-</div>
-</div>
-<div class="table-bulk-action-bar hidden" id="auditTable_bulkActionBar">
-<div class="bulk-info">
-<i data-lucide="check-square"></i>
-<span><strong class="bulk-count">0</strong> selected</span>
-</div>
-<div class="bulk-actions-buttons">
-<button class="btn btn-sm btn-outline bulk-export-btn" onclick="SetuTableManager.exportSelected('auditTable')" type="button">
-<i data-lucide="download"></i> Export Selected
-    </button>
-<button class="btn btn-sm btn-warning bulk-archive-btn" onclick="SetuTableManager.archiveSelected('auditTable')" type="button">
-<i data-lucide="archive"></i> Archive / Deactivate
-    </button>
-<button class="btn btn-sm btn-danger bulk-delete-btn" onclick="SetuTableManager.deleteSelected('auditTable')" type="button">
-<i data-lucide="trash-2"></i> Delete Selected
-    </button>
-<button class="btn btn-sm btn-skin" onclick="SetuTableManager.clearSelection('auditTable')" type="button">
-      Deselect All
-    </button>
-</div>
-</div><div class="table-wrap">
-<table class="data-table" id="auditTable">
-<thead>
-<tr><th class="th-bulk-select" style="width: 44px; text-align: center;" title="Select All Rows"><input aria-label="Select All" class="bulk-select-all" onchange="SetuTableManager.toggleSelectAll('auditTable', this.checked)" type="checkbox"/></th>
-<th>Timestamp (UTC)</th>
-<th>Actor Identity</th>
-<th>Action</th>
-<th>Target Resource</th>
-<th>Audit Details</th>
-<th>IP Address</th>
-</tr>
-</thead>
-<tbody id="auditTableBody">
-<tr><td colspan="7" style="text-align: center; padding: 24px;">Loading audit records...</td></tr>
-</tbody>
-</table>
-</div><div class="pagination-wrap" id="auditPaginationWrap">
-<div class="pagination-nav-group left-corner">
-<button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('auditTable')" title="Previous Page" type="button">
-<i data-lucide="chevron-left"></i> Previous
-    </button>
-<span class="pagination-page-indicator">
-      Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
-</span>
-<button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('auditTable')" title="Next Page" type="button">
-      Next Page <i data-lucide="chevron-right"></i>
-</button>
-</div>
-<div class="pagination-info">
-<span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
-</div>
-<div class="pagination-page-size">
-<label class="pagination-label">Show:</label>
-<select class="pagination-select" onchange="SetuTableManager.changePageSize('auditTable', this.value)">
-<option selected="" value="10">10 per page</option>
-<option value="20">20 per page</option>
-<option value="30">30 per page</option>
-<option value="50">50 per page</option>
-<option value="100">100 per page</option>
-<option value="all">All</option>
-</select>
-</div>
-</div>
-</div>
+  <!-- Header Title & Subtitle -->
+  <div style="margin-bottom: 24px;">
+    <h1 style="font-size: 1.85rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px; letter-spacing: -0.02em;">Audit Logs</h1>
+    <p style="font-size: 0.95rem; color: var(--text-secondary); margin: 0;">Security logs and administrative action history.</p>
+  </div>
+
+  <!-- 5 KPI Metric Cards -->
+  <div class="audit-kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <!-- Card 1: Total Audit Events -->
+    <div class="card audit-stat-card" style="padding: 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-bottom: 3px solid #8b5cf6;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Total Audit Events</span>
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(139, 92, 246, 0.12); display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
+          <i data-lucide="activity" style="width: 18px; height: 18px;"></i>
+        </div>
+      </div>
+      <div id="auditTotalEventsCount" style="font-size: 2rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace);">892</div>
+    </div>
+
+    <!-- Card 2: Data Modifications -->
+    <div class="card audit-stat-card" style="padding: 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-bottom: 3px solid #6366f1;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Data Modifications</span>
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(99, 102, 241, 0.12); display: flex; align-items: center; justify-content: center; color: #6366f1;">
+          <i data-lucide="database" style="width: 18px; height: 18px;"></i>
+        </div>
+      </div>
+      <div id="auditDataModificationsCount" style="font-size: 2rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace);">143</div>
+    </div>
+
+    <!-- Card 3: Active User Sessions -->
+    <div class="card audit-stat-card" style="padding: 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-bottom: 3px solid #10b981;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Active User Sessions</span>
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(16, 185, 129, 0.12); display: flex; align-items: center; justify-content: center; color: #10b981;">
+          <i data-lucide="users" style="width: 18px; height: 18px;"></i>
+        </div>
+      </div>
+      <div id="auditActiveSessionsCount" style="font-size: 2rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace);">1</div>
+    </div>
+
+    <!-- Card 4: Security Alerts & Warnings -->
+    <div class="card audit-stat-card" style="padding: 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-bottom: 3px solid #f59e0b;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Security Alerts &amp; Warnings</span>
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(245, 158, 11, 0.12); display: flex; align-items: center; justify-content: center; color: #f59e0b;">
+          <i data-lucide="shield" style="width: 18px; height: 18px;"></i>
+        </div>
+      </div>
+      <div id="auditSecurityAlertsCount" style="font-size: 2rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace);">55</div>
+    </div>
+
+    <!-- Card 5: Critical Incidents -->
+    <div class="card audit-stat-card" style="padding: 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-bottom: 3px solid #ef4444;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">Critical Incidents</span>
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(239, 68, 68, 0.12); display: flex; align-items: center; justify-content: center; color: #ef4444;">
+          <i data-lucide="alert-triangle" style="width: 18px; height: 18px;"></i>
+        </div>
+      </div>
+      <div id="auditCriticalIncidentsCount" style="font-size: 2rem; font-weight: 800; color: var(--text-main); font-family: var(--font-mono, monospace);">0</div>
+    </div>
+  </div>
+
+  <!-- Filter Controls Bar -->
+  <div class="audit-filter-panel card" style="padding: 16px 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); margin-bottom: 24px;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) auto; gap: 14px; align-items: end;">
+      <div>
+        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Organization Filter</label>
+        <select id="auditOrgFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+          <option value="">All Organizations</option>
+          <option value="default_org">Setu Smart Farms HQ</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Event Category</label>
+        <select id="auditCategoryFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+          <option value="">All Categories</option>
+          <option value="USER_LOGIN">USER_LOGIN</option>
+          <option value="USER_LOGOUT">USER_LOGOUT</option>
+          <option value="DATA_UPDATE">DATA_UPDATE</option>
+          <option value="DATA_DELETION">DATA_DELETION</option>
+          <option value="DATA_CREATION">DATA_CREATION</option>
+          <option value="STATUS_CHANGE">STATUS_CHANGE</option>
+          <option value="SENSOR_CALIBRATION">SENSOR_CALIBRATION</option>
+          <option value="EMERGENCY_CONTROL">EMERGENCY_CONTROL</option>
+        </select>
+      </div>
+      <div style="min-width: 220px;">
+        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Search Event Logs</label>
+        <div class="search-input-wrap" style="position: relative;">
+          <input id="auditSearchInput" type="text" placeholder="Search actor, ID, IP, details..." oninput="debounceFilterAudit(this.value)" style="width: 100%; font-size: 0.82rem; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+        </div>
+      </div>
+      <div>
+        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Date Range</label>
+        <select id="auditDateRangeFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Status</label>
+        <select id="auditStatusFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+          <option value="">All Status</option>
+          <option value="SUCCESS">SUCCESS</option>
+          <option value="FAILURE">FAILURE</option>
+          <option value="WARNING">WARNING</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Risk Level</label>
+        <select id="auditRiskFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+          <option value="">All Risks</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn btn-outline btn-sm" onclick="resetAuditFilters()" type="button" style="padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Switcher -->
+  <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+    <button id="btnTabActivityStream" class="btn btn-sm audit-tab-btn active" onclick="switchAuditTab('activity')" style="border-radius: 20px; padding: 8px 18px; font-weight: 700; font-size: 0.86rem; background: #0f172a; color: #fff; border: 1px solid #0f172a; cursor: pointer;">Activity Stream</button>
+    <button id="btnTabActiveSessions" class="btn btn-sm audit-tab-btn" onclick="switchAuditTab('sessions')" style="border-radius: 20px; padding: 8px 18px; font-weight: 600; font-size: 0.86rem; background: #fff; color: var(--text-secondary); border: 1px solid var(--border-color); cursor: pointer;">Active Session Registry</button>
+  </div>
+
+  <!-- Activity Stream Table Card -->
+  <div id="auditActivityStreamContainer" class="table-card">
+    <div class="table-toolbar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 18px 24px; border-bottom: 1px solid var(--border-color);">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin: 0;">Compliance Activity Stream</h3>
+        <span id="auditBadgeCount" class="badge" style="background: #fef3c7; color: #b45309; font-weight: 700; font-size: 0.8rem; border-radius: 20px; padding: 3px 10px;">● 892 events</span>
+        <span style="font-size: 0.82rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="shield-check" style="width: 15px; height: 15px; color: #10b981;"></i> Standard retention: 7 years. Logs older than 7 years are eligible for purge.
+        </span>
+      </div>
+      <div>
+        <button class="btn btn-danger btn-sm" onclick="openPurgeAuditModal()" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; background: #ef4444; color: #fff; border: none; cursor: pointer;">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Purge Audit Logs
+        </button>
+      </div>
+    </div>
+
+    <!-- Table with 10 Enriched Columns -->
+    <div class="table-wrap" style="overflow-x: auto;">
+      <table class="data-table" id="auditTable" style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: var(--bg-surface); border-bottom: 1px solid var(--border-color);">
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">TIMESTAMP</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">OPERATOR</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">ROLE</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">ACTION CATEGORY</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">IP ADDRESS</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">LOCATION</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">DEVICE / OS</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">RISK</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">STATUS</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: center;">TRACE</th>
+          </tr>
+        </thead>
+        <tbody id="auditTableBody">
+          <tr><td colspan="10" style="text-align: center; padding: 24px;">Loading audit records...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-wrap" id="auditPaginationWrap">
+      <div class="pagination-nav-group left-corner">
+        <button class="btn btn-sm pagination-btn prev-btn" onclick="SetuTableManager.prevPage('auditTable')" title="Previous Page" type="button">
+          <i data-lucide="chevron-left"></i> Previous
+        </button>
+        <span class="pagination-page-indicator">
+          Page <strong class="curr-page">1</strong> of <strong class="total-pages">1</strong>
+        </span>
+        <button class="btn btn-sm pagination-btn next-btn" onclick="SetuTableManager.nextPage('auditTable')" title="Next Page" type="button">
+          Next Page <i data-lucide="chevron-right"></i>
+        </button>
+      </div>
+      <div class="pagination-info">
+        <span>Showing <strong class="page-start">0</strong>–<strong class="page-end">0</strong> of <strong class="page-total">0</strong> records</span>
+      </div>
+      <div class="pagination-page-size">
+        <label class="pagination-label">Show:</label>
+        <select class="pagination-select" onchange="SetuTableManager.changePageSize('auditTable', this.value)">
+          <option selected="" value="10">10 per page</option>
+          <option value="20">20 per page</option>
+          <option value="50">50 per page</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active Session Registry View (Container) -->
+  <div id="auditActiveSessionsContainer" class="table-card hidden">
+    <div class="table-toolbar" style="padding: 18px 24px; border-bottom: 1px solid var(--border-color);">
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin: 0;">Active User Sessions Registry</h3>
+      <p style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">Live cryptographic sessions currently authenticated across web and mobile platforms.</p>
+    </div>
+    <div class="table-wrap" style="overflow-x: auto;">
+      <table class="data-table" id="activeSessionsTable" style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: var(--bg-surface); border-bottom: 1px solid var(--border-color);">
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">OPERATOR</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">ROLE</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">SESSION ID</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">LOGIN TIME</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">IP ADDRESS</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">LOCATION</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">DEVICE / OS</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: left;">STATUS</th>
+            <th style="padding: 12px 14px; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted); text-align: center;">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody id="activeSessionsTableBody">
+          <tr><td colspan="9" style="text-align: center; padding: 24px;">Loading active sessions...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </section>
 <!-- ================= 21. VIEW: INTEGRATIONS ================= -->
 <section class="view-section hidden" id="section-integrations">
@@ -2987,8 +3123,143 @@
 </div>
 </div>
 <!-- Toast Notification Container -->
+
+<!-- ================= AUDIT LOG TRACE DETAIL MODAL ================= -->
+<div class="modal-backdrop hidden" id="auditTraceModal" style="background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 9999;">
+  <div class="modal-card" style="max-width: 820px; width: 95%; max-height: 90vh; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; background: #fff; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+    
+    <!-- Modal Header -->
+    <div style="padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-start; background: #f8fafc;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <span id="auditTraceRiskBadge" class="badge" style="background: #e0e7ff; color: #4338ca; font-weight: 700; font-size: 0.76rem; border-radius: 6px; padding: 2px 8px;">Medium</span>
+          <span id="auditTraceActionBadge" class="badge" style="background: #f1f5f9; color: #0f172a; font-weight: 700; font-family: monospace; font-size: 0.76rem; border-radius: 6px; padding: 2px 8px;">USER_LOGIN</span>
+        </div>
+        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #0f172a;">Audit Trace Details</h3>
+        <p id="auditTraceIdSubtitle" style="margin: 4px 0 0 0; font-size: 0.8rem; color: #64748b; font-family: monospace;">
+          Audit ID: <span id="auditTraceIdVal">log-7f9a8c</span> · <span style="color: #10b981; font-weight: 600;">🛡 SHA-256 Verified</span>
+        </p>
+      </div>
+      <button onclick="closeAuditTraceModal()" style="background: transparent; border: none; font-size: 1.2rem; color: #64748b; cursor: pointer; padding: 4px 8px; border-radius: 6px;">
+        <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div style="padding: 24px; overflow-y: auto; flex: 1;">
+      <!-- Metadata 2-Column Grid -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Operator</div>
+          <div id="auditTraceOperator" style="font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-top: 2px;">Harshith Kd</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Email</div>
+          <div id="auditTraceEmail" style="font-size: 0.9rem; color: #0f172a; font-weight: 500; margin-top: 2px;">harshithkd6@gmail.com</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">IP Address</div>
+          <div id="auditTraceIp" style="font-size: 0.9rem; font-family: monospace; color: #0f172a; font-weight: 600; margin-top: 2px;">152.57.100.5</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Location</div>
+          <div id="auditTraceLocation" style="font-size: 0.9rem; color: #0f172a; font-weight: 500; margin-top: 2px;">Bengaluru, Karnataka, IN</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Device / OS</div>
+          <div id="auditTraceDevice" style="font-size: 0.9rem; color: #0f172a; font-weight: 500; margin-top: 2px;">Desktop (Chrome on Windows)</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">HTTP Response</div>
+          <div id="auditTraceHttp" style="margin-top: 2px;"><span class="badge" style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 0.75rem; border-radius: 4px; padding: 2px 8px;">200 (OK)</span></div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Execution Latency</div>
+          <div id="auditTraceLatency" style="font-size: 0.9rem; font-family: monospace; color: #0f172a; font-weight: 600; margin-top: 2px;">12.4 ms</div>
+        </div>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700;">Session ID</div>
+          <div id="auditTraceSessionId" style="font-size: 0.85rem; font-family: monospace; color: #4338ca; font-weight: 600; margin-top: 2px; word-break: break-all;">SESS-789a4cd8-e120-4a2e</div>
+        </div>
+      </div>
+
+      <!-- State Modifications Diff Table -->
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 0.88rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="git-commit" style="width: 16px; height: 16px; color: #6366f1;"></i> State Modifications (Past vs Current)
+        </h4>
+        <div style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: #f1f5f9; border-bottom: 1px solid #e2e8f0;">
+                <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: #475569; width: 30%;">Field</th>
+                <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: #b91c1c; width: 35%; background: rgba(254, 226, 226, 0.4);">⊖ Past Data (Old)</th>
+                <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: #15803d; width: 35%; background: rgba(220, 252, 231, 0.4);">⊕ Current Data (New)</th>
+              </tr>
+            </thead>
+            <tbody id="auditTraceDiffBody">
+              <!-- Rendered diff rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Session Chronology Timeline -->
+      <div style="margin-bottom: 24px;">
+        <h4 style="font-size: 0.88rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #0f172a; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="clock" style="width: 16px; height: 16px; color: #6366f1;"></i> Session Chronology
+        </h4>
+        <div id="auditTraceChronology" style="border-left: 2px solid #e2e8f0; margin-left: 10px; padding-left: 16px; display: flex; flex-direction: column; gap: 14px;">
+          <!-- Timeline elements -->
+        </div>
+      </div>
+
+      <!-- Related Activity Flags -->
+      <div style="padding: 14px 18px; border-radius: 10px; background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.15);">
+        <div style="font-size: 0.76rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #4338ca; margin-bottom: 4px;">Related Activity Flags</div>
+        <div id="auditTraceRelatedFlags" style="font-size: 0.82rem; color: #475569; line-height: 1.5;">Verified TLS 1.3 encrypted connection · Known IP range · Zero authorization violations detected · Clean audit fingerprint</div>
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div style="padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+      <button class="btn btn-outline btn-sm" onclick="copyAuditLogId()" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+        <i data-lucide="copy" style="width: 14px; height: 14px;"></i> Copy Log ID
+      </button>
+      <button class="btn btn-skin btn-sm" onclick="closeAuditTraceModal()" style="padding: 8px 18px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+        Close
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= PURGE CONFIRMATION MODAL ================= -->
+<div class="modal-backdrop hidden" id="auditPurgeModal" style="background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(4px); z-index: 9999;">
+  <div class="modal-card" style="max-width: 480px; width: 90%; border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
+    <div style="padding: 24px;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+        <div style="width: 42px; height: 42px; border-radius: 10px; background: #fee2e2; color: #ef4444; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="trash-2" style="width: 22px; height: 22px;"></i>
+        </div>
+        <div>
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0f172a;">Purge Audit Retention Logs</h3>
+          <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: #64748b;">Statutory 7-Year Compliance Cycle</p>
+        </div>
+      </div>
+      <p style="font-size: 0.86rem; color: #475569; line-height: 1.5; margin-bottom: 20px;">
+        In accordance with your enterprise data retention policy, logs exceeding the 7-year statutory window can be safely expunged. This purge operation is logged cryptographically.
+      </p>
+      <div style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-skin btn-sm" onclick="closePurgeAuditModal()" style="padding: 8px 16px; border-radius: 8px; cursor: pointer;">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="executeAuditPurge()" style="background: #ef4444; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 700; border: none; cursor: pointer;">Confirm Purge</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="/admin/table-manager.js?v=4.5"></script><script src="/admin/app.js?v=4.5" charset="UTF-8"></script>
+<script src="/admin/table-manager.js?v=4.6"></script><script src="/admin/app.js?v=4.6" charset="UTF-8"></script>
 </body>
 </html>

@@ -4588,3 +4588,32 @@ tr.row-selected {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==============================================================================
+   32. AUDIT LOGS & COMPLIANCE STREAM STYLING
+   ============================================================================== */
+.audit-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 1200px) {
+  .audit-kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+.audit-stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.audit-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+}
+.audit-tab-btn {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.audit-tab-btn:hover {
+  opacity: 0.9;
+}
