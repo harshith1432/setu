@@ -455,7 +455,7 @@ def _seed_enterprise_users(cursor, now_dt):
         ("usr_technician_01", "tech_kiran", "tech2026", "Kiran Kumar (Field Lead)", "+91 98450 22002", "kn", "technician", "Mysuru Field Hub", "Mysuru Region", "shed_01"),
         ("usr_support_01", "support_priya", "support2026", "Priya Sharma (Support Specialist)", "+91 98450 33003", "en", "support", "Hubballi Support Desk", "Hubballi Cluster", "shed_01"),
         ("usr_sales_01", "sales_anand", "sales2026", "Anand Verma (Billing Lead)", "+91 98450 44004", "en", "sales", "Kolar Commercial Desk", "Kolar Sericulture District", "shed_01"),
-        ("usr_ramesh", "ramesh_farmer", "setu2026", "Ramesh Gowda", "+91 98112 75512", "kn", "farmer", "Gowda Sericulture Farm", "Karnataka", "shed_01"),
+        ("usr_001", "ramesh_farmer", "setu2026", "Ramesh Gowda", "+91 98112 75512", "kn", "farmer", "Gowda Sericulture Farm", "Karnataka", "shed_01"),
     ]
     for uid, uname, pwd, name, phone, lang, role, farm, reg, sid in role_accounts:
         cursor.execute("SELECT id FROM users WHERE username = %s", (uname,))
@@ -1914,22 +1914,34 @@ def create_installation_job(job_data: Dict[str, Any], creator_id: str = "admin")
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     job_num = f"INST-2026-{uuid.uuid4().hex[:6].upper()}"
     farmer_id = job_data.get("farmer_id")
-    if not farmer_id or farmer_id in ("admin", "superadmin"):
-        farmer_id = "usr_ramesh"
     technician_id = job_data.get("technician_id")
     assigned_reason = job_data.get("assigned_reason", "")
     area = job_data.get("area")
 
+    with get_db_cursor(dict_cursor=True) as cur:
+        farmer_row = None
+        if farmer_id:
+            cur.execute("SELECT id, region, latitude, longitude FROM users WHERE id = %s;", (farmer_id,))
+            farmer_row = cur.fetchone()
+            if not farmer_row:
+                farmer_id = None
+        if not farmer_id:
+            cur.execute("SELECT id, region, latitude, longitude FROM users WHERE role = 'farmer' ORDER BY id ASC LIMIT 1;")
+            farmer_row = cur.fetchone()
+            if farmer_row:
+                farmer_id = farmer_row["id"]
+            else:
+                cur.execute("SELECT id, region, latitude, longitude FROM users ORDER BY id ASC LIMIT 1;")
+                farmer_row = cur.fetchone()
+                farmer_id = farmer_row["id"] if farmer_row else "usr_admin"
+
+        f_region = area or (farmer_row["region"] if farmer_row else "Bengaluru") or "Bengaluru"
+        f_lat = farmer_row.get("latitude") if farmer_row else None
+        f_lon = farmer_row.get("longitude") if farmer_row else None
+        area = f_region
+
     if not technician_id:
         from app.services.dispatch_service import find_best_technician_for_installation
-        with get_db_cursor(dict_cursor=True) as cur:
-            cur.execute("SELECT region, latitude, longitude FROM users WHERE id = %s", (farmer_id,))
-            farmer_row = cur.fetchone()
-            f_region = area or (farmer_row["region"] if farmer_row else "Bengaluru") or "Bengaluru"
-            f_lat = farmer_row.get("latitude") if farmer_row else None
-            f_lon = farmer_row.get("longitude") if farmer_row else None
-            area = f_region
-
         tech, reason = find_best_technician_for_installation(f_region, f_lat, f_lon)
         if tech:
             technician_id = tech["user_id"]

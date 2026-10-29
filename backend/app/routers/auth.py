@@ -12,6 +12,8 @@ from app.models.schemas import UserLogin, UserCreate, Token, UserOut, UserProfil
 from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user_payload
 from app.services.db_service import (
+    create_password_reset,
+    verify_and_complete_password_reset,
     get_user_by_username,
     get_user_by_username_or_phone,
     get_user_by_id,
@@ -671,6 +673,14 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
     confirm_password: Optional[str] = None
 
+class ForgotPasswordRequest(BaseModel):
+    identifier: str
+
+class ResetPasswordRequest(BaseModel):
+    reset_code: str
+    new_password: str
+    confirm_password: Optional[str] = None
+
 @router.post("/change-password")
 def change_user_password(
     payload: ChangePasswordRequest,
@@ -704,6 +714,43 @@ def change_user_password(
 
     log_audit(user["username"], "PASSWORD_CHANGE", "User successfully changed their account password")
     return {"status": "success", "message": "Password changed successfully."}
+
+@router.post("/forgot-password")
+def forgot_password_endpoint(req: ForgotPasswordRequest, request: Request = None):
+    """
+    Initiates password recovery for any user role (Farmer, Technician, Admin, Superadmin).
+    Generates a secure, time-limited verification code.
+    """
+    clean_id = (req.identifier or "").strip()
+    if not clean_id:
+        raise HTTPException(status_code=400, detail="Username, email, or phone number is required.")
+
+    ip_addr = request.client.host if request and request.client else None
+    res = create_password_reset(clean_id, ip_address=ip_addr)
+    if not res:
+        raise HTTPException(
+            status_code=404, 
+            detail="No account found matching that username, email, or phone number."
+        )
+    return res
+
+@router.post("/reset-password")
+def reset_password_endpoint(req: ResetPasswordRequest, request: Request = None):
+    """
+    Verifies recovery code and sets a new password with session invalidation.
+    """
+    if req.confirm_password is not None and req.new_password != req.confirm_password:
+        raise HTTPException(status_code=400, detail="New passwords do not match.")
+    
+    if len(req.new_password.strip()) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
+
+    ip_addr = request.client.host if request and request.client else None
+    success, msg = verify_and_complete_password_reset(req.reset_code, req.new_password, ip_address=ip_addr)
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
+    
+    return {"success": True, "message": msg}
 
 @router.put("/profile", response_model=UserOut)
 def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_current_user_payload)):

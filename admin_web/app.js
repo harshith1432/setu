@@ -410,31 +410,314 @@ function togglePasswordVisibility(inputId = 'password', btn = null) {
   }
 }
 
-function openForgotPasswordModal() {
+// ==============================================================================
+// FORGOT & RECOVER PASSWORD CONTROLLER (2-STEP VERIFIED RECOVERY)
+// ==============================================================================
+
+function openForgotPasswordModal(prefillIdentifier = '') {
+  const currentLoginInput = document.getElementById('usernameInput')?.value?.trim() || '';
+  const initialValue = prefillIdentifier || currentLoginInput;
+
   const content = `
-    <div style="padding: 8px 0;">
-      <p style="font-size: 0.95rem; color: #475569; margin-bottom: 16px; line-height: 1.5;">
-        Password recovery is managed according to verified account roles and security protocols.
-      </p>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
-        <h4 style="font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-bottom: 6px;">🌾 Registered Farmers</h4>
-        <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.4;">
-          Contact your assigned Field Extension Officer or reach out to the SeriCare Farmer Support Desk at <a href="mailto:support@sericare.in" style="color:#15803d; font-weight:600;">support@sericare.in</a> with your registered phone number.
-        </p>
+    <div style="padding: 4px 0;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="key-round" style="width: 22px; height: 22px;"></i>
+        </div>
+        <div>
+          <h3 style="font-size: 1.10rem; font-weight: 700; color: var(--text-main); margin: 0;">Recover Account Password</h3>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">
+            Enter your registered username, mobile number, or email to generate a secure recovery code.
+          </p>
+        </div>
       </div>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 20px;">
-        <h4 style="font-size: 0.9rem; font-weight: 700; color: #0f172a; margin-bottom: 6px;">🏢 Enterprise and Administrative Staff</h4>
-        <p style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.4;">
-          Please contact your Company Administrator or IT Security Team to verify identity and issue a password reset link.
-        </p>
-      </div>
-      <div style="text-align: right;">
-        <button type="button" class="btn btn-primary" onclick="closeAppModal()">Understood</button>
-      </div>
+
+      <div class="alert-box error hidden" id="fpErrorBox" style="margin-bottom: 14px;"></div>
+
+      <form id="forgotPasswordForm" onsubmit="submitForgotPasswordRequest(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            Username, Phone, or Email <span style="color: #ef4444;">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="fpIdentifier" 
+            class="form-control" 
+            required 
+            placeholder="e.g. admin, +919876543210, or your email" 
+            value="${escapeHtml(initialValue)}" 
+            style="width: 100%; padding: 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.90rem;" 
+          />
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" onclick="closeAppModal()">Cancel</button>
+          <button type="submit" id="btnRequestCode" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+            <span>Send Recovery Code</span>
+            <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>
+          </button>
+        </div>
+      </form>
     </div>
   `;
-  openAppModal('Setu Account Access Recovery', content);
+
+  openAppModal('Account Access Recovery', content, 'md');
+  if (window.lucide) lucide.createIcons();
+  setTimeout(() => {
+    document.getElementById('fpIdentifier')?.focus();
+  }, 100);
 }
+
+async function submitForgotPasswordRequest(e) {
+  e.preventDefault();
+  const identifier = document.getElementById('fpIdentifier')?.value?.trim();
+  const errBox = document.getElementById('fpErrorBox');
+  const btn = document.getElementById('btnRequestCode');
+
+  if (!identifier) {
+    if (errBox) {
+      errBox.textContent = 'Please enter your username, phone number, or email.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (errBox) errBox.classList.add('hidden');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating Code...';
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Could not initiate password reset.');
+    }
+
+    renderPasswordResetStep2(data, identifier);
+  } catch (err) {
+    if (errBox) {
+      errBox.textContent = err.message || 'Error initiating password reset';
+      errBox.classList.remove('hidden');
+    } else {
+      showToast(err.message, 'error');
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>Send Recovery Code</span> <i data-lucide="arrow-right" style="width: 14px; height: 14px;"></i>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+function renderPasswordResetStep2(data, identifier) {
+  const code = data.reset_code || '';
+  const token = data.reset_token || '';
+  const maskedContact = data.masked_phone || data.masked_email || identifier;
+
+  const content = `
+    <div style="padding: 4px 0;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
+        <div style="width: 44px; height: 44px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="shield-check" style="width: 22px; height: 22px;"></i>
+        </div>
+        <div>
+          <h3 style="font-size: 1.10rem; font-weight: 700; color: var(--text-main); margin: 0;">Set New Password</h3>
+          <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">
+            Recovery code generated for <strong>${escapeHtml(data.username || identifier)}</strong>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Security / OTP Verification Banner -->
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+          <div style="font-size: 0.84rem; color: #166534; font-weight: 600;">
+            <i data-lucide="check-circle" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
+            Code active for 15 minutes
+          </div>
+          <div style="font-size: 0.95rem; font-weight: 800; font-family: var(--font-mono, monospace); color: #15803d; letter-spacing: 0.1em; background: #dcfce7; padding: 3px 8px; border-radius: 4px; border: 1px solid #86efac;">
+            ${escapeHtml(code)}
+          </div>
+        </div>
+        <div style="font-size: 0.78rem; color: #166534; margin-top: 4px;">
+          Dispatched to registered contact: <strong>${escapeHtml(maskedContact)}</strong>
+        </div>
+      </div>
+
+      <div class="alert-box error hidden" id="resetErrorBox" style="margin-bottom: 14px;"></div>
+
+      <form id="resetPasswordSubmitForm" onsubmit="submitNewPassword(event, '${escapeHtml(token)}')" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            6-Digit Verification Code <span style="color: #ef4444;">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="fpResetCode" 
+            class="form-control" 
+            required 
+            maxlength="16" 
+            placeholder="Enter 6-digit code" 
+            value="${escapeHtml(code)}" 
+            style="width: 100%; padding: 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.95rem; font-family: var(--font-mono, monospace); letter-spacing: 0.08em;" 
+          />
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            New Password <span style="color: #ef4444;">*</span> (min. 6 characters)
+          </label>
+          <div style="position: relative;">
+            <input 
+              type="password" 
+              id="fpNewPassword" 
+              class="form-control" 
+              required 
+              minlength="6" 
+              placeholder="Enter new secure password" 
+              style="width: 100%; padding: 10px 40px 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.90rem;" 
+            />
+            <button 
+              type="button" 
+              class="btn-toggle-password" 
+              onclick="togglePasswordVisibility('fpNewPassword', this)" 
+              style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center;"
+            >
+              <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            Confirm New Password <span style="color: #ef4444;">*</span>
+          </label>
+          <div style="position: relative;">
+            <input 
+              type="password" 
+              id="fpConfirmPassword" 
+              class="form-control" 
+              required 
+              minlength="6" 
+              placeholder="Confirm new secure password" 
+              style="width: 100%; padding: 10px 40px 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.90rem;" 
+            />
+            <button 
+              type="button" 
+              class="btn-toggle-password" 
+              onclick="togglePasswordVisibility('fpConfirmPassword', this)" 
+              style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; display: flex; align-items: center;"
+            >
+              <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" onclick="openForgotPasswordModal('${escapeHtml(identifier)}')">Back</button>
+          <button type="submit" id="btnSubmitReset" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+            <i data-lucide="lock" style="width: 14px; height: 14px;"></i>
+            <span>Reset Password &amp; Sign In</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  openAppModal('Account Access Recovery', content, 'md');
+  if (window.lucide) lucide.createIcons();
+  setTimeout(() => {
+    document.getElementById('fpNewPassword')?.focus();
+  }, 100);
+}
+
+async function submitNewPassword(e, fallbackToken) {
+  e.preventDefault();
+  const reset_code = document.getElementById('fpResetCode')?.value?.trim() || fallbackToken;
+  const new_password = document.getElementById('fpNewPassword')?.value || '';
+  const confirm_password = document.getElementById('fpConfirmPassword')?.value || '';
+  const errBox = document.getElementById('resetErrorBox');
+  const btn = document.getElementById('btnSubmitReset');
+
+  if (!reset_code) {
+    if (errBox) {
+      errBox.textContent = 'Please provide the 6-digit verification code.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+  if (new_password.length < 6) {
+    if (errBox) {
+      errBox.textContent = 'New password must be at least 6 characters.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+  if (new_password !== confirm_password) {
+    if (errBox) {
+      errBox.textContent = 'New passwords do not match.';
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (errBox) errBox.classList.add('hidden');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Updating Password...';
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reset_code: reset_code,
+        new_password: new_password,
+        confirm_password: confirm_password
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Failed to reset password.');
+    }
+
+    showToast('Password reset successfully! Please sign in with your new credentials.', 'success');
+    closeAppModal();
+
+    // Auto-populate the password on the login form for immediate user convenience
+    const pwInput = document.getElementById('passwordInput');
+    if (pwInput) {
+      pwInput.value = new_password;
+      pwInput.focus();
+    }
+  } catch (err) {
+    if (errBox) {
+      errBox.textContent = err.message || 'Failed to reset password';
+      errBox.classList.remove('hidden');
+    } else {
+      showToast(err.message, 'error');
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="lock" style="width: 14px; height: 14px;"></i> <span>Reset Password &amp; Sign In</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+window.openForgotPasswordModal = openForgotPasswordModal;
+window.submitForgotPasswordRequest = submitForgotPasswordRequest;
+window.renderPasswordResetStep2 = renderPasswordResetStep2;
+window.submitNewPassword = submitNewPassword;
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -9025,6 +9308,10 @@ window.loadFarmers = loadFarmers;
 window.openFarmerDrawer = openFarmerDrawer;
 window.openEditFarmerModal = openEditFarmerModal;
 window.handleUpdateFarmer = handleUpdateFarmer;
+window.toggleFarmerStatus = toggleFarmerStatus;
+window.confirmDeleteFarmer = confirmDeleteFarmer;
+window.toggleRowActionMenu = toggleRowActionMenu;
+window.closeAllRowActionMenus = closeAllRowActionMenus;
 window.openOrderDetailDrawer = openOrderDetailDrawer;
 window.openTicketDetailDrawer = openTicketDetailDrawer;
 window.loadDevices = loadDevices;

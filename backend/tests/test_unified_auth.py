@@ -222,3 +222,81 @@ async def test_farmer_registration_duplicate_username(async_client):
     res2 = await async_client.post("/api/v1/auth/register", json=payload2)
     assert res2.status_code == 400
     assert "already exists" in res2.json()["detail"].lower()
+
+
+@pytest.mark.anyio
+async def test_forgot_and_reset_password_flow(async_client):
+    """
+    Verifies end-to-end 2-step password recovery:
+    1. Requests recovery code for valid registered identifier
+    2. Enforces 404 on nonexistent identifiers
+    3. Rejects invalid OTP reset codes
+    4. Resets password successfully with valid OTP code
+    5. Confirms old credentials revoked and new credentials work
+    """
+    import uuid
+    suffix = uuid.uuid4().hex[:6]
+    test_user = f"resetuser_{suffix}"
+    test_phone = f"+9198{uuid.uuid4().int % 100000000:08d}"
+    initial_pass = "InitialPass123"
+    new_pass = "UpdatedPass999!"
+
+    # 1. Register test farmer account
+    reg_res = await async_client.post("/api/v1/auth/register", json={
+        "full_name": "Password Reset Tester",
+        "username": test_user,
+        "phone": test_phone,
+        "password": initial_pass,
+        "confirm_password": initial_pass,
+        "terms_accepted": True
+    })
+    assert reg_res.status_code == 200
+
+    # 2. Unknown identifier returns 404
+    bad_req = await async_client.post("/api/v1/auth/forgot-password", json={
+        "identifier": "non_existent_account_99999"
+    })
+    assert bad_req.status_code == 404
+
+    # 3. Valid identifier returns 200 and recovery OTP
+    fp_res = await async_client.post("/api/v1/auth/forgot-password", json={
+        "identifier": test_user
+    })
+    assert fp_res.status_code == 200
+    fp_data = fp_res.json()
+    assert fp_data["success"] is True
+    assert "reset_code" in fp_data
+    reset_code = fp_data["reset_code"]
+
+    # 4. Invalid reset code returns 400
+    bad_reset = await async_client.post("/api/v1/auth/reset-password", json={
+        "reset_code": "000000",
+        "new_password": new_pass,
+        "confirm_password": new_pass
+    })
+    assert bad_reset.status_code == 400
+
+    # 5. Valid code updates password
+    good_reset = await async_client.post("/api/v1/auth/reset-password", json={
+        "reset_code": reset_code,
+        "new_password": new_pass,
+        "confirm_password": new_pass
+    })
+    assert good_reset.status_code == 200
+    assert good_reset.json()["success"] is True
+
+    # 6. Old password no longer works
+    old_login = await async_client.post("/api/v1/auth/login", json={
+        "username": test_user,
+        "password": initial_pass
+    })
+    assert old_login.status_code == 401
+
+    # 7. New password authenticates and issues token
+    new_login = await async_client.post("/api/v1/auth/login", json={
+        "username": test_user,
+        "password": new_pass
+    })
+    assert new_login.status_code == 200
+    assert "access_token" in new_login.json()
+

@@ -6,7 +6,7 @@ import time
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, execute_values
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone, timedelta
 from contextlib import contextmanager
 from app.core.config import settings
@@ -395,6 +395,54 @@ def init_db():
             user_agent TEXT,
             ip_address VARCHAR(45)
         );
+
+        -- Password Reset Tokens & Verification Codes
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            identifier VARCHAR(255) NOT NULL,
+            reset_code VARCHAR(16) NOT NULL,
+            reset_token VARCHAR(128) NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            ip_address VARCHAR(64),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(reset_token);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(reset_code);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+
+        -- Password Reset Tokens & Verification Codes
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            identifier VARCHAR(255) NOT NULL,
+            reset_code VARCHAR(16) NOT NULL,
+            reset_token VARCHAR(128) NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            ip_address VARCHAR(64),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(reset_token);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(reset_code);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
+
+        -- Password Reset Tokens & Verification Codes
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL,
+            identifier VARCHAR(255) NOT NULL,
+            reset_code VARCHAR(16) NOT NULL,
+            reset_token VARCHAR(128) NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            used_at TIMESTAMPTZ,
+            ip_address VARCHAR(64),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(reset_token);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(reset_code);
+        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
         CREATE TABLE IF NOT EXISTS sheds (
             id VARCHAR(64) PRIMARY KEY,
             name VARCHAR(128) NOT NULL,
@@ -2038,6 +2086,399 @@ def revoke_user_session(session_id: str, reason: str = "User logout") -> bool:
         WHERE session_id = %s;
         """, (reason, session_id))
     return True
+
+def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Generates a secure 6-digit OTP code and unique reset token for password recovery.
+    Dispatches notifications via SMS/WhatsApp if available.
+    """
+    clean_id = (identifier or "").strip()
+    if not clean_id:
+        return None
+
+    user = get_user_by_username_or_phone(clean_id)
+    if not user:
+        with get_db_cursor(dict_cursor=True) as cur:
+            cur.execute("SELECT * FROM users WHERE LOWER(TRIM(official_email)) = LOWER(TRIM(%s)) LIMIT 1", (clean_id,))
+            row = cur.fetchone()
+            if row:
+                user = dict(row)
+
+    if not user:
+        return None
+
+    import secrets
+    import string
+    now_dt = datetime.now(timezone.utc)
+    expires_at = now_dt + timedelta(minutes=15)
+    
+    reset_code = "".join(secrets.choice(string.digits) for _ in range(6))
+    reset_token = f"rst_{secrets.token_urlsafe(32)}"
+    reset_id = f"pr_{secrets.token_hex(12)}"
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute(
+            """
+            INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
+        )
+
+    log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
+
+    phone = user.get("phone") or ""
+    masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
+    email = user.get("official_email") or ""
+    masked_email = ""
+    if email and "@" in email:
+        parts = email.split("@")
+        masked_email = f"{parts[0][:2]}***@{parts[1]}"
+
+    try:
+        from app.services.whatsapp_alerts import alert_service
+        target_whatsapp = user.get("whatsapp_number") or user.get("phone")
+        if target_whatsapp:
+            alert_service.send_alert(
+                f"Your Setu Platform password recovery code is: {reset_code}. Valid for 15 minutes. Do not share this code.",
+                target_phone=target_whatsapp
+            )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "reset_token": reset_token,
+        "reset_code": reset_code,
+        "username": user["username"],
+        "masked_phone": masked_phone,
+        "masked_email": masked_email,
+        "expires_in_minutes": 15
+    }
+
+def verify_and_complete_password_reset(
+    code_or_token: str, 
+    new_password: str,
+    ip_address: Optional[str] = None
+) -> Tuple[bool, str]:
+    """
+    Validates recovery code and updates the user's password with OWASP session revocation.
+    """
+    clean_val = (code_or_token or "").strip()
+    if not clean_val:
+        return False, "Verification code or token is required."
+    
+    if len(new_password) < 6:
+        return False, "New password must be at least 6 characters long."
+
+    now_dt = datetime.now(timezone.utc)
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute(
+            """
+            SELECT * FROM password_resets
+            WHERE (reset_code = %s OR reset_token = %s)
+              AND used_at IS NULL
+              AND expires_at > %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (clean_val, clean_val, now_dt)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return False, "Invalid, expired, or already used recovery code."
+
+        reset_record = dict(row)
+        user_id = reset_record["user_id"]
+
+        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            return False, "Associated user account not found."
+        
+        user = dict(user_row)
+
+        from app.core.security import get_password_hash
+        hashed_pw = get_password_hash(new_password)
+
+        cursor.execute(
+            "UPDATE users SET hashed_password = %s WHERE id = %s",
+            (hashed_pw, user_id)
+        )
+
+        cursor.execute(
+            "UPDATE password_resets SET used_at = %s WHERE id = %s",
+            (now_dt, reset_record["id"])
+        )
+
+        cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+
+        log_audit(user["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user['username']}")
+
+    return True, "Password has been successfully reset. You may now sign in with your new password."
+
+def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Generates a secure 6-digit OTP code and unique reset token for password recovery.
+    Dispatches notifications via SMS/WhatsApp if available.
+    """
+    clean_id = (identifier or "").strip()
+    if not clean_id:
+        return None
+
+    user = get_user_by_username_or_phone(clean_id)
+    if not user:
+        with get_db_cursor(dict_cursor=True) as cur:
+            cur.execute("SELECT * FROM users WHERE LOWER(TRIM(official_email)) = LOWER(TRIM(%s)) LIMIT 1", (clean_id,))
+            row = cur.fetchone()
+            if row:
+                user = dict(row)
+
+    if not user:
+        return None
+
+    import secrets
+    import string
+    now_dt = datetime.now(timezone.utc)
+    expires_at = now_dt + timedelta(minutes=15)
+    
+    reset_code = "".join(secrets.choice(string.digits) for _ in range(6))
+    reset_token = f"rst_{secrets.token_urlsafe(32)}"
+    reset_id = f"pr_{secrets.token_hex(12)}"
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute(
+            """
+            INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
+        )
+
+    log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
+
+    phone = user.get("phone") or ""
+    masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
+    email = user.get("official_email") or ""
+    masked_email = ""
+    if email and "@" in email:
+        parts = email.split("@")
+        masked_email = f"{parts[0][:2]}***@{parts[1]}"
+
+    try:
+        from app.services.whatsapp_alerts import alert_service
+        target_whatsapp = user.get("whatsapp_number") or user.get("phone")
+        if target_whatsapp:
+            alert_service.send_alert(
+                f"Your Setu Platform password recovery code is: {reset_code}. Valid for 15 minutes. Do not share this code.",
+                target_phone=target_whatsapp
+            )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "reset_token": reset_token,
+        "reset_code": reset_code,
+        "username": user["username"],
+        "masked_phone": masked_phone,
+        "masked_email": masked_email,
+        "expires_in_minutes": 15
+    }
+
+def verify_and_complete_password_reset(
+    code_or_token: str, 
+    new_password: str,
+    ip_address: Optional[str] = None
+) -> Tuple[bool, str]:
+    """
+    Validates recovery code and updates the user's password with OWASP session revocation.
+    """
+    clean_val = (code_or_token or "").strip()
+    if not clean_val:
+        return False, "Verification code or token is required."
+    
+    if len(new_password) < 6:
+        return False, "New password must be at least 6 characters long."
+
+    now_dt = datetime.now(timezone.utc)
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute(
+            """
+            SELECT * FROM password_resets
+            WHERE (reset_code = %s OR reset_token = %s)
+              AND used_at IS NULL
+              AND expires_at > %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (clean_val, clean_val, now_dt)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return False, "Invalid, expired, or already used recovery code."
+
+        reset_record = dict(row)
+        user_id = reset_record["user_id"]
+
+        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            return False, "Associated user account not found."
+        
+        user = dict(user_row)
+
+        from app.core.security import get_password_hash
+        hashed_pw = get_password_hash(new_password)
+
+        cursor.execute(
+            "UPDATE users SET hashed_password = %s WHERE id = %s",
+            (hashed_pw, user_id)
+        )
+
+        cursor.execute(
+            "UPDATE password_resets SET used_at = %s WHERE id = %s",
+            (now_dt, reset_record["id"])
+        )
+
+        cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+
+        log_audit(user["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user['username']}")
+
+    return True, "Password has been successfully reset. You may now sign in with your new password."
+
+def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """
+    Generates a secure 6-digit OTP code and unique reset token for password recovery.
+    Dispatches notifications via SMS/WhatsApp if available.
+    """
+    clean_id = (identifier or "").strip()
+    if not clean_id:
+        return None
+
+    user = get_user_by_username_or_phone(clean_id)
+    if not user:
+        with get_db_cursor(dict_cursor=True) as cur:
+            cur.execute("SELECT * FROM users WHERE LOWER(TRIM(official_email)) = LOWER(TRIM(%s)) LIMIT 1", (clean_id,))
+            row = cur.fetchone()
+            if row:
+                user = dict(row)
+
+    if not user:
+        return None
+
+    import secrets
+    import string
+    now_dt = datetime.now(timezone.utc)
+    expires_at = now_dt + timedelta(minutes=15)
+    
+    reset_code = "".join(secrets.choice(string.digits) for _ in range(6))
+    reset_token = f"rst_{secrets.token_urlsafe(32)}"
+    reset_id = f"pr_{secrets.token_hex(12)}"
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute(
+            """
+            INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
+        )
+
+    log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
+
+    phone = user.get("phone") or ""
+    masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
+    email = user.get("official_email") or ""
+    masked_email = ""
+    if email and "@" in email:
+        parts = email.split("@")
+        masked_email = f"{parts[0][:2]}***@{parts[1]}"
+
+    try:
+        from app.services.whatsapp_alerts import alert_service
+        target_whatsapp = user.get("whatsapp_number") or user.get("phone")
+        if target_whatsapp:
+            alert_service.send_alert(
+                f"Your Setu Platform password recovery code is: {reset_code}. Valid for 15 minutes. Do not share this code.",
+                target_phone=target_whatsapp
+            )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "reset_token": reset_token,
+        "reset_code": reset_code,
+        "username": user["username"],
+        "masked_phone": masked_phone,
+        "masked_email": masked_email,
+        "expires_in_minutes": 15
+    }
+
+def verify_and_complete_password_reset(
+    code_or_token: str, 
+    new_password: str,
+    ip_address: Optional[str] = None
+) -> Tuple[bool, str]:
+    """
+    Validates recovery code and updates the user's password with OWASP session revocation.
+    """
+    clean_val = (code_or_token or "").strip()
+    if not clean_val:
+        return False, "Verification code or token is required."
+    
+    if len(new_password) < 6:
+        return False, "New password must be at least 6 characters long."
+
+    now_dt = datetime.now(timezone.utc)
+
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute(
+            """
+            SELECT * FROM password_resets
+            WHERE (reset_code = %s OR reset_token = %s)
+              AND used_at IS NULL
+              AND expires_at > %s
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (clean_val, clean_val, now_dt)
+        )
+        row = cursor.fetchone()
+        if not row:
+            return False, "Invalid, expired, or already used recovery code."
+
+        reset_record = dict(row)
+        user_id = reset_record["user_id"]
+
+        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            return False, "Associated user account not found."
+        
+        user = dict(user_row)
+
+        from app.core.security import get_password_hash
+        hashed_pw = get_password_hash(new_password)
+
+        cursor.execute(
+            "UPDATE users SET hashed_password = %s WHERE id = %s",
+            (hashed_pw, user_id)
+        )
+
+        cursor.execute(
+            "UPDATE password_resets SET used_at = %s WHERE id = %s",
+            (now_dt, reset_record["id"])
+        )
+
+        cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+
+        log_audit(user["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user['username']}")
+
+    return True, "Password has been successfully reset. You may now sign in with your new password."
 
 def revoke_all_user_sessions(user_id: str, reason: str = "Logout all sessions") -> int:
     """Revokes all active sessions for a user across all tabs and devices."""

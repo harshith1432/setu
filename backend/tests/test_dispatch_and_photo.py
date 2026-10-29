@@ -13,6 +13,18 @@ from app.services.dispatch_service import (
 )
 from app.services.enterprise_db import create_installation_job, update_installation_job
 
+def get_test_farmer_id():
+    from app.services.db_service import get_db_cursor
+    with get_db_cursor(dict_cursor=True) as cur:
+        cur.execute("SELECT id FROM users WHERE role = 'farmer' ORDER BY id ASC LIMIT 1;")
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+        cur.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1;")
+        row = cur.fetchone()
+        return row["id"] if row else "usr_admin"
+
+
 def test_haversine_accuracy():
     # Distance between Indiranagar and Koramangala is roughly 4-6 km
     loc_indiranagar = (12.9784, 77.6408)
@@ -40,7 +52,7 @@ def test_job_completion_mandates_photo():
     # Test creating a job and attempting completion without photo
     job = create_installation_job({
         "shed_id": "shed_test_verify",
-        "farmer_id": "usr_ramesh",
+        "farmer_id": get_test_farmer_id(),
         "scheduled_date": "2026-11-01T10:00:00Z",
         "remarks": "Test verification job",
         "area": "Bengaluru",
@@ -78,7 +90,7 @@ def test_workload_balancing():
     # Create job 1 in Bengaluru -> dispatches to best technician
     job1 = create_installation_job({
         "shed_id": "shed_workload_1",
-        "farmer_id": "usr_ramesh",
+        "farmer_id": get_test_farmer_id(),
         "scheduled_date": "2026-11-01T10:00:00Z",
         "area": "Bengaluru",
         "latitude": 12.9784,
