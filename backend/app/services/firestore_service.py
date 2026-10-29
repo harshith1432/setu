@@ -38,7 +38,8 @@ class FirestoreService:
             if not firebase_admin._apps:
                 cred = None
                 sa_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-                sa_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                default_local_sa = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "credentials", "firebase-service-account.json"))
+                sa_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or (default_local_sa if os.path.exists(default_local_sa) else None)
 
                 if sa_json and len(sa_json.strip()) > 20:
                     try:

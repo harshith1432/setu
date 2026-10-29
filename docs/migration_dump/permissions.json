@@ -1,17 +1,17 @@
 [
   {
-    "code": "org:read",
-    "name": "View Organization",
-    "category": "Organization",
-    "description": "View organization details and profiles",
-    "_id": "org:read"
+    "code": "ops:incidents_ack",
+    "name": "Acknowledge Incidents",
+    "category": "Operations",
+    "description": "Acknowledge active alarms and assign responders",
+    "_id": "ops:incidents_ack"
   },
   {
-    "code": "org:write",
-    "name": "Manage Organization Settings",
-    "category": "Organization",
-    "description": "Edit organization profile, branding and settings",
-    "_id": "org:write"
+    "code": "ops:incidents_resolve",
+    "name": "Resolve Incidents",
+    "category": "Operations",
+    "description": "Mark incidents as safely resolved with post-mortem notes",
+    "_id": "ops:incidents_resolve"
   },
   {
     "code": "ops:installations_read",
@@ -26,6 +26,41 @@
     "category": "Operations",
     "description": "Dispatch field technicians and verify sign-off checklists",
     "_id": "ops:installations_write"
+  },
+  {
+    "code": "commercial:products_read",
+    "name": "View Products",
+    "category": "Commercial",
+    "description": "Browse sericulture equipment catalogue and inventory",
+    "_id": "commercial:products_read"
+  },
+  {
+    "code": "org:read",
+    "name": "View Organization",
+    "category": "Organization",
+    "description": "View organization details and profiles",
+    "_id": "org:read"
+  },
+  {
+    "code": "commercial:products_write",
+    "name": "Manage Products",
+    "category": "Commercial",
+    "description": "Update product specifications, prices, and stock balance",
+    "_id": "commercial:products_write"
+  },
+  {
+    "code": "commercial:orders_read",
+    "name": "View Orders",
+    "category": "Commercial",
+    "description": "View customer equipment and sensor orders",
+    "_id": "commercial:orders_read"
+  },
+  {
+    "code": "org:write",
+    "name": "Manage Organization Settings",
+    "category": "Organization",
+    "description": "Edit organization profile, branding and settings",
+    "_id": "org:write"
   },
   {
     "code": "org:subscriptions",
@@ -49,11 +84,11 @@
     "_id": "users:invite"
   },
   {
-    "code": "commercial:products_read",
-    "name": "View Products",
+    "code": "commercial:orders_write",
+    "name": "Manage Orders",
     "category": "Commercial",
-    "description": "Browse sericulture equipment catalogue and inventory",
-    "_id": "commercial:products_read"
+    "description": "Process orders and update fulfilment statuses",
+    "_id": "commercial:orders_write"
   },
   {
     "code": "users:write",
@@ -63,39 +98,18 @@
     "_id": "users:write"
   },
   {
-    "code": "users:suspend",
-    "name": "Suspend Users",
-    "category": "Users",
-    "description": "Activate, suspend, or revoke employee accounts",
-    "_id": "users:suspend"
-  },
-  {
-    "code": "commercial:products_write",
-    "name": "Manage Products",
-    "category": "Commercial",
-    "description": "Update product specifications, prices, and stock balance",
-    "_id": "commercial:products_write"
-  },
-  {
-    "code": "commercial:orders_read",
-    "name": "View Orders",
-    "category": "Commercial",
-    "description": "View customer equipment and sensor orders",
-    "_id": "commercial:orders_read"
-  },
-  {
-    "code": "commercial:orders_write",
-    "name": "Manage Orders",
-    "category": "Commercial",
-    "description": "Process orders and update fulfilment statuses",
-    "_id": "commercial:orders_write"
-  },
-  {
     "code": "commercial:billing_read",
     "name": "View Billing",
     "category": "Commercial",
     "description": "View invoices, subscriptions, and payment history",
     "_id": "commercial:billing_read"
+  },
+  {
+    "code": "users:suspend",
+    "name": "Suspend Users",
+    "category": "Users",
+    "description": "Activate, suspend, or revoke employee accounts",
+    "_id": "users:suspend"
   },
   {
     "code": "commercial:billing_write",
@@ -112,18 +126,39 @@
     "_id": "analytics:read"
   },
   {
-    "code": "users:roles",
-    "name": "Assign Roles",
-    "category": "Users",
-    "description": "Assign authorized roles to employees",
-    "_id": "users:roles"
-  },
-  {
     "code": "analytics:export",
     "name": "Export Authorized Reports",
     "category": "Analytics",
     "description": "Export CSV/PDF audits and seasonal performance metrics",
     "_id": "analytics:export"
+  },
+  {
+    "code": "admin:audit_read",
+    "name": "View Audit Logs",
+    "category": "Administration",
+    "description": "Inspect immutable administrative and security audit trail",
+    "_id": "admin:audit_read"
+  },
+  {
+    "code": "admin:integrations",
+    "name": "Manage Integrations",
+    "category": "Administration",
+    "description": "Configure cloud, WhatsApp, and telemetry bridges",
+    "_id": "admin:integrations"
+  },
+  {
+    "code": "admin:settings",
+    "name": "Manage Platform Settings",
+    "category": "Administration",
+    "description": "Configure platform-wide policies and global setpoints",
+    "_id": "admin:settings"
+  },
+  {
+    "code": "users:roles",
+    "name": "Assign Roles",
+    "category": "Users",
+    "description": "Assign authorized roles to employees",
+    "_id": "users:roles"
   },
   {
     "code": "roles:read",
@@ -189,27 +224,6 @@
     "_id": "iot:write"
   },
   {
-    "code": "admin:audit_read",
-    "name": "View Audit Logs",
-    "category": "Administration",
-    "description": "Inspect immutable administrative and security audit trail",
-    "_id": "admin:audit_read"
-  },
-  {
-    "code": "admin:integrations",
-    "name": "Manage Integrations",
-    "category": "Administration",
-    "description": "Configure cloud, WhatsApp, and telemetry bridges",
-    "_id": "admin:integrations"
-  },
-  {
-    "code": "admin:settings",
-    "name": "Manage Platform Settings",
-    "category": "Administration",
-    "description": "Configure platform-wide policies and global setpoints",
-    "_id": "admin:settings"
-  },
-  {
     "code": "iot:sensors",
     "name": "Configure Sensors",
     "category": "IoT",
@@ -236,19 +250,5 @@
     "category": "Operations",
     "description": "View climate warnings and emergency alerts",
     "_id": "ops:incidents_read"
-  },
-  {
-    "code": "ops:incidents_ack",
-    "name": "Acknowledge Incidents",
-    "category": "Operations",
-    "description": "Acknowledge active alarms and assign responders",
-    "_id": "ops:incidents_ack"
-  },
-  {
-    "code": "ops:incidents_resolve",
-    "name": "Resolve Incidents",
-    "category": "Operations",
-    "description": "Mark incidents as safely resolved with post-mortem notes",
-    "_id": "ops:incidents_resolve"
   }
 ]

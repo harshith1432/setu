@@ -8857,5 +8857,211 @@
     "error_message": null,
     "organization_id": "default_org",
     "_id": "cmd_17ec467eb7a2"
+  },
+  {
+    "command_id": "cmd_413ae07cac65",
+    "device_id": "esp32_shed_01",
+    "shed_id": "shed_01",
+    "requested_by": "ramesh_farmer",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "cooler"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:29:37.930573+05:30",
+    "expires_at": "2026-10-29T11:34:37.930573+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_413ae07cac65"
+  },
+  {
+    "command_id": "cmd_3912ef429573",
+    "device_id": "esp32_shed_02",
+    "shed_id": "shed_02",
+    "requested_by": "admin",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "cooler"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:29:39.844403+05:30",
+    "expires_at": "2026-10-29T11:34:39.844403+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_3912ef429573"
+  },
+  {
+    "command_id": "cmd_22d90a608e3b",
+    "device_id": "esp32_gateway_02",
+    "shed_id": "shed_02",
+    "requested_by": "farmer_charlie",
+    "command_type": "cooling_fan",
+    "command_payload": {
+      "state": "ON"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:30:06.712857+05:30",
+    "expires_at": "2026-10-29T11:35:06.712857+05:30",
+    "correlation_id": "corr_2c0927",
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_22d90a608e3b"
+  },
+  {
+    "command_id": "cmd_d5e3f2abd07f",
+    "device_id": "esp32_shed_01",
+    "shed_id": "shed_01",
+    "requested_by": "operator",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "cooler"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:30:11.331765+05:30",
+    "expires_at": "2026-10-29T11:35:11.331765+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_d5e3f2abd07f"
+  },
+  {
+    "command_id": "cmd_c48488102c56",
+    "device_id": "esp32_shed_01",
+    "shed_id": "shed_01",
+    "requested_by": "operator",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "heater"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:30:11.336251+05:30",
+    "expires_at": "2026-10-29T11:35:11.336251+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_c48488102c56"
+  },
+  {
+    "command_id": "cmd_842f62194b8b",
+    "device_id": "esp32_shed_01",
+    "shed_id": "shed_01",
+    "requested_by": "ramesh_farmer",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "cooler"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:32:25.791997+05:30",
+    "expires_at": "2026-10-29T11:37:25.791997+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_842f62194b8b"
+  },
+  {
+    "command_id": "cmd_18a9dad55116",
+    "device_id": "esp32_shed_02",
+    "shed_id": "shed_02",
+    "requested_by": "admin",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "cooler"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:32:27.992159+05:30",
+    "expires_at": "2026-10-29T11:37:27.992159+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_18a9dad55116"
+  },
+  {
+    "command_id": "cmd_b6b2b8f1f6ac",
+    "device_id": "esp32_gateway_02",
+    "shed_id": "shed_02",
+    "requested_by": "farmer_charlie",
+    "command_type": "cooling_fan",
+    "command_payload": {
+      "state": "ON"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:32:53.241993+05:30",
+    "expires_at": "2026-10-29T11:37:53.241993+05:30",
+    "correlation_id": "corr_61aa28",
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_b6b2b8f1f6ac"
+  },
+  {
+    "command_id": "cmd_24c4625f9409",
+    "device_id": "esp32_shed_01",
+    "shed_id": "shed_01",
+    "requested_by": "operator",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "cooler"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:32:57.378997+05:30",
+    "expires_at": "2026-10-29T11:37:57.378997+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_24c4625f9409"
+  },
+  {
+    "command_id": "cmd_a5c4a6359718",
+    "device_id": "esp32_shed_01",
+    "shed_id": "shed_01",
+    "requested_by": "operator",
+    "command_type": "SET_ACTUATOR",
+    "command_payload": {
+      "state": true,
+      "value": null,
+      "actuator": "heater"
+    },
+    "status": "QUEUED",
+    "created_at": "2026-10-29T11:32:57.383353+05:30",
+    "expires_at": "2026-10-29T11:37:57.383353+05:30",
+    "correlation_id": null,
+    "acknowledged_at": null,
+    "applied_at": null,
+    "error_message": null,
+    "organization_id": "default_org",
+    "_id": "cmd_a5c4a6359718"
   }
 ]

@@ -117,6 +117,32 @@
     "_id": "mov_1cd0b9cb6e16"
   },
   {
+    "id": "mov_b9cf3d705967",
+    "product_id": "prod_d0df852f0c29",
+    "movement_type": "SALE",
+    "quantity_change": -2,
+    "previous_quantity": 5,
+    "new_quantity": 3,
+    "reference_id": "ORD-2026-676206",
+    "notes": "Customer Order ORD-2026-676206",
+    "created_by": "usr_001",
+    "created_at": "2026-10-29T11:29:44.210351+05:30",
+    "_id": "mov_b9cf3d705967"
+  },
+  {
+    "id": "mov_c002ce50ad43",
+    "product_id": "prod_5424500a1906",
+    "movement_type": "PURCHASE",
+    "quantity_change": 5,
+    "previous_quantity": 0,
+    "new_quantity": 5,
+    "reference_id": "INITIAL_ENTRY",
+    "notes": "Initial product catalog creation",
+    "created_by": "admin",
+    "created_at": "2026-10-29T11:30:07.580089+05:30",
+    "_id": "mov_c002ce50ad43"
+  },
+  {
     "id": "mov_2fbaf0c2c619",
     "product_id": "prod_fc0628eec38a",
     "movement_type": "SALE",
@@ -143,6 +169,19 @@
     "_id": "mov_a61bb9fccd60"
   },
   {
+    "id": "mov_3a080c583619",
+    "product_id": "prod_5424500a1906",
+    "movement_type": "SALE",
+    "quantity_change": -2,
+    "previous_quantity": 5,
+    "new_quantity": 3,
+    "reference_id": "ORD-2026-734062",
+    "notes": "Customer Order ORD-2026-734062",
+    "created_by": "usr_001",
+    "created_at": "2026-10-29T11:32:32.346768+05:30",
+    "_id": "mov_3a080c583619"
+  },
+  {
     "id": "mov_0bfbf8b38c54",
     "product_id": "prod_ece3366e3954",
     "movement_type": "SALE",
@@ -154,6 +193,19 @@
     "created_by": "usr_001",
     "created_at": "2026-10-29T03:21:03.264156+05:30",
     "_id": "mov_0bfbf8b38c54"
+  },
+  {
+    "id": "mov_52aaf82136b7",
+    "product_id": "prod_a94dc911a23d",
+    "movement_type": "PURCHASE",
+    "quantity_change": 5,
+    "previous_quantity": 0,
+    "new_quantity": 5,
+    "reference_id": "INITIAL_ENTRY",
+    "notes": "Initial product catalog creation",
+    "created_by": "admin",
+    "created_at": "2026-10-29T11:32:53.743621+05:30",
+    "_id": "mov_52aaf82136b7"
   },
   {
     "id": "mov_15ebfd44d881",

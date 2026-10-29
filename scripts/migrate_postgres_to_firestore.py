@@ -147,7 +147,7 @@ def transform_generic(rows: List[Dict[str, Any]], id_col: str = "id") -> List[Di
         docs.append(doc)
     return docs
 
-def run_migration(dry_run: bool = True, target_collection: Optional[str] = None, limit: Optional[int] = None, export_dir: str = "docs/migration_dump") -> Dict[str, Any]:
+def run_migration(dry_run: bool = True, target_collection: Optional[str] = None, limit: Optional[int] = None, export_dir: str = "docs/migration_dump", service_account_path: Optional[str] = None) -> Dict[str, Any]:
     """Execute the extraction, transformation, validation, and optional Firestore commit."""
     os.makedirs(export_dir, exist_ok=True)
     report = {
@@ -265,10 +265,19 @@ def run_migration(dry_run: bool = True, target_collection: Optional[str] = None,
         logger.info("LIVE MODE: Attempting batched writes to Cloud Firestore project '%s'...", FIRESTORE_PROJECT_ID)
         try:
             import firebase_admin
-            from firebase_admin import firestore
+            from firebase_admin import credentials, firestore
 
             if not firebase_admin._apps:
-                firebase_admin.initialize_app(options={'projectId': FIRESTORE_PROJECT_ID})
+                cred = None
+                sa_path = service_account_path or os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY") or "credentials/firebase-service-account.json"
+                if sa_path and os.path.exists(sa_path):
+                    cred = credentials.Certificate(sa_path)
+                    logger.info("Using Service Account credentials from: %s", sa_path)
+                options = {'projectId': FIRESTORE_PROJECT_ID}
+                if cred:
+                    firebase_admin.initialize_app(cred, options=options)
+                else:
+                    firebase_admin.initialize_app(options=options)
             db = firestore.client()
 
             for col_name, docs in firestore_collections.items():
@@ -346,13 +355,15 @@ def generate_markdown_report(report: Dict[str, Any], output_path: str = "docs/fi
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Migrate SeriCare from PostgreSQL to Cloud Firestore")
-    parser.add_argument('--live', action='store_true', help="Execute live writes to Firestore (default: dry-run)")
+    parser.add_argument('--live', action='store_true', help="Execute live writes to Firestore")
+    parser.add_argument('--dry-run', action='store_true', help="Run in dry-run mode (default if --live not passed)")
+    parser.add_argument('--service-account', type=str, default="credentials/firebase-service-account.json", help="Path to Service Account JSON key")
     parser.add_argument('--collection', type=str, help="Migrate a specific collection")
     parser.add_argument('--limit', type=int, help="Limit number of rows per table")
     parser.add_argument('--report', type=str, default="docs/firestore_migration_report.md", help="Report output path")
     
     args = parser.parse_args()
-    dry_run = not args.live
-    rep = run_migration(dry_run=dry_run, target_collection=args.collection, limit=args.limit)
+    dry_run = args.dry_run or (not args.live)
+    rep = run_migration(dry_run=dry_run, target_collection=args.collection, limit=args.limit, service_account_path=args.service_account)
     generate_markdown_report(rep, args.report)
     print("\nMigration run finished successfully.")

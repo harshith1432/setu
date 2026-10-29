@@ -116858,5 +116858,3115 @@
     "target_resource": null,
     "ip_address": null,
     "_id": "11686"
+  },
+  {
+    "id": 11687,
+    "timestamp": "2026-10-29T11:21:54.651596+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-2042 (empb-2042@test.com) and associated credentials",
+    "target_resource": "EMPB-2042",
+    "ip_address": "127.0.0.1",
+    "_id": "11687"
+  },
+  {
+    "id": 11688,
+    "timestamp": "2026-10-29T11:21:54.673961+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-B8E0 (empa-b8e0@test.com) and associated credentials",
+    "target_resource": "EMPA-B8E0",
+    "ip_address": "127.0.0.1",
+    "_id": "11688"
+  },
+  {
+    "id": 11689,
+    "timestamp": "2026-10-29T11:21:54.785895+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-761F6F (emp_761f6f@sericare.internal) and associated credentials",
+    "target_resource": "EMP-761F6F",
+    "ip_address": "127.0.0.1",
+    "_id": "11689"
+  },
+  {
+    "id": 11690,
+    "timestamp": "2026-10-29T11:21:54.805539+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-A1B6 (empa-a1b6@test.com) and associated credentials",
+    "target_resource": "EMPA-A1B6",
+    "ip_address": "127.0.0.1",
+    "_id": "11690"
+  },
+  {
+    "id": 11691,
+    "timestamp": "2026-10-29T11:21:54.826055+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-2BEFF2 (emp_2beff2@sericare.internal) and associated credentials",
+    "target_resource": "EMP-2BEFF2",
+    "ip_address": "127.0.0.1",
+    "_id": "11691"
+  },
+  {
+    "id": 11692,
+    "timestamp": "2026-10-29T11:21:54.846493+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-9771 (empb-9771@test.com) and associated credentials",
+    "target_resource": "EMPB-9771",
+    "ip_address": "127.0.0.1",
+    "_id": "11692"
+  },
+  {
+    "id": 11693,
+    "timestamp": "2026-10-29T11:21:54.867198+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-F682 (empa-f682@test.com) and associated credentials",
+    "target_resource": "EMPA-F682",
+    "ip_address": "127.0.0.1",
+    "_id": "11693"
+  },
+  {
+    "id": 11694,
+    "timestamp": "2026-10-29T11:21:54.884427+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-C8D3C1 (emp_c8d3c1@sericare.internal) and associated credentials",
+    "target_resource": "EMP-C8D3C1",
+    "ip_address": "127.0.0.1",
+    "_id": "11694"
+  },
+  {
+    "id": 11695,
+    "timestamp": "2026-10-29T11:21:54.902166+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-5828 (empb-5828@test.com) and associated credentials",
+    "target_resource": "EMPB-5828",
+    "ip_address": "127.0.0.1",
+    "_id": "11695"
+  },
+  {
+    "id": 11696,
+    "timestamp": "2026-10-29T11:21:54.998449+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-EAF0 (empa-eaf0@test.com) and associated credentials",
+    "target_resource": "EMPA-EAF0",
+    "ip_address": "127.0.0.1",
+    "_id": "11696"
+  },
+  {
+    "id": 11697,
+    "timestamp": "2026-10-29T11:22:05.479381+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-C91007 (emp_c91007@sericare.internal) and associated credentials",
+    "target_resource": "EMP-C91007",
+    "ip_address": "127.0.0.1",
+    "_id": "11697"
+  },
+  {
+    "id": 11698,
+    "timestamp": "2026-10-29T11:22:05.497470+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-1C7E (empb-1c7e@test.com) and associated credentials",
+    "target_resource": "EMPB-1C7E",
+    "ip_address": "127.0.0.1",
+    "_id": "11698"
+  },
+  {
+    "id": 11699,
+    "timestamp": "2026-10-29T11:22:05.593256+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-4452 (empa-4452@test.com) and associated credentials",
+    "target_resource": "EMPA-4452",
+    "ip_address": "127.0.0.1",
+    "_id": "11699"
+  },
+  {
+    "id": 11700,
+    "timestamp": "2026-10-29T11:22:05.614878+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-717D4F (emp_717d4f@sericare.internal) and associated credentials",
+    "target_resource": "EMP-717D4F",
+    "ip_address": "127.0.0.1",
+    "_id": "11700"
+  },
+  {
+    "id": 11701,
+    "timestamp": "2026-10-29T11:22:05.634063+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-E65A (empb-e65a@test.com) and associated credentials",
+    "target_resource": "EMPB-E65A",
+    "ip_address": "127.0.0.1",
+    "_id": "11701"
+  },
+  {
+    "id": 11702,
+    "timestamp": "2026-10-29T11:22:05.652086+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-820C (empa-820c@test.com) and associated credentials",
+    "target_resource": "EMPA-820C",
+    "ip_address": "127.0.0.1",
+    "_id": "11702"
+  },
+  {
+    "id": 11703,
+    "timestamp": "2026-10-29T11:22:05.673101+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-554F90 (emp_554f90@sericare.internal) and associated credentials",
+    "target_resource": "EMP-554F90",
+    "ip_address": "127.0.0.1",
+    "_id": "11703"
+  },
+  {
+    "id": 11704,
+    "timestamp": "2026-10-29T11:22:05.695279+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-4D63 (empb-4d63@test.com) and associated credentials",
+    "target_resource": "EMPB-4D63",
+    "ip_address": "127.0.0.1",
+    "_id": "11704"
+  },
+  {
+    "id": 11705,
+    "timestamp": "2026-10-29T11:22:05.715001+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-01BD (empa-01bd@test.com) and associated credentials",
+    "target_resource": "EMPA-01BD",
+    "ip_address": "127.0.0.1",
+    "_id": "11705"
+  },
+  {
+    "id": 11706,
+    "timestamp": "2026-10-29T11:22:05.735858+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-8EB83E (emp_8eb83e@sericare.internal) and associated credentials",
+    "target_resource": "EMP-8EB83E",
+    "ip_address": "127.0.0.1",
+    "_id": "11706"
+  },
+  {
+    "id": 11707,
+    "timestamp": "2026-10-29T11:22:17.594346+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-EE96 (empb-ee96@test.com) and associated credentials",
+    "target_resource": "EMPB-EE96",
+    "ip_address": "127.0.0.1",
+    "_id": "11707"
+  },
+  {
+    "id": 11708,
+    "timestamp": "2026-10-29T11:22:17.610138+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-D338 (empa-d338@test.com) and associated credentials",
+    "target_resource": "EMPA-D338",
+    "ip_address": "127.0.0.1",
+    "_id": "11708"
+  },
+  {
+    "id": 11709,
+    "timestamp": "2026-10-29T11:22:17.705340+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-8FF5A7 (emp_8ff5a7@sericare.internal) and associated credentials",
+    "target_resource": "EMP-8FF5A7",
+    "ip_address": "127.0.0.1",
+    "_id": "11709"
+  },
+  {
+    "id": 11710,
+    "timestamp": "2026-10-29T11:22:17.722684+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-85E1 (empb-85e1@test.com) and associated credentials",
+    "target_resource": "EMPB-85E1",
+    "ip_address": "127.0.0.1",
+    "_id": "11710"
+  },
+  {
+    "id": 11711,
+    "timestamp": "2026-10-29T11:22:17.739174+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-836E (empa-836e@test.com) and associated credentials",
+    "target_resource": "EMPA-836E",
+    "ip_address": "127.0.0.1",
+    "_id": "11711"
+  },
+  {
+    "id": 11712,
+    "timestamp": "2026-10-29T11:22:17.756172+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-E92BBB (emp_e92bbb@sericare.internal) and associated credentials",
+    "target_resource": "EMP-E92BBB",
+    "ip_address": "127.0.0.1",
+    "_id": "11712"
+  },
+  {
+    "id": 11713,
+    "timestamp": "2026-10-29T11:22:17.774508+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-9CE4 (empb-9ce4@test.com) and associated credentials",
+    "target_resource": "EMPB-9CE4",
+    "ip_address": "127.0.0.1",
+    "_id": "11713"
+  },
+  {
+    "id": 11714,
+    "timestamp": "2026-10-29T11:22:17.793252+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-7906 (empa-7906@test.com) and associated credentials",
+    "target_resource": "EMPA-7906",
+    "ip_address": "127.0.0.1",
+    "_id": "11714"
+  },
+  {
+    "id": 11715,
+    "timestamp": "2026-10-29T11:22:17.811028+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-6DC9DA (emp_6dc9da@sericare.internal) and associated credentials",
+    "target_resource": "EMP-6DC9DA",
+    "ip_address": "127.0.0.1",
+    "_id": "11715"
+  },
+  {
+    "id": 11716,
+    "timestamp": "2026-10-29T11:22:17.920561+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-CFF3 (empb-cff3@test.com) and associated credentials",
+    "target_resource": "EMPB-CFF3",
+    "ip_address": "127.0.0.1",
+    "_id": "11716"
+  },
+  {
+    "id": 11717,
+    "timestamp": "2026-10-29T11:22:42.554748+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-1B02 (empa-1b02@test.com) and associated credentials",
+    "target_resource": "EMPA-1B02",
+    "ip_address": "127.0.0.1",
+    "_id": "11717"
+  },
+  {
+    "id": 11718,
+    "timestamp": "2026-10-29T11:22:42.571761+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-0865CD (emp_0865cd@sericare.internal) and associated credentials",
+    "target_resource": "EMP-0865CD",
+    "ip_address": "127.0.0.1",
+    "_id": "11718"
+  },
+  {
+    "id": 11719,
+    "timestamp": "2026-10-29T11:22:42.682350+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-2266 (empb-2266@test.com) and associated credentials",
+    "target_resource": "EMPB-2266",
+    "ip_address": "127.0.0.1",
+    "_id": "11719"
+  },
+  {
+    "id": 11720,
+    "timestamp": "2026-10-29T11:22:42.710870+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-B7F8 (empa-b7f8@test.com) and associated credentials",
+    "target_resource": "EMPA-B7F8",
+    "ip_address": "127.0.0.1",
+    "_id": "11720"
+  },
+  {
+    "id": 11721,
+    "timestamp": "2026-10-29T11:22:42.734608+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-9F9D2A (emp_9f9d2a@sericare.internal) and associated credentials",
+    "target_resource": "EMP-9F9D2A",
+    "ip_address": "127.0.0.1",
+    "_id": "11721"
+  },
+  {
+    "id": 11722,
+    "timestamp": "2026-10-29T11:22:42.760742+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-010 (ramesh.farmer@sericare.io) and associated credentials",
+    "target_resource": "EMP-010",
+    "ip_address": "127.0.0.1",
+    "_id": "11722"
+  },
+  {
+    "id": 11723,
+    "timestamp": "2026-10-29T11:22:42.782495+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-E2B7 (empb-e2b7@test.com) and associated credentials",
+    "target_resource": "EMPB-E2B7",
+    "ip_address": "127.0.0.1",
+    "_id": "11723"
+  },
+  {
+    "id": 11724,
+    "timestamp": "2026-10-29T11:22:42.801128+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-7A26 (empa-7a26@test.com) and associated credentials",
+    "target_resource": "EMPA-7A26",
+    "ip_address": "127.0.0.1",
+    "_id": "11724"
+  },
+  {
+    "id": 11725,
+    "timestamp": "2026-10-29T11:22:42.819007+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-FA7941 (emp_fa7941@sericare.internal) and associated credentials",
+    "target_resource": "EMP-FA7941",
+    "ip_address": "127.0.0.1",
+    "_id": "11725"
+  },
+  {
+    "id": 11726,
+    "timestamp": "2026-10-29T11:22:42.925386+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-892F (empb-892f@test.com) and associated credentials",
+    "target_resource": "EMPB-892F",
+    "ip_address": "127.0.0.1",
+    "_id": "11726"
+  },
+  {
+    "id": 11727,
+    "timestamp": "2026-10-29T11:22:47.201146+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-EEAE (empa-eeae@test.com) and associated credentials",
+    "target_resource": "EMPA-EEAE",
+    "ip_address": "127.0.0.1",
+    "_id": "11727"
+  },
+  {
+    "id": 11728,
+    "timestamp": "2026-10-29T11:22:47.215412+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-DA6A4B (emp_da6a4b@sericare.internal) and associated credentials",
+    "target_resource": "EMP-DA6A4B",
+    "ip_address": "127.0.0.1",
+    "_id": "11728"
+  },
+  {
+    "id": 11729,
+    "timestamp": "2026-10-29T11:22:47.307680+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-8671 (empb-8671@test.com) and associated credentials",
+    "target_resource": "EMPB-8671",
+    "ip_address": "127.0.0.1",
+    "_id": "11729"
+  },
+  {
+    "id": 11730,
+    "timestamp": "2026-10-29T11:22:47.331548+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-1EB3 (empa-1eb3@test.com) and associated credentials",
+    "target_resource": "EMPA-1EB3",
+    "ip_address": "127.0.0.1",
+    "_id": "11730"
+  },
+  {
+    "id": 11731,
+    "timestamp": "2026-10-29T11:22:47.349016+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-02BF62 (emp_02bf62@sericare.internal) and associated credentials",
+    "target_resource": "EMP-02BF62",
+    "ip_address": "127.0.0.1",
+    "_id": "11731"
+  },
+  {
+    "id": 11732,
+    "timestamp": "2026-10-29T11:22:47.366271+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-48A3 (empb-48a3@test.com) and associated credentials",
+    "target_resource": "EMPB-48A3",
+    "ip_address": "127.0.0.1",
+    "_id": "11732"
+  },
+  {
+    "id": 11733,
+    "timestamp": "2026-10-29T11:22:47.381990+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-4687 (empa-4687@test.com) and associated credentials",
+    "target_resource": "EMPA-4687",
+    "ip_address": "127.0.0.1",
+    "_id": "11733"
+  },
+  {
+    "id": 11734,
+    "timestamp": "2026-10-29T11:22:47.399153+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-00A9B9 (emp_00a9b9@sericare.internal) and associated credentials",
+    "target_resource": "EMP-00A9B9",
+    "ip_address": "127.0.0.1",
+    "_id": "11734"
+  },
+  {
+    "id": 11735,
+    "timestamp": "2026-10-29T11:22:47.415721+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-BFB7 (empb-bfb7@test.com) and associated credentials",
+    "target_resource": "EMPB-BFB7",
+    "ip_address": "127.0.0.1",
+    "_id": "11735"
+  },
+  {
+    "id": 11736,
+    "timestamp": "2026-10-29T11:22:47.521205+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-5CFD (empa-5cfd@test.com) and associated credentials",
+    "target_resource": "EMPA-5CFD",
+    "ip_address": "127.0.0.1",
+    "_id": "11736"
+  },
+  {
+    "id": 11737,
+    "timestamp": "2026-10-29T11:22:51.921613+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-4DD696 (emp_4dd696@sericare.internal) and associated credentials",
+    "target_resource": "EMP-4DD696",
+    "ip_address": "127.0.0.1",
+    "_id": "11737"
+  },
+  {
+    "id": 11738,
+    "timestamp": "2026-10-29T11:22:51.947871+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-EC7E (empb-ec7e@test.com) and associated credentials",
+    "target_resource": "EMPB-EC7E",
+    "ip_address": "127.0.0.1",
+    "_id": "11738"
+  },
+  {
+    "id": 11739,
+    "timestamp": "2026-10-29T11:22:52.086692+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-FAFC (empa-fafc@test.com) and associated credentials",
+    "target_resource": "EMPA-FAFC",
+    "ip_address": "127.0.0.1",
+    "_id": "11739"
+  },
+  {
+    "id": 11740,
+    "timestamp": "2026-10-29T11:22:52.117000+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-F816D9 (emp_f816d9@sericare.internal) and associated credentials",
+    "target_resource": "EMP-F816D9",
+    "ip_address": "127.0.0.1",
+    "_id": "11740"
+  },
+  {
+    "id": 11741,
+    "timestamp": "2026-10-29T11:22:52.143135+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-A46D (empb-a46d@test.com) and associated credentials",
+    "target_resource": "EMPB-A46D",
+    "ip_address": "127.0.0.1",
+    "_id": "11741"
+  },
+  {
+    "id": 11742,
+    "timestamp": "2026-10-29T11:22:52.167673+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-E4A6 (empa-e4a6@test.com) and associated credentials",
+    "target_resource": "EMPA-E4A6",
+    "ip_address": "127.0.0.1",
+    "_id": "11742"
+  },
+  {
+    "id": 11743,
+    "timestamp": "2026-10-29T11:22:52.193004+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-E5ED74 (emp_e5ed74@sericare.internal) and associated credentials",
+    "target_resource": "EMP-E5ED74",
+    "ip_address": "127.0.0.1",
+    "_id": "11743"
+  },
+  {
+    "id": 11744,
+    "timestamp": "2026-10-29T11:22:52.317144+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-003 (ceo@sericare.io) and associated credentials",
+    "target_resource": "EMP-003",
+    "ip_address": "127.0.0.1",
+    "_id": "11744"
+  },
+  {
+    "id": 11745,
+    "timestamp": "2026-10-29T11:22:52.427054+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-006 (kiran.tech@sericare.io) and associated credentials",
+    "target_resource": "EMP-006",
+    "ip_address": "127.0.0.1",
+    "_id": "11745"
+  },
+  {
+    "id": 11746,
+    "timestamp": "2026-10-29T11:22:52.516424+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-007 (anand.sales@sericare.io) and associated credentials",
+    "target_resource": "EMP-007",
+    "ip_address": "127.0.0.1",
+    "_id": "11746"
+  },
+  {
+    "id": 11747,
+    "timestamp": "2026-10-29T11:22:57.002166+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-008 (priya.support@sericare.io) and associated credentials",
+    "target_resource": "EMP-008",
+    "ip_address": "127.0.0.1",
+    "_id": "11747"
+  },
+  {
+    "id": 11748,
+    "timestamp": "2026-10-29T11:22:57.019969+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-005 (manoj.ops@sericare.io) and associated credentials",
+    "target_resource": "EMP-005",
+    "ip_address": "127.0.0.1",
+    "_id": "11748"
+  },
+  {
+    "id": 11749,
+    "timestamp": "2026-10-29T11:22:57.111768+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-002 (siddharth.rao@sericare.io) and associated credentials",
+    "target_resource": "EMP-002",
+    "ip_address": "127.0.0.1",
+    "_id": "11749"
+  },
+  {
+    "id": 11750,
+    "timestamp": "2026-10-29T11:22:57.129977+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-004 (deepa.hr@sericare.io) and associated credentials",
+    "target_resource": "EMP-004",
+    "ip_address": "127.0.0.1",
+    "_id": "11750"
+  },
+  {
+    "id": 11751,
+    "timestamp": "2026-10-29T11:22:57.145339+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMP-009 (sneha.research@sericare.io) and associated credentials",
+    "target_resource": "EMP-009",
+    "ip_address": "127.0.0.1",
+    "_id": "11751"
+  },
+  {
+    "id": 11752,
+    "timestamp": "2026-10-29T11:22:57.165608+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPB-C61D (empb-c61d@test.com) and associated credentials",
+    "target_resource": "EMPB-C61D",
+    "ip_address": "127.0.0.1",
+    "_id": "11752"
+  },
+  {
+    "id": 11753,
+    "timestamp": "2026-10-29T11:22:57.261148+05:30",
+    "actor": "admin",
+    "action": "EMPLOYEE_DELETED",
+    "details": "Permanently deleted employee EMPA-4C75 (empa-4c75@test.com) and associated credentials",
+    "target_resource": "EMPA-4C75",
+    "ip_address": "127.0.0.1",
+    "_id": "11753"
+  },
+  {
+    "id": 11754,
+    "timestamp": "2026-10-29T11:29:03.492413+05:30",
+    "actor": "superadmin",
+    "action": "UPDATE_PLATFORM_SETTINGS",
+    "details": "Updated general platform configuration",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11754"
+  },
+  {
+    "id": 11755,
+    "timestamp": "2026-10-29T11:29:03.510590+05:30",
+    "actor": "superadmin",
+    "action": "UPDATE_PLATFORM_SETTINGS",
+    "details": "Updated general platform configuration",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11755"
+  },
+  {
+    "id": 11756,
+    "timestamp": "2026-10-29T11:29:37.644347+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11756"
+  },
+  {
+    "id": 11757,
+    "timestamp": "2026-10-29T11:29:37.653858+05:30",
+    "actor": "ravi_farmer",
+    "action": "LOGIN_FAILED",
+    "details": "Failed authentication attempt (invalid credentials)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11757"
+  },
+  {
+    "id": 11758,
+    "timestamp": "2026-10-29T11:29:37.916082+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11758"
+  },
+  {
+    "id": 11759,
+    "timestamp": "2026-10-29T11:29:37.933226+05:30",
+    "actor": "ramesh_farmer",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_413ae07cac65 (SET_ACTUATOR) for device esp32_shed_01",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11759"
+  },
+  {
+    "id": 11760,
+    "timestamp": "2026-10-29T11:29:39.838943+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11760"
+  },
+  {
+    "id": 11761,
+    "timestamp": "2026-10-29T11:29:39.845294+05:30",
+    "actor": "admin",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_3912ef429573 (SET_ACTUATOR) for device esp32_shed_02",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11761"
+  },
+  {
+    "id": 11762,
+    "timestamp": "2026-10-29T11:29:40.247030+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11762"
+  },
+  {
+    "id": 11763,
+    "timestamp": "2026-10-29T11:29:40.484795+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11763"
+  },
+  {
+    "id": 11764,
+    "timestamp": "2026-10-29T11:29:40.727185+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11764"
+  },
+  {
+    "id": 11765,
+    "timestamp": "2026-10-29T11:29:40.955417+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11765"
+  },
+  {
+    "id": 11766,
+    "timestamp": "2026-10-29T11:29:40.979003+05:30",
+    "actor": "admin",
+    "action": "UPDATE_FARMER",
+    "details": "Farmer ramesh_farmer (Ramesh Gowda Updated) details updated by superadmin",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11766"
+  },
+  {
+    "id": 11767,
+    "timestamp": "2026-10-29T11:29:41.247604+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: farmer_test_1793253581 (Siddappa Gowda) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11767"
+  },
+  {
+    "id": 11768,
+    "timestamp": "2026-10-29T11:29:41.466091+05:30",
+    "actor": "farmer_test_1793253581",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11768"
+  },
+  {
+    "id": 11769,
+    "timestamp": "2026-10-29T11:29:42.092879+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11769"
+  },
+  {
+    "id": 11770,
+    "timestamp": "2026-10-29T11:29:42.104254+05:30",
+    "actor": "admin",
+    "action": "UPDATE_STAGE_LEVEL",
+    "details": "Stage 1 (1st Instar (Chawki)) levels updated: Temp 27.2\u00b0C\u201328.5\u00b0C, Hum 82.0%\u201388.0%",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11770"
+  },
+  {
+    "id": 11771,
+    "timestamp": "2026-10-29T11:29:42.109711+05:30",
+    "actor": "admin",
+    "action": "CHANGE_SHED_STAGE",
+    "details": "shed_01 stage switched to 1 (1st Instar (Chawki))",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11771"
+  },
+  {
+    "id": 11772,
+    "timestamp": "2026-10-29T11:29:42.121880+05:30",
+    "actor": "admin",
+    "action": "RESET_STAGES",
+    "details": "All rearing stage climate levels restored to Central Silk Board standard defaults.",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11772"
+  },
+  {
+    "id": 11773,
+    "timestamp": "2026-10-29T11:29:42.356487+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11773"
+  },
+  {
+    "id": 11774,
+    "timestamp": "2026-10-29T11:29:42.601753+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11774"
+  },
+  {
+    "id": 11775,
+    "timestamp": "2026-10-29T11:29:42.846321+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11775"
+  },
+  {
+    "id": 11776,
+    "timestamp": "2026-10-29T11:29:43.125500+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11776"
+  },
+  {
+    "id": 11777,
+    "timestamp": "2026-10-29T11:29:43.358238+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11777"
+  },
+  {
+    "id": 11778,
+    "timestamp": "2026-10-29T11:29:43.620272+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11778"
+  },
+  {
+    "id": 11779,
+    "timestamp": "2026-10-29T11:29:43.634632+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_CREATE",
+    "details": "Created product SKU-TEST-B6D0AA - Automated Ultrasonic Fogger Test",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11779"
+  },
+  {
+    "id": 11780,
+    "timestamp": "2026-10-29T11:29:43.643029+05:30",
+    "actor": "admin",
+    "action": "STOCK_ADJUSTMENT",
+    "details": "Adjusted stock for product prod_91a5180ea69a by 5",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11780"
+  },
+  {
+    "id": 11781,
+    "timestamp": "2026-10-29T11:29:43.658252+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_UPDATE",
+    "details": "Updated product SKU-TEST-B6D0AA - Updated Automated Fogger Pro",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11781"
+  },
+  {
+    "id": 11782,
+    "timestamp": "2026-10-29T11:29:43.664315+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_ARCHIVED",
+    "details": "ARCHIVED product SKU-TEST-B6D0AA - Updated Automated Fogger Pro",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11782"
+  },
+  {
+    "id": 11783,
+    "timestamp": "2026-10-29T11:29:43.671745+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_RESTORED",
+    "details": "RESTORED product SKU-TEST-B6D0AA - Updated Automated Fogger Pro",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11783"
+  },
+  {
+    "id": 11784,
+    "timestamp": "2026-10-29T11:29:43.680370+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_DELETE",
+    "details": "Deleted product SKU-TEST-B6D0AA - Updated Automated Fogger Pro (ID: prod_91a5180ea69a)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11784"
+  },
+  {
+    "id": 11785,
+    "timestamp": "2026-10-29T11:29:43.954051+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11785"
+  },
+  {
+    "id": 11786,
+    "timestamp": "2026-10-29T11:29:44.193479+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11786"
+  },
+  {
+    "id": 11787,
+    "timestamp": "2026-10-29T11:29:44.214380+05:30",
+    "actor": "ramesh_farmer",
+    "action": "ORDER_CREATED",
+    "details": "Placed order ORD-2026-676206 (1 item(s), \u20b92336.40) via UPI",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11787"
+  },
+  {
+    "id": 11788,
+    "timestamp": "2026-10-29T11:29:44.523857+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11788"
+  },
+  {
+    "id": 11789,
+    "timestamp": "2026-10-29T11:29:44.793490+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11789"
+  },
+  {
+    "id": 11790,
+    "timestamp": "2026-10-29T11:29:44.823099+05:30",
+    "actor": "usr_001",
+    "action": "TICKET_CREATE",
+    "details": "Created ticket TKT-2026-87CD09",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11790"
+  },
+  {
+    "id": 11791,
+    "timestamp": "2026-10-29T11:29:44.841633+05:30",
+    "actor": "admin",
+    "action": "TICKET_STATUS_UPDATE",
+    "details": "Ticket tkt_a611d94c01ee updated to RESOLVED",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11791"
+  },
+  {
+    "id": 11792,
+    "timestamp": "2026-10-29T11:29:45.075547+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11792"
+  },
+  {
+    "id": 11793,
+    "timestamp": "2026-10-29T11:29:45.311264+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11793"
+  },
+  {
+    "id": 11794,
+    "timestamp": "2026-10-29T11:29:45.550437+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11794"
+  },
+  {
+    "id": 11795,
+    "timestamp": "2026-10-29T11:29:45.561450+05:30",
+    "actor": "admin",
+    "action": "SENSOR_CALIBRATE",
+    "details": "Calibrated sensor sns_01_aq with offset 0.4",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11795"
+  },
+  {
+    "id": 11796,
+    "timestamp": "2026-10-29T11:29:45.802381+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11796"
+  },
+  {
+    "id": 11797,
+    "timestamp": "2026-10-29T11:29:46.126215+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11797"
+  },
+  {
+    "id": 11798,
+    "timestamp": "2026-10-29T11:29:46.603680+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11798"
+  },
+  {
+    "id": 11799,
+    "timestamp": "2026-10-29T11:29:46.908452+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11799"
+  },
+  {
+    "id": 11800,
+    "timestamp": "2026-10-29T11:29:47.162834+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11800"
+  },
+  {
+    "id": 11801,
+    "timestamp": "2026-10-29T11:29:47.399955+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11801"
+  },
+  {
+    "id": 11802,
+    "timestamp": "2026-10-29T11:29:47.412037+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_IMAGE_UPLOAD",
+    "details": "Uploaded product photo: prod_b1360f91_automated_test_photo.png (67 bytes)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11802"
+  },
+  {
+    "id": 11803,
+    "timestamp": "2026-10-29T11:29:47.428339+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_CREATE",
+    "details": "Created product SKU-TEST-UP-99 - Upload Verification Device",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11803"
+  },
+  {
+    "id": 11804,
+    "timestamp": "2026-10-29T11:29:47.436678+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_DELETE",
+    "details": "Deleted product SKU-TEST-UP-99 - Upload Verification Device (ID: prod_6a4440ebf8be)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11804"
+  },
+  {
+    "id": 11805,
+    "timestamp": "2026-10-29T11:29:47.672705+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11805"
+  },
+  {
+    "id": 11806,
+    "timestamp": "2026-10-29T11:29:47.928239+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11806"
+  },
+  {
+    "id": 11807,
+    "timestamp": "2026-10-29T11:29:48.156858+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11807"
+  },
+  {
+    "id": 11808,
+    "timestamp": "2026-10-29T11:29:48.400585+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11808"
+  },
+  {
+    "id": 11809,
+    "timestamp": "2026-10-29T11:29:48.641579+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11809"
+  },
+  {
+    "id": 11810,
+    "timestamp": "2026-10-29T11:29:48.872495+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11810"
+  },
+  {
+    "id": 11811,
+    "timestamp": "2026-10-29T11:29:49.138264+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11811"
+  },
+  {
+    "id": 11812,
+    "timestamp": "2026-10-29T11:29:49.360176+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11812"
+  },
+  {
+    "id": 11813,
+    "timestamp": "2026-10-29T11:29:49.586078+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11813"
+  },
+  {
+    "id": 11814,
+    "timestamp": "2026-10-29T11:29:49.591226+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGOUT",
+    "details": "User logged out of tab session (session_id: sess_4da56a2e0b1b4c57a9d227e36917c86a, jti: f1d69fea12884cdfb4ca1dbbb1f8ad34)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11814"
+  },
+  {
+    "id": 11815,
+    "timestamp": "2026-10-29T11:29:49.835715+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11815"
+  },
+  {
+    "id": 11816,
+    "timestamp": "2026-10-29T11:29:50.102950+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11816"
+  },
+  {
+    "id": 11817,
+    "timestamp": "2026-10-29T11:29:50.336191+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11817"
+  },
+  {
+    "id": 11818,
+    "timestamp": "2026-10-29T11:29:59.822963+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11818"
+  },
+  {
+    "id": 11819,
+    "timestamp": "2026-10-29T11:30:00.070170+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11819"
+  },
+  {
+    "id": 11820,
+    "timestamp": "2026-10-29T11:30:00.378423+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11820"
+  },
+  {
+    "id": 11821,
+    "timestamp": "2026-10-29T11:30:00.671137+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11821"
+  },
+  {
+    "id": 11822,
+    "timestamp": "2026-10-29T11:30:00.949656+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11822"
+  },
+  {
+    "id": 11823,
+    "timestamp": "2026-10-29T11:30:01.198675+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11823"
+  },
+  {
+    "id": 11824,
+    "timestamp": "2026-10-29T11:30:01.475636+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11824"
+  },
+  {
+    "id": 11825,
+    "timestamp": "2026-10-29T11:30:01.489820+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGOUT_ALL",
+    "details": "User revoked all 17 active sessions.",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11825"
+  },
+  {
+    "id": 11826,
+    "timestamp": "2026-10-29T11:30:01.758237+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11826"
+  },
+  {
+    "id": 11827,
+    "timestamp": "2026-10-29T11:30:01.779335+05:30",
+    "actor": "admin",
+    "action": "CREATE_DEPARTMENT",
+    "details": "Created department 'Quality Assurance 41fdc3' (QA_41FDC3)",
+    "target_resource": "dept_qa_41fdc3",
+    "ip_address": "127.0.0.1",
+    "_id": "11827"
+  },
+  {
+    "id": 11828,
+    "timestamp": "2026-10-29T11:30:01.787894+05:30",
+    "actor": "admin",
+    "action": "UPDATE_DEPARTMENT",
+    "details": "Updated department dept_qa_41fdc3: ['description']",
+    "target_resource": "dept_qa_41fdc3",
+    "ip_address": "127.0.0.1",
+    "_id": "11828"
+  },
+  {
+    "id": 11829,
+    "timestamp": "2026-10-29T11:30:02.056708+05:30",
+    "actor": "hr_deepa",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: hr)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11829"
+  },
+  {
+    "id": 11830,
+    "timestamp": "2026-10-29T11:30:02.327833+05:30",
+    "actor": "hr_deepa",
+    "action": "INVITE_EMPLOYEE",
+    "details": "Invited new employee 'Tester Onboard 59f5ce' (emp_59f5ce@sericare.internal, ID: EMP-59F5CE, Role: technician)",
+    "target_resource": "emp_b763ce99",
+    "ip_address": "127.0.0.1",
+    "_id": "11830"
+  },
+  {
+    "id": 11831,
+    "timestamp": "2026-10-29T11:30:02.603904+05:30",
+    "actor": "emp_59f5ce",
+    "action": "INVITATION_ACCEPTED",
+    "details": "Employee EMP-59F5CE (emp_59f5ce@sericare.internal) accepted invitation and established password",
+    "target_resource": "emp_b763ce99",
+    "ip_address": "127.0.0.1",
+    "_id": "11831"
+  },
+  {
+    "id": 11832,
+    "timestamp": "2026-10-29T11:30:02.604469+05:30",
+    "actor": "emp_59f5ce",
+    "action": "ACCOUNT_ACTIVATED",
+    "details": "Account for Tester Onboard 59f5ce activated successfully (MFA: False)",
+    "target_resource": "usr_46feb070f719",
+    "ip_address": "127.0.0.1",
+    "_id": "11832"
+  },
+  {
+    "id": 11833,
+    "timestamp": "2026-10-29T11:30:02.864775+05:30",
+    "actor": "emp_59f5ce",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: technician)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11833"
+  },
+  {
+    "id": 11834,
+    "timestamp": "2026-10-29T11:30:02.878302+05:30",
+    "actor": "hr_deepa",
+    "action": "EMPLOYEE_STATUS_CHANGE",
+    "details": "Employee EMP-59F5CE (Tester Onboard 59f5ce) status changed to SUSPENDED. User session active: False",
+    "target_resource": "emp_b763ce99",
+    "ip_address": "127.0.0.1",
+    "_id": "11834"
+  },
+  {
+    "id": 11835,
+    "timestamp": "2026-10-29T11:30:03.156241+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11835"
+  },
+  {
+    "id": 11836,
+    "timestamp": "2026-10-29T11:30:03.488847+05:30",
+    "actor": "admin",
+    "action": "INVITE_EMPLOYEE",
+    "details": "Invited new employee 'Supervisor Alpha' (empa-f4b7@test.com, ID: EMPA-F4B7, Role: operations_manager)",
+    "target_resource": "emp_4ab99785",
+    "ip_address": "127.0.0.1",
+    "_id": "11836"
+  },
+  {
+    "id": 11837,
+    "timestamp": "2026-10-29T11:30:03.771895+05:30",
+    "actor": "admin",
+    "action": "INVITE_EMPLOYEE",
+    "details": "Invited new employee 'Subordinate Beta' (empb-7d24@test.com, ID: EMPB-7D24, Role: technician)",
+    "target_resource": "emp_f9ccc6aa",
+    "ip_address": "127.0.0.1",
+    "_id": "11837"
+  },
+  {
+    "id": 11838,
+    "timestamp": "2026-10-29T11:30:04.102987+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11838"
+  },
+  {
+    "id": 11839,
+    "timestamp": "2026-10-29T11:30:04.145538+05:30",
+    "actor": "admin",
+    "action": "CREATE_CUSTOM_ROLE",
+    "details": "Created custom role 'Custom Auditor' with 3 permissions",
+    "target_resource": "role_custom_5604dd9f",
+    "ip_address": "127.0.0.1",
+    "_id": "11839"
+  },
+  {
+    "id": 11840,
+    "timestamp": "2026-10-29T11:30:04.462341+05:30",
+    "actor": "hr_deepa",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: hr)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11840"
+  },
+  {
+    "id": 11841,
+    "timestamp": "2026-10-29T11:30:04.760591+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11841"
+  },
+  {
+    "id": 11842,
+    "timestamp": "2026-10-29T11:30:05.082837+05:30",
+    "actor": "comp_admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: company_admin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11842"
+  },
+  {
+    "id": 11843,
+    "timestamp": "2026-10-29T11:30:05.432785+05:30",
+    "actor": "tech_kiran",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: technician)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11843"
+  },
+  {
+    "id": 11844,
+    "timestamp": "2026-10-29T11:30:05.716425+05:30",
+    "actor": "sales_anand",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: sales)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11844"
+  },
+  {
+    "id": 11845,
+    "timestamp": "2026-10-29T11:30:06.008634+05:30",
+    "actor": "support_priya",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: support)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11845"
+  },
+  {
+    "id": 11846,
+    "timestamp": "2026-10-29T11:30:06.303436+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11846"
+  },
+  {
+    "id": 11847,
+    "timestamp": "2026-10-29T11:30:06.643863+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11847"
+  },
+  {
+    "id": 11848,
+    "timestamp": "2026-10-29T11:30:06.700927+05:30",
+    "actor": "admin",
+    "action": "LOGOUT",
+    "details": "User logged out of tab session (session_id: None, jti: 3d5d61d15d2b410481315b08aef87468)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11848"
+  },
+  {
+    "id": 11849,
+    "timestamp": "2026-10-29T11:30:06.715766+05:30",
+    "actor": "farmer_charlie",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_22d90a608e3b (cooling_fan) for device esp32_gateway_02",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11849"
+  },
+  {
+    "id": 11850,
+    "timestamp": "2026-10-29T11:30:07.080500+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11850"
+  },
+  {
+    "id": 11851,
+    "timestamp": "2026-10-29T11:30:07.448404+05:30",
+    "actor": "superadmin",
+    "action": "UPDATE_PLATFORM_SETTINGS",
+    "details": "Updated general platform configuration",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11851"
+  },
+  {
+    "id": 11852,
+    "timestamp": "2026-10-29T11:30:07.458097+05:30",
+    "actor": "superadmin",
+    "action": "UPDATE_PLATFORM_SETTINGS",
+    "details": "Updated general platform configuration",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11852"
+  },
+  {
+    "id": 11853,
+    "timestamp": "2026-10-29T11:30:07.582931+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_CREATE",
+    "details": "Created product SKU-DRAFT-3FE0F6 - Experimental Sensor (Draft)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11853"
+  },
+  {
+    "id": 11854,
+    "timestamp": "2026-10-29T11:30:07.590365+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_PUBLICATION_UPDATE",
+    "details": "Updated product prod_5424500a1906 publication to DRAFT",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11854"
+  },
+  {
+    "id": 11855,
+    "timestamp": "2026-10-29T11:30:07.676237+05:30",
+    "actor": "admin",
+    "action": "ENQUIRY_STATUS_UPDATE",
+    "details": "Updated enquiry enq_40e23b54af7f to CONTACTED",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11855"
+  },
+  {
+    "id": 11856,
+    "timestamp": "2026-10-29T11:30:07.997840+05:30",
+    "actor": "tech_kiran",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: technician)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11856"
+  },
+  {
+    "id": 11857,
+    "timestamp": "2026-10-29T11:30:08.999636+05:30",
+    "actor": "ops_manoj",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: operations_manager)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11857"
+  },
+  {
+    "id": 11858,
+    "timestamp": "2026-10-29T11:30:09.476774+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11858"
+  },
+  {
+    "id": 11859,
+    "timestamp": "2026-10-29T11:30:09.765045+05:30",
+    "actor": "ceo",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: ceo)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11859"
+  },
+  {
+    "id": 11860,
+    "timestamp": "2026-10-29T11:30:10.052665+05:30",
+    "actor": "ops_manoj",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: operations_manager)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11860"
+  },
+  {
+    "id": 11861,
+    "timestamp": "2026-10-29T11:30:10.411387+05:30",
+    "actor": "support_priya",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: support)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11861"
+  },
+  {
+    "id": 11862,
+    "timestamp": "2026-10-29T11:30:10.710401+05:30",
+    "actor": "sales_anand",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: sales)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11862"
+  },
+  {
+    "id": 11863,
+    "timestamp": "2026-10-29T11:30:10.985393+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11863"
+  },
+  {
+    "id": 11864,
+    "timestamp": "2026-10-29T11:30:11.333218+05:30",
+    "actor": "operator",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_d5e3f2abd07f (SET_ACTUATOR) for device esp32_shed_01",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11864"
+  },
+  {
+    "id": 11865,
+    "timestamp": "2026-10-29T11:30:11.337909+05:30",
+    "actor": "operator",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_c48488102c56 (SET_ACTUATOR) for device esp32_shed_01",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11865"
+  },
+  {
+    "id": 11866,
+    "timestamp": "2026-10-29T11:30:11.374537+05:30",
+    "actor": "security_tester",
+    "action": "PRIVILEGE_ELEVATION_CHECK",
+    "details": "Validated superadmin role enforcement",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11866"
+  },
+  {
+    "id": 11867,
+    "timestamp": "2026-10-29T11:30:11.689592+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11867"
+  },
+  {
+    "id": 11868,
+    "timestamp": "2026-10-29T11:30:11.952646+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11868"
+  },
+  {
+    "id": 11869,
+    "timestamp": "2026-10-29T11:30:11.963117+05:30",
+    "actor": "nonexistent_user_9999",
+    "action": "LOGIN_FAILED",
+    "details": "Failed authentication attempt (invalid credentials)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11869"
+  },
+  {
+    "id": 11870,
+    "timestamp": "2026-10-29T11:30:12.207742+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: farmer_770820 (Ramesh Gowda) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11870"
+  },
+  {
+    "id": 11871,
+    "timestamp": "2026-10-29T11:30:12.452115+05:30",
+    "actor": "farmer_770820",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11871"
+  },
+  {
+    "id": 11872,
+    "timestamp": "2026-10-29T11:30:12.719505+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: hacker_7736bf (Attacker Trying Admin) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11872"
+  },
+  {
+    "id": 11873,
+    "timestamp": "2026-10-29T11:30:13.012072+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: dupuser_033c17 (First User) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11873"
+  },
+  {
+    "id": 11874,
+    "timestamp": "2026-10-29T11:30:13.367677+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11874"
+  },
+  {
+    "id": 11875,
+    "timestamp": "2026-10-29T11:30:13.713718+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11875"
+  },
+  {
+    "id": 11876,
+    "timestamp": "2026-10-29T11:30:14.036772+05:30",
+    "actor": "twilio_webhook",
+    "action": "WHATSAPP_VERIFIED",
+    "details": "WhatsApp verified for +919876543210 (Body: join stay-spread)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11876"
+  },
+  {
+    "id": 11877,
+    "timestamp": "2026-10-29T11:32:25.469717+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11877"
+  },
+  {
+    "id": 11878,
+    "timestamp": "2026-10-29T11:32:25.486554+05:30",
+    "actor": "ravi_farmer",
+    "action": "LOGIN_FAILED",
+    "details": "Failed authentication attempt (invalid credentials)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11878"
+  },
+  {
+    "id": 11879,
+    "timestamp": "2026-10-29T11:32:25.773096+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11879"
+  },
+  {
+    "id": 11880,
+    "timestamp": "2026-10-29T11:32:25.794766+05:30",
+    "actor": "ramesh_farmer",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_842f62194b8b (SET_ACTUATOR) for device esp32_shed_01",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11880"
+  },
+  {
+    "id": 11881,
+    "timestamp": "2026-10-29T11:32:27.983681+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11881"
+  },
+  {
+    "id": 11882,
+    "timestamp": "2026-10-29T11:32:27.993266+05:30",
+    "actor": "admin",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_18a9dad55116 (SET_ACTUATOR) for device esp32_shed_02",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11882"
+  },
+  {
+    "id": 11883,
+    "timestamp": "2026-10-29T11:32:28.396205+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11883"
+  },
+  {
+    "id": 11884,
+    "timestamp": "2026-10-29T11:32:28.633354+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11884"
+  },
+  {
+    "id": 11885,
+    "timestamp": "2026-10-29T11:32:28.869150+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11885"
+  },
+  {
+    "id": 11886,
+    "timestamp": "2026-10-29T11:32:29.105832+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11886"
+  },
+  {
+    "id": 11887,
+    "timestamp": "2026-10-29T11:32:29.131831+05:30",
+    "actor": "admin",
+    "action": "UPDATE_FARMER",
+    "details": "Farmer ramesh_farmer (Ramesh Gowda Updated) details updated by superadmin",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11887"
+  },
+  {
+    "id": 11888,
+    "timestamp": "2026-10-29T11:32:29.428585+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: farmer_test_1793253749 (Siddappa Gowda) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11888"
+  },
+  {
+    "id": 11889,
+    "timestamp": "2026-10-29T11:32:29.653770+05:30",
+    "actor": "farmer_test_1793253749",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11889"
+  },
+  {
+    "id": 11890,
+    "timestamp": "2026-10-29T11:32:30.185864+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11890"
+  },
+  {
+    "id": 11891,
+    "timestamp": "2026-10-29T11:32:30.197541+05:30",
+    "actor": "admin",
+    "action": "UPDATE_STAGE_LEVEL",
+    "details": "Stage 1 (1st Instar (Chawki)) levels updated: Temp 27.2\u00b0C\u201328.5\u00b0C, Hum 82.0%\u201388.0%",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11891"
+  },
+  {
+    "id": 11892,
+    "timestamp": "2026-10-29T11:32:30.203912+05:30",
+    "actor": "admin",
+    "action": "CHANGE_SHED_STAGE",
+    "details": "shed_01 stage switched to 1 (1st Instar (Chawki))",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11892"
+  },
+  {
+    "id": 11893,
+    "timestamp": "2026-10-29T11:32:30.216336+05:30",
+    "actor": "admin",
+    "action": "RESET_STAGES",
+    "details": "All rearing stage climate levels restored to Central Silk Board standard defaults.",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11893"
+  },
+  {
+    "id": 11894,
+    "timestamp": "2026-10-29T11:32:30.475247+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11894"
+  },
+  {
+    "id": 11895,
+    "timestamp": "2026-10-29T11:32:30.739680+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11895"
+  },
+  {
+    "id": 11896,
+    "timestamp": "2026-10-29T11:32:31.007301+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11896"
+  },
+  {
+    "id": 11897,
+    "timestamp": "2026-10-29T11:32:31.251236+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11897"
+  },
+  {
+    "id": 11898,
+    "timestamp": "2026-10-29T11:32:31.491336+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11898"
+  },
+  {
+    "id": 11899,
+    "timestamp": "2026-10-29T11:32:31.726446+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11899"
+  },
+  {
+    "id": 11900,
+    "timestamp": "2026-10-29T11:32:31.744493+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_CREATE",
+    "details": "Created product SKU-TEST-7FC782 - Automated Ultrasonic Fogger Test",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11900"
+  },
+  {
+    "id": 11901,
+    "timestamp": "2026-10-29T11:32:31.752429+05:30",
+    "actor": "admin",
+    "action": "STOCK_ADJUSTMENT",
+    "details": "Adjusted stock for product prod_17bec6440255 by 5",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11901"
+  },
+  {
+    "id": 11902,
+    "timestamp": "2026-10-29T11:32:31.764944+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_UPDATE",
+    "details": "Updated product SKU-TEST-7FC782 - Updated Automated Fogger Pro",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11902"
+  },
+  {
+    "id": 11903,
+    "timestamp": "2026-10-29T11:32:31.770577+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_ARCHIVED",
+    "details": "ARCHIVED product SKU-TEST-7FC782 - Updated Automated Fogger Pro",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11903"
+  },
+  {
+    "id": 11904,
+    "timestamp": "2026-10-29T11:32:31.778165+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_RESTORED",
+    "details": "RESTORED product SKU-TEST-7FC782 - Updated Automated Fogger Pro",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11904"
+  },
+  {
+    "id": 11905,
+    "timestamp": "2026-10-29T11:32:31.786914+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_DELETE",
+    "details": "Deleted product SKU-TEST-7FC782 - Updated Automated Fogger Pro (ID: prod_17bec6440255)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11905"
+  },
+  {
+    "id": 11906,
+    "timestamp": "2026-10-29T11:32:32.054301+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11906"
+  },
+  {
+    "id": 11907,
+    "timestamp": "2026-10-29T11:32:32.319912+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11907"
+  },
+  {
+    "id": 11908,
+    "timestamp": "2026-10-29T11:32:32.352688+05:30",
+    "actor": "ramesh_farmer",
+    "action": "ORDER_CREATED",
+    "details": "Placed order ORD-2026-734062 (1 item(s), \u20b92336.40) via UPI",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11908"
+  },
+  {
+    "id": 11909,
+    "timestamp": "2026-10-29T11:32:32.612915+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11909"
+  },
+  {
+    "id": 11910,
+    "timestamp": "2026-10-29T11:32:32.852282+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11910"
+  },
+  {
+    "id": 11911,
+    "timestamp": "2026-10-29T11:32:32.862943+05:30",
+    "actor": "usr_001",
+    "action": "TICKET_CREATE",
+    "details": "Created ticket TKT-2026-F46596",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11911"
+  },
+  {
+    "id": 11912,
+    "timestamp": "2026-10-29T11:32:32.875458+05:30",
+    "actor": "admin",
+    "action": "TICKET_STATUS_UPDATE",
+    "details": "Ticket tkt_cfdc9aacfe8b updated to RESOLVED",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11912"
+  },
+  {
+    "id": 11913,
+    "timestamp": "2026-10-29T11:32:33.108420+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11913"
+  },
+  {
+    "id": 11914,
+    "timestamp": "2026-10-29T11:32:33.339916+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11914"
+  },
+  {
+    "id": 11915,
+    "timestamp": "2026-10-29T11:32:33.580983+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11915"
+  },
+  {
+    "id": 11916,
+    "timestamp": "2026-10-29T11:32:33.598171+05:30",
+    "actor": "admin",
+    "action": "SENSOR_CALIBRATE",
+    "details": "Calibrated sensor sns_01_aq with offset 0.4",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11916"
+  },
+  {
+    "id": 11917,
+    "timestamp": "2026-10-29T11:32:33.880443+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11917"
+  },
+  {
+    "id": 11918,
+    "timestamp": "2026-10-29T11:32:34.225293+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11918"
+  },
+  {
+    "id": 11919,
+    "timestamp": "2026-10-29T11:32:34.561073+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11919"
+  },
+  {
+    "id": 11920,
+    "timestamp": "2026-10-29T11:32:34.798783+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11920"
+  },
+  {
+    "id": 11921,
+    "timestamp": "2026-10-29T11:32:35.049624+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11921"
+  },
+  {
+    "id": 11922,
+    "timestamp": "2026-10-29T11:32:35.287874+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11922"
+  },
+  {
+    "id": 11923,
+    "timestamp": "2026-10-29T11:32:35.297579+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_IMAGE_UPLOAD",
+    "details": "Uploaded product photo: prod_edcb6dc9_automated_test_photo.png (67 bytes)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11923"
+  },
+  {
+    "id": 11924,
+    "timestamp": "2026-10-29T11:32:35.311833+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_CREATE",
+    "details": "Created product SKU-TEST-UP-99 - Upload Verification Device",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11924"
+  },
+  {
+    "id": 11925,
+    "timestamp": "2026-10-29T11:32:35.317283+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_DELETE",
+    "details": "Deleted product SKU-TEST-UP-99 - Upload Verification Device (ID: prod_28669322a76b)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11925"
+  },
+  {
+    "id": 11926,
+    "timestamp": "2026-10-29T11:32:35.550845+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11926"
+  },
+  {
+    "id": 11927,
+    "timestamp": "2026-10-29T11:32:35.775321+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11927"
+  },
+  {
+    "id": 11928,
+    "timestamp": "2026-10-29T11:32:35.997636+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11928"
+  },
+  {
+    "id": 11929,
+    "timestamp": "2026-10-29T11:32:36.237047+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11929"
+  },
+  {
+    "id": 11930,
+    "timestamp": "2026-10-29T11:32:36.471241+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11930"
+  },
+  {
+    "id": 11931,
+    "timestamp": "2026-10-29T11:32:36.717704+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11931"
+  },
+  {
+    "id": 11932,
+    "timestamp": "2026-10-29T11:32:36.985343+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11932"
+  },
+  {
+    "id": 11933,
+    "timestamp": "2026-10-29T11:32:37.218310+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11933"
+  },
+  {
+    "id": 11934,
+    "timestamp": "2026-10-29T11:32:37.447984+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11934"
+  },
+  {
+    "id": 11935,
+    "timestamp": "2026-10-29T11:32:37.452972+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGOUT",
+    "details": "User logged out of tab session (session_id: sess_2a1de27d663644feb2a52d2280984c06, jti: be8a80035184445185e1aee8193ff8ec)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11935"
+  },
+  {
+    "id": 11936,
+    "timestamp": "2026-10-29T11:32:37.703109+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11936"
+  },
+  {
+    "id": 11937,
+    "timestamp": "2026-10-29T11:32:37.934524+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11937"
+  },
+  {
+    "id": 11938,
+    "timestamp": "2026-10-29T11:32:38.178883+05:30",
+    "actor": "suresh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11938"
+  },
+  {
+    "id": 11939,
+    "timestamp": "2026-10-29T11:32:46.744279+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11939"
+  },
+  {
+    "id": 11940,
+    "timestamp": "2026-10-29T11:32:47.020738+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11940"
+  },
+  {
+    "id": 11941,
+    "timestamp": "2026-10-29T11:32:47.313849+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11941"
+  },
+  {
+    "id": 11942,
+    "timestamp": "2026-10-29T11:32:47.554480+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11942"
+  },
+  {
+    "id": 11943,
+    "timestamp": "2026-10-29T11:32:47.826708+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11943"
+  },
+  {
+    "id": 11944,
+    "timestamp": "2026-10-29T11:32:48.089056+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11944"
+  },
+  {
+    "id": 11945,
+    "timestamp": "2026-10-29T11:32:48.337709+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11945"
+  },
+  {
+    "id": 11946,
+    "timestamp": "2026-10-29T11:32:48.352672+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGOUT_ALL",
+    "details": "User revoked all 23 active sessions.",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11946"
+  },
+  {
+    "id": 11947,
+    "timestamp": "2026-10-29T11:32:48.598309+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11947"
+  },
+  {
+    "id": 11948,
+    "timestamp": "2026-10-29T11:32:48.616157+05:30",
+    "actor": "admin",
+    "action": "CREATE_DEPARTMENT",
+    "details": "Created department 'Quality Assurance a1f000' (QA_A1F000)",
+    "target_resource": "dept_qa_a1f000",
+    "ip_address": "127.0.0.1",
+    "_id": "11948"
+  },
+  {
+    "id": 11949,
+    "timestamp": "2026-10-29T11:32:48.623187+05:30",
+    "actor": "admin",
+    "action": "UPDATE_DEPARTMENT",
+    "details": "Updated department dept_qa_a1f000: ['description']",
+    "target_resource": "dept_qa_a1f000",
+    "ip_address": "127.0.0.1",
+    "_id": "11949"
+  },
+  {
+    "id": 11950,
+    "timestamp": "2026-10-29T11:32:48.885031+05:30",
+    "actor": "hr_deepa",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: hr)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11950"
+  },
+  {
+    "id": 11951,
+    "timestamp": "2026-10-29T11:32:49.144433+05:30",
+    "actor": "hr_deepa",
+    "action": "INVITE_EMPLOYEE",
+    "details": "Invited new employee 'Tester Onboard e171b7' (emp_e171b7@sericare.internal, ID: EMP-E171B7, Role: technician)",
+    "target_resource": "emp_87808a85",
+    "ip_address": "127.0.0.1",
+    "_id": "11951"
+  },
+  {
+    "id": 11952,
+    "timestamp": "2026-10-29T11:32:49.391851+05:30",
+    "actor": "emp_e171b7",
+    "action": "INVITATION_ACCEPTED",
+    "details": "Employee EMP-E171B7 (emp_e171b7@sericare.internal) accepted invitation and established password",
+    "target_resource": "emp_87808a85",
+    "ip_address": "127.0.0.1",
+    "_id": "11952"
+  },
+  {
+    "id": 11953,
+    "timestamp": "2026-10-29T11:32:49.392322+05:30",
+    "actor": "emp_e171b7",
+    "action": "ACCOUNT_ACTIVATED",
+    "details": "Account for Tester Onboard e171b7 activated successfully (MFA: False)",
+    "target_resource": "usr_239592c8b22e",
+    "ip_address": "127.0.0.1",
+    "_id": "11953"
+  },
+  {
+    "id": 11954,
+    "timestamp": "2026-10-29T11:32:49.650641+05:30",
+    "actor": "emp_e171b7",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: technician)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11954"
+  },
+  {
+    "id": 11955,
+    "timestamp": "2026-10-29T11:32:49.663650+05:30",
+    "actor": "hr_deepa",
+    "action": "EMPLOYEE_STATUS_CHANGE",
+    "details": "Employee EMP-E171B7 (Tester Onboard e171b7) status changed to SUSPENDED. User session active: False",
+    "target_resource": "emp_87808a85",
+    "ip_address": "127.0.0.1",
+    "_id": "11955"
+  },
+  {
+    "id": 11956,
+    "timestamp": "2026-10-29T11:32:49.938063+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11956"
+  },
+  {
+    "id": 11957,
+    "timestamp": "2026-10-29T11:32:50.189113+05:30",
+    "actor": "admin",
+    "action": "INVITE_EMPLOYEE",
+    "details": "Invited new employee 'Supervisor Alpha' (empa-3306@test.com, ID: EMPA-3306, Role: operations_manager)",
+    "target_resource": "emp_8812542c",
+    "ip_address": "127.0.0.1",
+    "_id": "11957"
+  },
+  {
+    "id": 11958,
+    "timestamp": "2026-10-29T11:32:50.435819+05:30",
+    "actor": "admin",
+    "action": "INVITE_EMPLOYEE",
+    "details": "Invited new employee 'Subordinate Beta' (empb-a386@test.com, ID: EMPB-A386, Role: technician)",
+    "target_resource": "emp_0e5bd11d",
+    "ip_address": "127.0.0.1",
+    "_id": "11958"
+  },
+  {
+    "id": 11959,
+    "timestamp": "2026-10-29T11:32:50.698144+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11959"
+  },
+  {
+    "id": 11960,
+    "timestamp": "2026-10-29T11:32:50.720646+05:30",
+    "actor": "admin",
+    "action": "CREATE_CUSTOM_ROLE",
+    "details": "Created custom role 'Custom Auditor' with 3 permissions",
+    "target_resource": "role_custom_eec5fd65",
+    "ip_address": "127.0.0.1",
+    "_id": "11960"
+  },
+  {
+    "id": 11961,
+    "timestamp": "2026-10-29T11:32:50.977043+05:30",
+    "actor": "hr_deepa",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: hr)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11961"
+  },
+  {
+    "id": 11962,
+    "timestamp": "2026-10-29T11:32:51.242890+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11962"
+  },
+  {
+    "id": 11963,
+    "timestamp": "2026-10-29T11:32:51.504621+05:30",
+    "actor": "comp_admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: company_admin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11963"
+  },
+  {
+    "id": 11964,
+    "timestamp": "2026-10-29T11:32:51.803018+05:30",
+    "actor": "tech_kiran",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: technician)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11964"
+  },
+  {
+    "id": 11965,
+    "timestamp": "2026-10-29T11:32:52.141632+05:30",
+    "actor": "sales_anand",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: sales)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11965"
+  },
+  {
+    "id": 11966,
+    "timestamp": "2026-10-29T11:32:52.525507+05:30",
+    "actor": "support_priya",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: support)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11966"
+  },
+  {
+    "id": 11967,
+    "timestamp": "2026-10-29T11:32:52.828732+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11967"
+  },
+  {
+    "id": 11968,
+    "timestamp": "2026-10-29T11:32:53.197515+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11968"
+  },
+  {
+    "id": 11969,
+    "timestamp": "2026-10-29T11:32:53.234028+05:30",
+    "actor": "admin",
+    "action": "LOGOUT",
+    "details": "User logged out of tab session (session_id: None, jti: 91b449f99dd74cf7b3317b34aea9a1bf)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11969"
+  },
+  {
+    "id": 11970,
+    "timestamp": "2026-10-29T11:32:53.244264+05:30",
+    "actor": "farmer_charlie",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_b6b2b8f1f6ac (cooling_fan) for device esp32_gateway_02",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11970"
+  },
+  {
+    "id": 11971,
+    "timestamp": "2026-10-29T11:32:53.504369+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11971"
+  },
+  {
+    "id": 11972,
+    "timestamp": "2026-10-29T11:32:53.651536+05:30",
+    "actor": "superadmin",
+    "action": "UPDATE_PLATFORM_SETTINGS",
+    "details": "Updated general platform configuration",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11972"
+  },
+  {
+    "id": 11973,
+    "timestamp": "2026-10-29T11:32:53.658062+05:30",
+    "actor": "superadmin",
+    "action": "UPDATE_PLATFORM_SETTINGS",
+    "details": "Updated general platform configuration",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11973"
+  },
+  {
+    "id": 11974,
+    "timestamp": "2026-10-29T11:32:53.746743+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_CREATE",
+    "details": "Created product SKU-DRAFT-F9A99D - Experimental Sensor (Draft)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11974"
+  },
+  {
+    "id": 11975,
+    "timestamp": "2026-10-29T11:32:53.753671+05:30",
+    "actor": "admin",
+    "action": "PRODUCT_PUBLICATION_UPDATE",
+    "details": "Updated product prod_a94dc911a23d publication to DRAFT",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11975"
+  },
+  {
+    "id": 11976,
+    "timestamp": "2026-10-29T11:32:53.807042+05:30",
+    "actor": "admin",
+    "action": "ENQUIRY_STATUS_UPDATE",
+    "details": "Updated enquiry enq_422a2e2bd764 to CONTACTED",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11976"
+  },
+  {
+    "id": 11977,
+    "timestamp": "2026-10-29T11:32:54.140356+05:30",
+    "actor": "tech_kiran",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: technician)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11977"
+  },
+  {
+    "id": 11978,
+    "timestamp": "2026-10-29T11:32:55.153961+05:30",
+    "actor": "ops_manoj",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: operations_manager)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11978"
+  },
+  {
+    "id": 11979,
+    "timestamp": "2026-10-29T11:32:55.643079+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11979"
+  },
+  {
+    "id": 11980,
+    "timestamp": "2026-10-29T11:32:55.945652+05:30",
+    "actor": "ceo",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: ceo)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11980"
+  },
+  {
+    "id": 11981,
+    "timestamp": "2026-10-29T11:32:56.234799+05:30",
+    "actor": "ops_manoj",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: operations_manager)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11981"
+  },
+  {
+    "id": 11982,
+    "timestamp": "2026-10-29T11:32:56.507076+05:30",
+    "actor": "support_priya",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: support)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11982"
+  },
+  {
+    "id": 11983,
+    "timestamp": "2026-10-29T11:32:56.794564+05:30",
+    "actor": "sales_anand",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: sales)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11983"
+  },
+  {
+    "id": 11984,
+    "timestamp": "2026-10-29T11:32:57.087200+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11984"
+  },
+  {
+    "id": 11987,
+    "timestamp": "2026-10-29T11:32:57.414455+05:30",
+    "actor": "security_tester",
+    "action": "PRIVILEGE_ELEVATION_CHECK",
+    "details": "Validated superadmin role enforcement",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11987"
+  },
+  {
+    "id": 11988,
+    "timestamp": "2026-10-29T11:32:57.729798+05:30",
+    "actor": "admin",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: superadmin)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11988"
+  },
+  {
+    "id": 11989,
+    "timestamp": "2026-10-29T11:32:58.046712+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11989"
+  },
+  {
+    "id": 11990,
+    "timestamp": "2026-10-29T11:32:58.059508+05:30",
+    "actor": "nonexistent_user_9999",
+    "action": "LOGIN_FAILED",
+    "details": "Failed authentication attempt (invalid credentials)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11990"
+  },
+  {
+    "id": 11991,
+    "timestamp": "2026-10-29T11:32:58.355524+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: farmer_d50e6d (Ramesh Gowda) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11991"
+  },
+  {
+    "id": 11992,
+    "timestamp": "2026-10-29T11:32:58.623552+05:30",
+    "actor": "farmer_d50e6d",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11992"
+  },
+  {
+    "id": 11993,
+    "timestamp": "2026-10-29T11:32:58.890067+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: hacker_7d7c1a (Attacker Trying Admin) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11993"
+  },
+  {
+    "id": 11994,
+    "timestamp": "2026-10-29T11:32:59.189485+05:30",
+    "actor": "system",
+    "action": "REGISTER",
+    "details": "New farmer registered: dupuser_34f96f (First User) [Shed: shed_01]",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11994"
+  },
+  {
+    "id": 11995,
+    "timestamp": "2026-10-29T11:32:59.516650+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11995"
+  },
+  {
+    "id": 11996,
+    "timestamp": "2026-10-29T11:32:59.808119+05:30",
+    "actor": "ramesh_farmer",
+    "action": "LOGIN",
+    "details": "User logged in from client (role: farmer)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11996"
+  },
+  {
+    "id": 11997,
+    "timestamp": "2026-10-29T11:33:00.509342+05:30",
+    "actor": "twilio_webhook",
+    "action": "WHATSAPP_VERIFIED",
+    "details": "WhatsApp verified for +919876543210 (Body: join stay-spread)",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11997"
+  },
+  {
+    "id": 11985,
+    "timestamp": "2026-10-29T11:32:57.380203+05:30",
+    "actor": "operator",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_24c4625f9409 (SET_ACTUATOR) for device esp32_shed_01",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11985"
+  },
+  {
+    "id": 11986,
+    "timestamp": "2026-10-29T11:32:57.384327+05:30",
+    "actor": "operator",
+    "action": "COMMAND_CREATED",
+    "details": "Created command cmd_a5c4a6359718 (SET_ACTUATOR) for device esp32_shed_01",
+    "target_resource": null,
+    "ip_address": null,
+    "_id": "11986"
   }
 ]

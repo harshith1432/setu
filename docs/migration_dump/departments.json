@@ -1,5 +1,16 @@
 [
   {
+    "id": "dept_ops",
+    "name": "Operations & Field Services",
+    "code": "OPS",
+    "description": "Shed microclimate supervision, field deployment, and maintenance.",
+    "head_id": null,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "dept_ops"
+  },
+  {
     "id": "dept_org_7e87ac055341_ops",
     "name": "Operations",
     "code": "OPS",
@@ -374,15 +385,15 @@
     "_id": "dept_org_906fb2da4f74_admin"
   },
   {
-    "id": "dept_ops",
-    "name": "Operations & Field Services",
-    "code": "OPS",
-    "description": "Shed microclimate supervision, field deployment, and maintenance.",
+    "id": "dept_comm",
+    "name": "Commercial & Sales",
+    "code": "COMM",
+    "description": "Farm supplies distribution, subscriptions, and financial accounting.",
     "head_id": null,
     "status": "ACTIVE",
     "created_at": "2026-10-28T22:20:27.610473+05:30",
     "updated_at": "2026-10-28T22:20:27.610473+05:30",
-    "_id": "dept_ops"
+    "_id": "dept_comm"
   },
   {
     "id": "dept_org_fd2066530044_admin",
@@ -396,15 +407,15 @@
     "_id": "dept_org_fd2066530044_admin"
   },
   {
-    "id": "dept_comm",
-    "name": "Commercial & Sales",
-    "code": "COMM",
-    "description": "Farm supplies distribution, subscriptions, and financial accounting.",
+    "id": "dept_hr",
+    "name": "Human Resources & Onboarding",
+    "code": "HR",
+    "description": "Personnel onboarding, organizational development, and RBAC governance.",
     "head_id": null,
     "status": "ACTIVE",
     "created_at": "2026-10-28T22:20:27.610473+05:30",
     "updated_at": "2026-10-28T22:20:27.610473+05:30",
-    "_id": "dept_comm"
+    "_id": "dept_hr"
   },
   {
     "id": "dept_org_b6b7ff06fbaa_ops",
@@ -438,17 +449,6 @@
     "created_at": "2026-10-28T22:45:24.719132+05:30",
     "updated_at": "2026-10-28T22:45:24.719132+05:30",
     "_id": "dept_org_dd50159f5996_ops"
-  },
-  {
-    "id": "dept_hr",
-    "name": "Human Resources & Onboarding",
-    "code": "HR",
-    "description": "Personnel onboarding, organizational development, and RBAC governance.",
-    "head_id": null,
-    "status": "ACTIVE",
-    "created_at": "2026-10-28T22:20:27.610473+05:30",
-    "updated_at": "2026-10-28T22:20:27.610473+05:30",
-    "_id": "dept_hr"
   },
   {
     "id": "dept_org_dd50159f5996_eng",
@@ -1067,6 +1067,17 @@
     "_id": "dept_org_ddbf9424c16d_admin"
   },
   {
+    "id": "dept_exec",
+    "name": "Executive & Strategy",
+    "code": "EXEC",
+    "description": "Corporate oversight, strategy, and overall board governance.",
+    "head_id": null,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "dept_exec"
+  },
+  {
     "id": "dept_qa_15b16e",
     "name": "Quality Assurance 15b16e",
     "code": "QA_15B16E",
@@ -1120,17 +1131,6 @@
     "created_at": "2026-10-29T00:07:08.663341+05:30",
     "updated_at": "2026-10-29T00:07:08.670206+05:30",
     "_id": "dept_qa_9cdf14"
-  },
-  {
-    "id": "dept_exec",
-    "name": "Executive & Strategy",
-    "code": "EXEC",
-    "description": "Corporate oversight, strategy, and overall board governance.",
-    "head_id": null,
-    "status": "ACTIVE",
-    "created_at": "2026-10-28T22:20:27.610473+05:30",
-    "updated_at": "2026-10-28T22:20:27.610473+05:30",
-    "_id": "dept_exec"
   },
   {
     "id": "dept_qa_e61757",
@@ -1397,17 +1397,6 @@
     "_id": "dept_qa_e601cc"
   },
   {
-    "id": "dept_supp",
-    "name": "Customer Helpdesk & Support",
-    "code": "SUPP",
-    "description": "Farmer assistance, emergency incident triage, and field escalations.",
-    "head_id": null,
-    "status": "ACTIVE",
-    "created_at": "2026-10-28T22:20:27.610473+05:30",
-    "updated_at": "2026-10-28T22:20:27.610473+05:30",
-    "_id": "dept_supp"
-  },
-  {
     "id": "dept_qa_951197",
     "name": "Quality Assurance 951197",
     "code": "QA_951197",
@@ -1430,6 +1419,17 @@
     "_id": "dept_qa_9a82d9"
   },
   {
+    "id": "dept_qa_41fdc3",
+    "name": "Quality Assurance 41fdc3",
+    "code": "QA_41FDC3",
+    "description": "Updated quality inspection department",
+    "head_id": null,
+    "status": "ACTIVE",
+    "created_at": "2026-10-29T11:30:01.777996+05:30",
+    "updated_at": "2026-10-29T11:30:01.787241+05:30",
+    "_id": "dept_qa_41fdc3"
+  },
+  {
     "id": "dept_qa_fec34c",
     "name": "Quality Assurance fec34c",
     "code": "QA_FEC34C",
@@ -1450,5 +1450,27 @@
     "created_at": "2026-10-28T22:20:27.610473+05:30",
     "updated_at": "2026-10-28T22:20:27.610473+05:30",
     "_id": "dept_eng"
+  },
+  {
+    "id": "dept_qa_a1f000",
+    "name": "Quality Assurance a1f000",
+    "code": "QA_A1F000",
+    "description": "Updated quality inspection department",
+    "head_id": null,
+    "status": "ACTIVE",
+    "created_at": "2026-10-29T11:32:48.615214+05:30",
+    "updated_at": "2026-10-29T11:32:48.622546+05:30",
+    "_id": "dept_qa_a1f000"
+  },
+  {
+    "id": "dept_supp",
+    "name": "Customer Helpdesk & Support",
+    "code": "SUPP",
+    "description": "Farmer assistance, emergency incident triage, and field escalations.",
+    "head_id": null,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "dept_supp"
   }
 ]

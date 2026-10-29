@@ -136,3 +136,8 @@ mobile/android/app/google-services.json
 
 # Uploads
 uploads/
+
+# Firebase Credentials
+credentials/
+*firebase-adminsdk*.json
+
