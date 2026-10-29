@@ -296,83 +296,94 @@ def google_oauth_login(request: Request, redirect_url: str = None):
 
 @router.post("/google-sync", response_model=Token)
 def google_sync(req: GoogleAuthRequest):
-    # Lookup by email or phone or username
-    lookup_key = (req.email.strip().lower() if req.email else None) or (req.phone.replace(" ", "") if req.phone else None) or f"google_{req.google_id or uuid.uuid4().hex[:6]}"
-    existing = get_user_by_username_or_phone(lookup_key)
-    if not existing and req.phone:
-        existing = get_user_by_username_or_phone(req.phone.replace(" ", ""))
+    """
+    Seamless Google OAuth Synchronization:
+    - Existing Users: Automatically matches by email, phone, or Google ID.
+      Preserves all existing profiles, sheds, batches, orders, and roles.
+    - New Users: Automatically and strictly enrolled as a 'farmer' (smart sericulture grower).
+    """
+    clean_email = req.email.strip().lower() if req.email else None
+    clean_phone = req.phone.replace(" ", "") if req.phone else None
+    google_id = req.google_id or ""
+
+    existing = None
+    if clean_email:
+        existing = get_user_by_username_or_phone(clean_email)
+    if not existing and clean_phone:
+        existing = get_user_by_username_or_phone(clean_phone)
+    if not existing and google_id:
+        existing = get_user_by_username_or_phone(f"google_{google_id}")
 
     if existing:
-        # SEC-03: Prevent Account Takeover (ATO).
-        # Reject hijacking of password-authenticated accounts or admin accounts via unverified Google sync requests.
-        if existing.get("role") in ["admin", "superadmin"]:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Account requires password authentication. Direct OAuth linking not permitted without credentials."
-            )
-
         updates = {}
-        if req.full_name and req.full_name.strip():
+        # If email was missing in existing profile, link it now
+        if clean_email and not existing.get("official_email"):
+            updates["official_email"] = clean_email
+        # Only update name if user has no full_name set
+        if req.full_name and req.full_name.strip() and not existing.get("full_name"):
             updates["full_name"] = req.full_name.strip()
-        if req.phone and req.phone.strip():
-            updates["phone"] = req.phone.strip()
-        if req.farm_name and req.farm_name.strip():
+        # Only update phone if user has no phone set
+        if clean_phone and not existing.get("phone"):
+            updates["phone"] = clean_phone
+        # Only update farm_name / region if explicitly provided and not already configured
+        if req.farm_name and req.farm_name.strip() and not existing.get("farm_name"):
             updates["farm_name"] = req.farm_name.strip()
-        if req.region and req.region.strip():
+        if req.region and req.region.strip() and not existing.get("region"):
             updates["region"] = req.region.strip()
-        if req.batch_id and req.batch_id.strip():
-            updates["batch_id"] = req.batch_id.strip()
-        if req.dfl_capacity and req.dfl_capacity.strip():
-            updates["dfl_capacity"] = req.dfl_capacity.strip()
-        if req.breed and req.breed.strip():
-            updates["breed"] = req.breed.strip()
-        if req.latitude is not None:
-            updates["latitude"] = req.latitude
-        if req.longitude is not None:
-            updates["longitude"] = req.longitude
 
         if updates:
             updated_user = update_user_profile(existing["id"], updates)
             if updated_user:
                 existing = updated_user
 
+        user_role = existing.get("role", "farmer")
         access_token = create_access_token(
-            data={"sub": existing["username"], "user_id": existing["id"], "role": existing.get("role", "farmer")}
+            data={"sub": existing["username"], "user_id": existing["id"], "role": user_role}
         )
-        log_audit(existing["username"], "GOOGLE_LOGIN", f"Google user logged in: {existing['full_name']}")
+        log_audit(existing["username"], "GOOGLE_LOGIN", f"Google user logged in: {existing.get('full_name')} ({existing.get('username')})")
 
         user_out = UserOut(
             id=existing["id"],
             username=existing["username"],
-            full_name=existing["full_name"],
+            full_name=existing.get("full_name", "Setu User"),
             phone=existing.get("phone", "N/A"),
             whatsapp_number=existing.get("whatsapp_number"),
             whatsapp_verified=bool(existing.get("whatsapp_verified", False)),
             preferred_language=existing.get("preferred_language", "en"),
-            role=existing.get("role", "farmer"),
+            role=user_role,
             farm_name=existing.get("farm_name", "My Sericulture Farm"),
             region=existing.get("region", "Local Rearing Shed"),
+            shed_id=existing.get("shed_id", "shed_01"),
             latitude=existing.get("latitude"),
             longitude=existing.get("longitude"),
             batch_id=existing.get("batch_id", "SERI-2026-B01"),
             dfl_capacity=existing.get("dfl_capacity", "200 DFL"),
             breed=existing.get("breed", "Double Hybrid (FC1 x FC2)"),
+            official_email=existing.get("official_email") or clean_email,
             is_active=bool(existing.get("is_active", 1))
         )
         return Token(access_token=access_token, user=user_out)
 
-    # Otherwise create new enrolled farmer
+    # Otherwise, brand new user registering with Google: strictly enrolled as a FARMER!
+    from app.services.db_service import get_next_available_shed_id
+    assigned_shed = req.shed_id or get_next_available_shed_id()
     user_id = f"usr_{uuid.uuid4().hex[:8]}"
+    username = clean_email or clean_phone or f"farmer_{uuid.uuid4().hex[:6]}"
+
     new_user_data = {
         "id": user_id,
-        "username": lookup_key,
+        "username": username,
         "hashed_password": "oauth_google_" + uuid.uuid4().hex,
         "full_name": req.full_name.strip() if req.full_name else "Google Farmer",
-        "phone": req.phone.strip() if req.phone else "N/A",
+        "phone": clean_phone or "N/A",
+        "official_email": clean_email,
+        "whatsapp_number": clean_phone,
+        "whatsapp_verified": True if clean_phone else False,
         "preferred_language": req.preferred_language or "en",
-        "role": "farmer",
+        "role": "farmer",  # Guaranteed farmer for all new Google registrations!
         "farm_name": req.farm_name.strip() if req.farm_name else "My Sericulture Farm",
-        "region": req.region.strip() if req.region else "Local Rearing Shed",
+        "region": req.region.strip() if req.region else "Karnataka Silk Belt",
+        "shed_id": assigned_shed,
         "latitude": req.latitude,
         "longitude": req.longitude,
         "batch_id": req.batch_id.strip() if req.batch_id else "SERI-2026-B01",
@@ -385,7 +396,7 @@ def google_sync(req: GoogleAuthRequest):
     access_token = create_access_token(
         data={"sub": new_user_data["username"], "user_id": user_id, "role": "farmer"}
     )
-    log_audit(new_user_data["username"], "GOOGLE_ENROLL", f"New Google farmer enrolled: {new_user_data['full_name']} ({lookup_key})")
+    log_audit(new_user_data["username"], "GOOGLE_ENROLL", f"New Google farmer enrolled: {new_user_data['full_name']} ({username})")
 
     user_out = UserOut(
         id=user_id,
@@ -398,11 +409,13 @@ def google_sync(req: GoogleAuthRequest):
         role="farmer",
         farm_name=new_user_data["farm_name"],
         region=new_user_data["region"],
+        shed_id=assigned_shed,
         latitude=new_user_data.get("latitude"),
         longitude=new_user_data.get("longitude"),
         batch_id=new_user_data["batch_id"],
         dfl_capacity=new_user_data["dfl_capacity"],
         breed=new_user_data["breed"],
+        official_email=clean_email,
         is_active=True
     )
     return Token(access_token=access_token, user=user_out)

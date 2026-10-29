@@ -536,8 +536,8 @@ async function completeGoogleLogin(googleUserData) {
         google_id: googleUserData.google_id || '',
         full_name: googleUserData.full_name || 'Google User',
         phone: googleUserData.phone || '',
-        farm_name: googleUserData.farm_name || 'Setu Smart Farm',
-        region: googleUserData.region || 'Karnataka'
+        farm_name: googleUserData.farm_name || '',
+        region: googleUserData.region || ''
       })
     });
 
