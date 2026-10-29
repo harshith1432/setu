@@ -4,15 +4,15 @@
   "rewrites": [
     {
       "source": "/",
-      "destination": "/landing.html"
+      "destination": "/index.html"
     },
     {
       "source": "/home",
-      "destination": "/landing.html"
+      "destination": "/index.html"
     },
     {
       "source": "/landing",
-      "destination": "/landing.html"
+      "destination": "/index.html"
     },
     {
       "source": "/landing/(.*)",
@@ -27,12 +27,32 @@
       "destination": "/register.html"
     },
     {
+      "source": "/admin/style.css",
+      "destination": "/style.css"
+    },
+    {
+      "source": "/admin/app.js",
+      "destination": "/app.js"
+    },
+    {
+      "source": "/admin/table-manager.js",
+      "destination": "/table-manager.js"
+    },
+    {
+      "source": "/admin/assets/(.*)",
+      "destination": "/assets/$1"
+    },
+    {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/admin.html"
     },
     {
       "source": "/admin/(.*)",
-      "destination": "/$1"
+      "destination": "/admin.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/admin.html"
     },
     {
       "source": "/(.*)",

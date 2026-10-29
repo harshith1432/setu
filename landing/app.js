@@ -3,9 +3,129 @@
 // Dynamic REST Ingestion, Database Catalog, Telemetry Stream & Enquiry CRM
 // ==========================================================================
 
-const API_BASE_URL = `${window.location.origin}/api/v1`;
+const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const isOnRenderHost = window.location.hostname === 'onrender.com' || window.location.hostname.endsWith('.onrender.com');
 
-let allProductsCache = [];
+const API_BASE_URL = isLocalHost
+  ? `${window.location.origin}/api/v1`
+  : (isOnRenderHost
+      ? `${window.location.origin}/api/v1`
+      : 'https://setu-8vh9.onrender.com/api/v1');
+
+const DEFAULT_CATALOG = [
+  {
+    "id": "prod_act_mist",
+    "sku": "SKU-ACT-MIST-4N",
+    "name": "High-Pressure Ultrasonic Cold Mist Fogger",
+    "slug": "high-pressure-ultrasonic-cold-mist-fogger",
+    "category": "Smart Rearing Shed Control",
+    "short_description": "Micro-droplet humidification unit maintaining 85–90% RH for 1st/2nd Instar Chawki worms without wet bed rot.",
+    "description": "Generates ultra-fine 5–10 micron water aerosols that evaporate in ambient air without settling on mulberry leaves.",
+    "price_minor_units": 899900,
+    "currency": "INR",
+    "stock_quantity": 19,
+    "unit": "unit",
+    "availability_status": "IN_STOCK",
+    "publication_status": "PUBLISHED",
+    "compatibility": "Setu Gateway Relay Port 1/2, Automated Humidity Rules Engine",
+    "specifications": {
+      "Operating Power": "230V AC @ 120W with internal DC driver",
+      "Atomization Rate": "3.5 Litres per hour (4 piezoceramic heads)",
+      "Droplet Particle Size": "5–10 microns (floating aerosol)"
+    },
+    "images": []
+  },
+  {
+    "id": "prod_sns_sht31",
+    "sku": "SKU-SNS-SHT31-IP67",
+    "name": "Sensirion SHT31 High-Precision Dual Probe",
+    "slug": "sensirion-sht31-precision-probe",
+    "category": "IoT Temperature and Humidity Sensors",
+    "short_description": "IP67 weather-shielded temperature (±0.2°C) and relative humidity (±1.5% RH) sensor probe for rearing racks.",
+    "description": "Engineered specifically for harsh rearing environments with high moisture and disinfectant chemical vapors.",
+    "price_minor_units": 185000,
+    "currency": "INR",
+    "stock_quantity": 118,
+    "unit": "unit",
+    "availability_status": "IN_STOCK",
+    "publication_status": "PUBLISHED",
+    "compatibility": "Setu Gateway v2.4, ESP32, Arduino, standard Modbus RTU masters",
+    "specifications": {
+      "Temperature Accuracy": "±0.2°C (at 20°C to 40°C)",
+      "Humidity Accuracy": "±1.5% RH (at 10% to 90% RH)",
+      "Ingress Protection": "IP67 Sintered Stainless Steel Filter Shield"
+    },
+    "images": []
+  },
+  {
+    "id": "prod_gw_01",
+    "sku": "SKU-GW-SERI-4G",
+    "name": "Setu Agri-Edge IoT Smart Gateway (4G + Wi-Fi)",
+    "slug": "setu-agri-edge-iot-smart-gateway-4g-wifi",
+    "category": "IoT Gateways and Connectivity",
+    "short_description": "Edge computing hub with dual 4G/Wi-Fi fallback, RS-485 Modbus, and 4 high-current relay outputs.",
+    "description": "Central computing and automation unit for silkworm sheds. Continuously logs microclimate metrics and triggers fans/foggers.",
+    "price_minor_units": 1249900,
+    "currency": "INR",
+    "stock_quantity": 42,
+    "unit": "unit",
+    "availability_status": "IN_STOCK",
+    "publication_status": "PUBLISHED",
+    "compatibility": "Sensirion SHT31, NDIR CO2, Lux probes, 230V AC foggers/exhaust fans",
+    "specifications": {
+      "Edge Microcontroller": "Dual-Core ESP32-S3 @ 240MHz with 8MB PSRAM",
+      "Network Uplink": "Quectel 4G LTE-M / NB-IoT + 2.4GHz Wi-Fi + BLE 5.0",
+      "Relay Switching": "4x 16A 250V AC Optocoupler-Isolated Relays"
+    },
+    "images": []
+  },
+  {
+    "id": "prod_sns_co2",
+    "sku": "SKU-SNS-CO2-S8",
+    "name": "SenseAir S8 Industrial NDIR CO2 Sensor Probe",
+    "slug": "senseair-s8-industrial-ndir-co2-sensor-probe",
+    "category": "Air Quality and Gas Detection",
+    "short_description": "Dual-beam non-dispersive infrared CO2 sensor (400–10,000 ppm) for Late Age silkworm ventilation monitoring.",
+    "description": "Detects carbon dioxide buildup in 4th and 5th instar rearing beds where silkworm respiration peaks.",
+    "price_minor_units": 345000,
+    "currency": "INR",
+    "stock_quantity": 65,
+    "unit": "unit",
+    "availability_status": "IN_STOCK",
+    "publication_status": "PUBLISHED",
+    "compatibility": "Setu Gateway v2.4 Analog/UART Port, Modbus RTU",
+    "specifications": {
+      "Target Gas": "Carbon Dioxide (CO2)",
+      "Measurement Range": "400 to 10,000 ppm",
+      "Sensor Technology": "Non-Dispersive Infrared (NDIR)"
+    },
+    "images": []
+  },
+  {
+    "id": "prod_act_fan",
+    "sku": "SKU-ACT-FAN-400",
+    "name": "Smart Variable-Speed Microclimate Exhaust Blower",
+    "slug": "smart-variable-speed-microclimate-exhaust-blower",
+    "category": "Smart Rearing Shed Control",
+    "short_description": "Quiet, high-airflow 400 CFM negative-pressure extraction fan with thermal overload cut-off.",
+    "description": "Evacuates stale, humid, and CO2-saturated air during critical molting and feeding stages.",
+    "price_minor_units": 420000,
+    "currency": "INR",
+    "stock_quantity": 28,
+    "unit": "unit",
+    "availability_status": "IN_STOCK",
+    "publication_status": "PUBLISHED",
+    "compatibility": "Setu Gateway Relay 1, PWM speed controller board",
+    "specifications": {
+      "Airflow Capacity": "400 CFM",
+      "Motor Type": "High-Efficiency Brushless DC (BLDC)",
+      "Noise Level": "< 38 dB(A)"
+    },
+    "images": []
+  }
+];
+
+let allProductsCache = [...DEFAULT_CATALOG];
 let activeCategory = 'ALL';
 
 document.addEventListener('DOMContentLoaded', () => {
