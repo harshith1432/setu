@@ -140,4 +140,6 @@ uploads/
 # Firebase Credentials
 credentials/
 *firebase-adminsdk*.json
+*client_secret*.json
+
 

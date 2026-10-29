@@ -227,6 +227,7 @@ function updateTopBarControlsVisibility() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.lucide) lucide.createIcons();
+  if (typeof initFirebaseAuthRedirect === 'function') { initFirebaseAuthRedirect(); }
 
   // Check for onboarding invitation token in URL hash or search params
   const hash = window.location.hash;
@@ -671,6 +672,51 @@ function redirectToGoogleOAuth() {
   }
 }
 
+// Firebase Authentication Redirect Handler (processes mobile & popup-fallback logins)
+async function initFirebaseAuthRedirect() {
+  if (typeof firebase === 'undefined' || !firebase.auth) return;
+  try {
+    const auth = firebase.auth();
+    const result = await auth.getRedirectResult();
+    if (result && result.user) {
+      const u = result.user;
+      const googleBtn = document.getElementById('googleSignInBtn');
+      if (googleBtn) {
+        googleBtn.disabled = true;
+        googleBtn.innerHTML = '<span>Verifying Google account...</span>';
+      }
+      showToast('Verified with Google! Connecting to Setu...', 'info');
+      await completeGoogleLogin({
+        email: u.email || '',
+        full_name: u.displayName || 'Google User',
+        google_id: u.uid
+      });
+    }
+  } catch (err) {
+    console.warn('[FirebaseAuth] Redirect result notice:', err);
+    const errorEl = document.getElementById('loginError');
+    if (err.code === 'auth/unauthorized-domain') {
+      if (errorEl) {
+        errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
+        errorEl.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+      }
+    } else if (err.message) {
+      if (errorEl) {
+        errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>' + escapeHtml(err.message) + '</span>';
+        errorEl.classList.remove('hidden');
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+  }
+}
+window.initFirebaseAuthRedirect = initFirebaseAuthRedirect;
+
+// Auto-check redirect result as soon as script evaluates
+if (typeof firebase !== 'undefined' && firebase.auth) {
+  try { initFirebaseAuthRedirect(); } catch (_) {}
+}
+
 async function handleGoogleSignIn() {
   const errorEl = document.getElementById('loginError');
   if (errorEl) errorEl.classList.add('hidden');
@@ -697,8 +743,10 @@ async function handleGoogleSignIn() {
     }
   };
 
-  // Safety timer: always reset button after 6 seconds if nothing completed
-  const safetyTimeout = setTimeout(resetButton, 6000);
+  // Safety timer: always reset button after 8 seconds if nothing completed
+  const safetyTimeout = setTimeout(resetButton, 8000);
+
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
 
   // 1. Firebase Authentication with Google Provider
   if (typeof firebase !== 'undefined' && firebase.auth) {
@@ -707,16 +755,49 @@ async function handleGoogleSignIn() {
       provider.addScope('email');
       provider.addScope('profile');
       provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await firebase.auth().signInWithPopup(provider);
-      clearTimeout(safetyTimeout);
-      if (result && result.user) {
-        const u = result.user;
-        await completeGoogleLogin({
-          email: u.email || '',
-          full_name: u.displayName || 'Google User',
-          google_id: u.uid
-        });
+
+      // On mobile devices, browsers strictly block popups: use signInWithRedirect directly
+      if (isMobile) {
+        if (googleBtn) googleBtn.innerHTML = '<span>Redirecting to Google...</span>';
+        await firebase.auth().signInWithRedirect(provider);
         return;
+      }
+
+      // On desktop, attempt popup
+      try {
+        const result = await firebase.auth().signInWithPopup(provider);
+        clearTimeout(safetyTimeout);
+        if (result && result.user) {
+          const u = result.user;
+          await completeGoogleLogin({
+            email: u.email || '',
+            full_name: u.displayName || 'Google User',
+            google_id: u.uid
+          });
+          return;
+        }
+      } catch (popupErr) {
+        console.warn('Firebase popup notice:', popupErr);
+        if (popupErr.code === 'auth/unauthorized-domain') {
+          clearTimeout(safetyTimeout);
+          resetButton();
+          if (errorEl) {
+            errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
+            errorEl.classList.remove('hidden');
+            if (window.lucide) lucide.createIcons();
+          }
+          showToast('Please add ' + window.location.hostname + ' to Firebase Authorized Domains', 'error');
+          return;
+        } else if (popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
+          clearTimeout(safetyTimeout);
+          resetButton();
+          return;
+        } else if (popupErr.code === 'auth/popup-blocked') {
+          // If browser popup blocker intervened on desktop, automatically fall back to redirect
+          if (googleBtn) googleBtn.innerHTML = '<span>Redirecting to Google...</span>';
+          await firebase.auth().signInWithRedirect(provider);
+          return;
+        }
       }
     } catch (fbErr) {
       console.warn('Firebase Google Sign-In notice:', fbErr);
@@ -724,21 +805,18 @@ async function handleGoogleSignIn() {
         clearTimeout(safetyTimeout);
         resetButton();
         if (errorEl) {
-          errorEl.textContent = `Domain ${window.location.hostname} is not yet authorized in Firebase Console. Add it in Firebase > Authentication > Settings > Authorized domains.`;
+          errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
           errorEl.classList.remove('hidden');
+          if (window.lucide) lucide.createIcons();
         }
-        showToast('Please add domain to Firebase Authorized Domains', 'error');
-        return;
-      } else if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.code === 'auth/cancelled-popup-request') {
-        clearTimeout(safetyTimeout);
-        resetButton();
+        showToast('Please add ' + window.location.hostname + ' to Firebase Authorized Domains', 'error');
         return;
       }
     }
   }
 
-  // 2. Google Identity Services (GIS) Token Client Popup
-  if (window.google && window.google.accounts && window.google.accounts.oauth2 && GOOGLE_CLIENT_ID) {
+  // 2. Google Identity Services (GIS) Token Client Popup (Desktop fallback)
+  if (!isMobile && window.google && window.google.accounts && window.google.accounts.oauth2 && GOOGLE_CLIENT_ID) {
     try {
       if (!googleTokenClient) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
@@ -790,7 +868,6 @@ async function handleGoogleSignIn() {
   // 3. Direct browser redirection fallback
   redirectToGoogleOAuth();
 }
-
 function checkGoogleOAuthCallback() {
   const hash = window.location.hash;
   if (!hash || (!hash.includes('access_token=') && !hash.includes('id_token='))) return;
