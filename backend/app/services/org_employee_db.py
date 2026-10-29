@@ -281,6 +281,7 @@ def init_org_employee_tables():
             user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
             employee_id VARCHAR(64) UNIQUE NOT NULL,
             official_email VARCHAR(255) UNIQUE NOT NULL,
+            organization_id VARCHAR(64) DEFAULT 'default_org',
             department_id VARCHAR(64) REFERENCES departments(id) ON DELETE SET NULL,
             designation VARCHAR(128) NOT NULL DEFAULT 'Staff Member',
             reporting_manager_id VARCHAR(64) REFERENCES employees(id) ON DELETE SET NULL,
@@ -325,6 +326,8 @@ def init_org_employee_tables():
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS official_email VARCHAR(255);")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE;")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_scope VARCHAR(32) DEFAULT 'GLOBAL';")
+        cursor.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org';")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_emp_org ON employees (organization_id);")
         
 
         cursor.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_resource VARCHAR(128);")
@@ -517,12 +520,12 @@ def _seed_all_role_employees(cursor, now_dt):
         if not existing_emp:
             cursor.execute("""
             INSERT INTO employees (
-                id, user_id, employee_id, official_email,
+                id, user_id, employee_id, official_email, organization_id,
                 department_id, designation, reporting_manager_id,
                 role_code, role_id, access_scope, assigned_resources,
                 employment_status, invitation_status, created_at, updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, NULL, %s, %s, %s, %s::jsonb, 'ACTIVE', 'ACCEPTED', %s, %s)
+            VALUES (%s, %s, %s, %s, 'default_org', %s, %s, NULL, %s, %s, %s, %s::jsonb, 'ACTIVE', 'ACCEPTED', %s, %s)
             """, (
                 emp_db_id, actual_uid, acc["emp_id"], acc["email"],
                 acc["dept_id"], acc["desig"], acc["role"], role_id,

@@ -385,6 +385,7 @@ def init_db():
             user_id VARCHAR(64) NOT NULL,
             username VARCHAR(64) NOT NULL,
             role VARCHAR(32) NOT NULL,
+            organization_id VARCHAR(64) DEFAULT 'default_org',
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_activity TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             expires_at TIMESTAMPTZ NOT NULL,
@@ -394,9 +395,25 @@ def init_db():
             user_agent TEXT,
             ip_address VARCHAR(45)
         );
+        CREATE TABLE IF NOT EXISTS sheds (
+            id VARCHAR(64) PRIMARY KEY,
+            name VARCHAR(128) NOT NULL,
+            location VARCHAR(128) DEFAULT 'Local Rearing Shed',
+            current_stage INT DEFAULT 3,
+            target_temp DOUBLE PRECISION DEFAULT 25.5,
+            target_humidity DOUBLE PRECISION DEFAULT 75.0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO sheds (id, name, location, current_stage, target_temp, target_humidity)
+        VALUES 
+            ('shed_01', 'Shed 01 - Main Chawki Hub', 'Kolar Rearing Center', 3, 26.0, 75.0),
+            ('shed_02', 'Shed 02 - Late Age Rearing', 'Mysuru Facility', 4, 25.0, 70.0),
+            ('shed_03', 'Shed 03 - Commercial Batch', 'Bengaluru Rural', 2, 27.0, 80.0)
+        ON CONFLICT (id) DO NOTHING;
         CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
         CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
         CREATE INDEX IF NOT EXISTS idx_user_sessions_is_revoked ON user_sessions (is_revoked);
+        ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org';
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_correlation ON device_commands (correlation_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);")
@@ -1705,14 +1722,14 @@ def create_user_session(
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("""
         INSERT INTO user_sessions (
-            session_id, user_id, username, role,
+            session_id, user_id, username, role, organization_id,
             expires_at, user_agent, ip_address, created_at, last_activity, is_revoked
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
         ON CONFLICT (session_id) DO UPDATE SET
             expires_at = EXCLUDED.expires_at,
             last_activity = CURRENT_TIMESTAMP,
             is_revoked = FALSE;
-        """, (session_id, user_id, username, role, expires_at, user_agent, ip_address))
+        """, (session_id, user_id, username, role, kwargs.get("organization_id", "default_org"), expires_at, user_agent, ip_address))
 
     with _sessions_cache_lock:
         _revoked_sessions_cache.discard(session_id)
