@@ -636,6 +636,8 @@ def get_current_user(payload: dict = Depends(get_current_user_payload)):
     username = payload.get("sub")
     user = get_user_by_username(username)
     if not user:
+        user = get_user_by_id(payload.get("user_id") or "") or get_user_by_username_or_phone(username or "")
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return UserOut(
         id=user["id"],
@@ -643,19 +645,23 @@ def get_current_user(payload: dict = Depends(get_current_user_payload)):
         full_name=user["full_name"],
         phone=user["phone"],
         official_email=user.get("official_email"),
-                access_scope=user.get("access_scope", "GLOBAL"),
+        email=user.get("official_email"),
+        access_scope=user.get("access_scope", "GLOBAL"),
         whatsapp_number=user.get("whatsapp_number"),
         whatsapp_verified=bool(user.get("whatsapp_verified", False)),
-        preferred_language=user["preferred_language"],
-        role=user["role"],
+        preferred_language=user.get("preferred_language", "kn"),
+        role=user.get("role", "farmer"),
         farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
         region=user.get("region", "Local Rearing Shed"),
         latitude=user.get("latitude"),
         longitude=user.get("longitude"),
+        shed_id=user.get("shed_id", "shed_01"),
         batch_id=user.get("batch_id", "SERI-2026-M04"),
         dfl_capacity=user.get("dfl_capacity", "200 DFL"),
         breed=user.get("breed", "Double Hybrid (FC1 x FC2)"),
-        is_active=bool(user.get("is_active", 1))
+        is_active=bool(user.get("is_active", 1)),
+        created_at=user.get("created_at"),
+        current_stage=user.get("current_stage", 3)
     )
 
 
@@ -708,11 +714,21 @@ def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_curre
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    updated_dict = update_user_profile(user["id"], updates.model_dump(exclude_unset=True))
+    update_data = updates.model_dump(exclude_unset=True)
+    if "email" in update_data and not update_data.get("official_email"):
+        update_data["official_email"] = update_data.pop("email")
+    elif "email" in update_data:
+        update_data.pop("email")
+
+    updated_dict = update_user_profile(user["id"], update_data)
     if not updated_dict:
         raise HTTPException(status_code=500, detail="Failed to update user profile")
     
-    log_audit(user["username"], "PROFILE_UPDATE", f"Farmer updated profile/location: {updates.region or ''}")
+    log_audit(
+        user["username"], 
+        "PROFILE_UPDATE", 
+        f"User updated profile details (name: {updated_dict.get('full_name')}, phone: {updated_dict.get('phone')}, email: {updated_dict.get('official_email')})"
+    )
     
     # Sync with shed telemetry and broadcast to admin web
     from app.services.telemetry_service import telemetry_service
@@ -743,18 +759,24 @@ def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_curre
         username=updated_dict["username"],
         full_name=updated_dict["full_name"],
         phone=updated_dict["phone"],
+        official_email=updated_dict.get("official_email"),
+        email=updated_dict.get("official_email"),
+        access_scope=updated_dict.get("access_scope", "GLOBAL"),
         whatsapp_number=updated_dict.get("whatsapp_number"),
         whatsapp_verified=bool(updated_dict.get("whatsapp_verified", False)),
-        preferred_language=updated_dict["preferred_language"],
-        role=updated_dict["role"],
+        preferred_language=updated_dict.get("preferred_language", "kn"),
+        role=updated_dict.get("role", "farmer"),
         farm_name=updated_dict.get("farm_name", "Green Valley Sericulture Farm"),
         region=updated_dict.get("region", "Local Rearing Shed"),
         latitude=updated_dict.get("latitude"),
         longitude=updated_dict.get("longitude"),
+        shed_id=updated_dict.get("shed_id", "shed_01"),
         batch_id=updated_dict.get("batch_id", "SERI-2026-M04"),
         dfl_capacity=updated_dict.get("dfl_capacity", "200 DFL"),
         breed=updated_dict.get("breed", "Double Hybrid (FC1 x FC2)"),
-        is_active=bool(updated_dict.get("is_active", 1))
+        is_active=bool(updated_dict.get("is_active", 1)),
+        created_at=updated_dict.get("created_at"),
+        current_stage=updated_dict.get("current_stage", 3)
     )
 
 @router.post("/logout")

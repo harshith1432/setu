@@ -127,7 +127,7 @@ def find_best_technician_for_installation(
                ) as active_jobs
         FROM users u
         JOIN employees e ON e.user_id = u.id
-        WHERE (e.role_code = 'technician' OR u.role = 'technician' OR e.designation ILIKE '%technician%' OR e.designation ILIKE '%installation%')
+        WHERE (e.role_code = 'technician' OR u.role = 'technician' OR LOWER(e.designation) LIKE %s OR LOWER(e.designation) LIKE %s)
           AND e.employment_status = 'ACTIVE' 
           AND u.is_active = TRUE
           AND (
@@ -137,7 +137,7 @@ def find_best_technician_for_installation(
               OR e.access_scope = 'GLOBAL'
           )
         ORDER BY active_jobs ASC, u.full_name ASC
-        """, (f"%{norm_area}%", f"%{norm_area}%"))
+        """, ("%technician%", "%installation%", f"%{norm_area}%", f"%{norm_area}%"))
 
         candidates = [dict(r) for r in cursor.fetchall()]
 
@@ -156,11 +156,11 @@ def find_best_technician_for_installation(
                    ) as active_jobs
             FROM users u
             JOIN employees e ON e.user_id = u.id
-            WHERE (e.role_code = 'technician' OR u.role = 'technician' OR e.designation ILIKE '%technician%' OR e.designation ILIKE '%installation%')
+            WHERE (e.role_code = 'technician' OR u.role = 'technician' OR LOWER(e.designation) LIKE %s OR LOWER(e.designation) LIKE %s)
               AND e.employment_status = 'ACTIVE' 
               AND u.is_active = TRUE
             ORDER BY active_jobs ASC, u.full_name ASC
-            """)
+            """, ("%technician%", "%installation%"))
             candidates = [dict(r) for r in cursor.fetchall()]
 
     if not candidates:

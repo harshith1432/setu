@@ -9588,6 +9588,227 @@ async function toggleAdminAccountStatus(userId, currentIsActive) {
 }
 
 
+// ==============================================================================
+// USER PROFILE MANAGEMENT (EDIT PROFILE & PASSWORD FOR ALL ROLES)
+// ==============================================================================
+
+async function openEditProfileModal() {
+  const user = currentUser || {};
+  
+  // Try to fetch latest fresh profile from /auth/me if token exists
+  let freshUser = user;
+  try {
+    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : localStorage.getItem('token'));
+    if (token) {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        freshUser = await res.json();
+        currentUser = { ...currentUser, ...freshUser };
+        TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+      }
+    }
+  } catch (_) {}
+
+  const fullName = freshUser.full_name || '';
+  const email = freshUser.official_email || freshUser.email || '';
+  const phone = freshUser.phone || '';
+  const username = freshUser.username || '';
+  const role = (freshUser.role || 'farmer').toUpperCase();
+  const lang = freshUser.preferred_language || 'kn';
+  const farmName = freshUser.farm_name || '';
+  const region = freshUser.region || '';
+  const isFarmer = (freshUser.role === 'farmer');
+
+  const bodyHtml = `
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Profile Header / Identity Badge -->
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: var(--bg-subtle); border-radius: var(--radius-md, 8px); border: 1px solid var(--border-subtle);">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--brand-tint, #ecfdf5); border: 1px solid var(--brand-border, #a7f3d0); display: flex; align-items: center; justify-content: center; color: var(--brand-500, #059669); font-weight: 800; font-size: 1.25rem;">
+          ${(fullName || username || 'U').charAt(0).toUpperCase()}
+        </div>
+        <div style="min-width: 0; flex: 1;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">${escapeHtml(fullName || username || 'User Profile')}</h3>
+            <span style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: var(--brand-tint, #ecfdf5); color: var(--brand-500, #059669); border: 1px solid var(--brand-border, #a7f3d0);">${role}</span>
+          </div>
+          <div style="font-size: 0.80rem; color: var(--text-muted); margin-top: 3px;">
+            Username: <code>@${escapeHtml(username)}</code> &bull; All roles can manage contact & security details
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Profile Form -->
+      <form id="editProfileForm" onsubmit="submitEditProfile(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <div class="form-group">
+            <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+              Full Name <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="text" id="profFullName" class="form-control" required placeholder="Enter full name" value="${escapeHtml(fullName)}" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.88rem;" />
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+              Email Address
+            </label>
+            <input type="email" id="profEmail" class="form-control" placeholder="user@example.com" value="${escapeHtml(email)}" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.88rem;" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <div class="form-group">
+            <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+              Phone / Mobile Number <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="tel" id="profPhone" class="form-control" required placeholder="+91 9876543210" value="${escapeHtml(phone)}" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.88rem;" />
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+              Preferred Language
+            </label>
+            <select id="profLang" class="form-select" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.88rem;">
+              <option value="kn" ${lang === 'kn' ? 'selected' : ''}>Kannada (ಕನ್ನಡ)</option>
+              <option value="en" ${lang === 'en' ? 'selected' : ''}>English</option>
+              <option value="hi" ${lang === 'hi' ? 'selected' : ''}>Hindi (हिन्दी)</option>
+              <option value="te" ${lang === 'te' ? 'selected' : ''}>Telugu (తెలుగు)</option>
+              <option value="ta" ${lang === 'ta' ? 'selected' : ''}>Tamil (தமிழ்)</option>
+              <option value="mr" ${lang === 'mr' ? 'selected' : ''}>Marathi (मराठी)</option>
+            </select>
+          </div>
+        </div>
+
+        ${isFarmer ? `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <div class="form-group">
+            <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">Farm / Shed Name</label>
+            <input type="text" id="profFarmName" class="form-control" placeholder="Green Valley Farm" value="${escapeHtml(farmName)}" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.88rem;" />
+          </div>
+          <div class="form-group">
+            <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">Cluster Region / Location</label>
+            <input type="text" id="profRegion" class="form-control" placeholder="Ramanagara Cluster" value="${escapeHtml(region)}" style="width: 100%; padding: 9px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.88rem;" />
+          </div>
+        </div>
+        ` : ''}
+
+        <!-- Security / Password Quick Card -->
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; background: var(--bg-subtle); border-radius: var(--radius-md, 8px); border: 1px solid var(--border-subtle); margin-top: 4px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 6px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="key-round" style="width: 16px; height: 16px;"></i>
+            </div>
+            <div>
+              <div style="font-size: 0.84rem; font-weight: 700; color: var(--text-main);">Account Password</div>
+              <div style="font-size: 0.76rem; color: var(--text-muted);">Change or reset your login credentials</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary" onclick="openChangePasswordModal()" style="font-size: 0.80rem; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;">
+            <i data-lucide="lock" style="width: 13px; height: 13px;"></i>
+            <span>Change Password</span>
+          </button>
+        </div>
+
+        <!-- Action Footer -->
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+          <button type="button" class="btn btn-secondary" onclick="closeAppModal()">Cancel</button>
+          <button type="submit" id="btnSaveProfile" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+            <i data-lucide="check" style="width: 15px; height: 15px;"></i>
+            <span>Save Profile Changes</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  openAppModal('Edit User Profile', bodyHtml, 'lg');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function submitEditProfile(e) {
+  e.preventDefault();
+  const fullName = document.getElementById('profFullName')?.value?.trim();
+  const email = document.getElementById('profEmail')?.value?.trim();
+  const phone = document.getElementById('profPhone')?.value?.trim();
+  const preferred_language = document.getElementById('profLang')?.value || 'kn';
+  const farm_name = document.getElementById('profFarmName')?.value?.trim();
+  const region = document.getElementById('profRegion')?.value?.trim();
+
+  if (!fullName) {
+    showToast('Full name is required', 'error');
+    return;
+  }
+  if (!phone) {
+    showToast('Phone number is required', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('btnSaveProfile');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+  }
+
+  const payload = {
+    full_name: fullName,
+    phone: phone,
+    email: email,
+    official_email: email,
+    preferred_language: preferred_language
+  };
+  if (farm_name !== undefined) payload.farm_name = farm_name;
+  if (region !== undefined) payload.region = region;
+
+  try {
+    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : localStorage.getItem('token'));
+    const res = await fetch(`${API_BASE_URL}/auth/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Failed to update profile');
+    }
+
+    // Update in-memory state and sessionStorage
+    currentUser = {
+      ...(currentUser || {}),
+      full_name: data.full_name || fullName,
+      phone: data.phone || phone,
+      official_email: data.official_email || email,
+      email: data.official_email || email,
+      preferred_language: data.preferred_language || preferred_language
+    };
+    if (farm_name) currentUser.farm_name = farm_name;
+    if (region) currentUser.region = region;
+
+    TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+
+    // Update UI headers and avatar labels immediately
+    updateUserBadge();
+
+    showToast('Profile updated successfully!', 'success');
+    closeAppModal();
+  } catch (err) {
+    showToast(err.message || 'Error updating profile', 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i data-lucide="check" style="width: 15px; height: 15px;"></i> <span>Save Profile Changes</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+window.openEditProfileModal = openEditProfileModal;
+window.submitEditProfile = submitEditProfile;
+
 function openChangePasswordModal() {
   const body = `
     <form id="changePasswordForm" onsubmit="submitChangePassword(event)" style="display: flex; flex-direction: column; gap: 14px;">

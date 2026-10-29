@@ -399,6 +399,14 @@
 <option value="farmer">Role: Farmer</option>
 </select>
 </div>
+<button class="user-menu-item" onclick="openEditProfileModal(); toggleUserDropdown();">
+<i data-lucide="user-cog"></i>
+<span>Edit Profile</span>
+</button>
+<button class="user-menu-item" onclick="openChangePasswordModal(); toggleUserDropdown();">
+<i data-lucide="key-round"></i>
+<span>Change Password</span>
+</button>
 <button class="user-menu-item" onclick="toggleTheme()">
 <i data-lucide="moon" id="themeIcon"></i>
 <span id="themeToggleLabel">Dark Theme</span>
@@ -410,10 +418,6 @@
 <button class="user-menu-item" onclick="switchNavTab('settings'); toggleUserDropdown();">
 <i data-lucide="settings"></i>
 <span>Platform Settings</span>
-</button>
-<button class="user-menu-item" onclick="openChangePasswordModal(); toggleUserDropdown();">
-<i data-lucide="key-round"></i>
-<span>Change Password</span>
 </button>
 <div style="height: 1px; background: var(--border-subtle); margin: 4px 0;"></div>
 <button class="user-menu-item" onclick="openActiveSessionsModal(); toggleUserDropdown();">

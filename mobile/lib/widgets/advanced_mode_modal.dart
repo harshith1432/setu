@@ -166,9 +166,11 @@ class AdvancedModeModal extends StatelessWidget {
                     children: [
                       Icon(Icons.tune, color: Color(0xFF1B5E20), size: 16),
                       SizedBox(width: 6),
-                      Text(
-                        'Advanced Custom Setpoint Mode Active',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                      Expanded(
+                        child: Text(
+                          'Advanced Custom Setpoint Mode Active',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF1B5E20)),
+                        ),
                       ),
                     ],
                   ),
