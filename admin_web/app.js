@@ -2063,6 +2063,381 @@ function gotoFarmersPage(page) {
   if (window.SetuTableManager) SetuTableManager.gotoPage('farmersTable', page);
 }
 
+async function openFarmerDrawer(farmerId) {
+  let farmer = (allFarmersData && allFarmersData.find(f => f.id === farmerId || f.username === farmerId)) || null;
+
+  const renderDrawer = (f, shedData = null) => {
+    const initials = (f.full_name || f.username || 'F')
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase();
+
+    const stageNames = {
+      1: 'Stage 1: 1st Instar (Chawki)',
+      2: 'Stage 2: 2nd Instar (Chawki)',
+      3: 'Stage 3: 3rd Instar (Active Feeding)',
+      4: 'Stage 4: 4th Instar (High Feed)',
+      5: 'Stage 5: 5th Instar (Peak Maturity)',
+      6: 'Spinning / Cocoon Stage',
+      7: 'Harvest & Grading'
+    };
+    const stageText = stageNames[f.current_stage || 3] || `Instar ${f.current_stage || 3}`;
+
+    const regDate = f.created_at ? new Date(f.created_at).toLocaleDateString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    }) : 'Registered Member';
+
+    const tempVal = shedData?.current?.temperature ?? '--';
+    const humVal = shedData?.current?.humidity ?? '--';
+    const airVal = shedData?.current?.air_quality ?? '--';
+    const luxVal = shedData?.current?.light_lux ?? '--';
+
+    const titleHtml = `<i data-lucide="user-check"></i> <span>Farmer Profile: ${escapeHtml(f.full_name || f.username)}</span>`;
+    
+    const bodyHtml = `
+      <div style="display: flex; flex-direction: column; gap: 18px;">
+        <!-- Farmer Identity Banner -->
+        <div style="background: var(--bg-surface-elevated, #f8fafc); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; display: flex; align-items: center; gap: 16px;">
+          <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 800; flex-shrink: 0; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25);">
+            ${initials}
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <h4 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--text-main);">${escapeHtml(f.full_name || f.username)}</h4>
+              <span class="badge ${f.is_active !== false ? 'badge-success' : 'badge-danger'}">${f.is_active !== false ? 'ACTIVE' : 'SUSPENDED'}</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-muted); font-family: var(--font-mono); margin-top: 3px;">
+              ID: ${escapeHtml(f.id)} &middot; ${escapeHtml(f.role || 'farmer').toUpperCase()}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 2px;">
+              Joined: ${regDate}
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Action Toolbar -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="openEditFarmerModal('${f.id}')" style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border-radius: 8px; font-weight: 600;">
+            <i data-lucide="edit-3" style="width: 15px; height: 15px;"></i>
+            <span>Edit Profile</span>
+          </button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="selectedShedId = '${f.shed_id || 'shed_01'}'; switchNavTab('live-monitoring'); closeAppDrawer();" style="display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border-radius: 8px; font-weight: 600;">
+            <i data-lucide="activity" style="width: 15px; height: 15px;"></i>
+            <span>View Shed IoT</span>
+          </button>
+        </div>
+
+        <!-- Contact & Authentication Card -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
+          <h5 style="margin: 0 0 12px 0; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="phone-call" style="width: 14px; height: 14px;"></i> Contact & Communication
+          </h5>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem;">
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Mobile Phone</span>
+              <strong style="color: var(--text-main); font-family: var(--font-mono);">${escapeHtml(f.phone || 'N/A')}</strong>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">WhatsApp</span>
+              <strong style="color: var(--text-main); font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 4px;">
+                ${escapeHtml(f.whatsapp_number || f.phone || 'N/A')}
+                ${f.whatsapp_verified ? '<i data-lucide="check-circle-2" style="width: 14px; height: 14px; color: #10b981;" title="Verified WhatsApp"></i>' : ''}
+              </strong>
+            </div>
+            <div style="grid-column: span 2;">
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Official Email</span>
+              <strong style="color: var(--text-main); word-break: break-all;">${escapeHtml(f.official_email || f.username || 'Not set')}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rearing Shed & Farm Information Card -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
+          <h5 style="margin: 0 0 12px 0; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+            <i data-lucide="home" style="width: 14px; height: 14px;"></i> Sericulture Farm & Infrastructure
+          </h5>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem;">
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Farm Name</span>
+              <strong style="color: var(--text-main);">${escapeHtml(f.farm_name || 'Setu Smart Farm')}</strong>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Silk Belt / Region</span>
+              <strong style="color: var(--text-main);">${escapeHtml(f.region || 'Karnataka')}</strong>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Assigned Shed</span>
+              <span class="badge badge-info" style="font-family: var(--font-mono); font-weight: 700;">${escapeHtml(f.shed_id || 'shed_01')}</span>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Current Stage</span>
+              <span class="badge badge-warning" style="font-weight: 700;">${escapeHtml(stageText)}</span>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Batch Identifier</span>
+              <strong style="color: var(--text-main); font-family: var(--font-mono);">${escapeHtml(f.batch_id || 'SERI-2026-B01')}</strong>
+            </div>
+            <div>
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">DFL Capacity</span>
+              <strong style="color: var(--text-main);">${escapeHtml(f.dfl_capacity || '200 DFL')}</strong>
+            </div>
+            <div style="grid-column: span 2;">
+              <span style="display: block; font-size: 0.74rem; color: var(--text-muted); text-transform: uppercase;">Silkworm Breed</span>
+              <strong style="color: var(--text-main);">${escapeHtml(f.breed || 'Double Hybrid (FC1 x FC2)')}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Telemetry Snapshot -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
+          <h5 style="margin: 0 0 12px 0; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="cpu" style="width: 14px; height: 14px;"></i> Live Microclimate Snapshot
+            </span>
+            <span style="font-size: 0.72rem; font-weight: 600; color: #10b981; display: inline-flex; align-items: center; gap: 4px;">
+              <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block;"></span> Active
+            </span>
+          </h5>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center;">
+            <div style="background: var(--bg-subtle, #f1f5f9); padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+              <span style="display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">TEMP</span>
+              <strong style="font-size: 1.05rem; color: var(--text-main);">${tempVal !== '--' ? `${Number(tempVal).toFixed(1)}°C` : '--'}</strong>
+            </div>
+            <div style="background: var(--bg-subtle, #f1f5f9); padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+              <span style="display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">HUMIDITY</span>
+              <strong style="font-size: 1.05rem; color: var(--text-main);">${humVal !== '--' ? `${Number(humVal).toFixed(1)}%` : '--'}</strong>
+            </div>
+            <div style="background: var(--bg-subtle, #f1f5f9); padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+              <span style="display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">AIR QUAL</span>
+              <strong style="font-size: 1.05rem; color: var(--text-main);">${airVal !== '--' ? `${Number(airVal).toFixed(0)}%` : '--'}</strong>
+            </div>
+            <div style="background: var(--bg-subtle, #f1f5f9); padding: 10px 4px; border-radius: 8px; border: 1px solid var(--border-color);">
+              <span style="display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: 700;">LIGHT</span>
+              <strong style="font-size: 1.05rem; color: var(--text-main);">${luxVal !== '--' ? `${Number(luxVal).toFixed(0)} lx` : '--'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger Zone / Status Toggle -->
+        <div style="display: flex; gap: 10px; margin-top: 4px;">
+          <button type="button" class="btn btn-outline btn-full btn-sm" onclick="toggleFarmerStatus('${f.id}', ${f.is_active !== false}); closeAppDrawer();" style="border-color: ${f.is_active !== false ? 'var(--status-warning, #f59e0b)' : '#10b981'}; color: ${f.is_active !== false ? '#d97706' : '#10b981'}; font-weight: 600;">
+            <i data-lucide="${f.is_active !== false ? 'pause-circle' : 'play-circle'}" style="width: 14px; height: 14px;"></i>
+            <span>${f.is_active !== false ? 'Suspend Account' : 'Activate Account'}</span>
+          </button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="confirmDeleteFarmer('${f.id}'); closeAppDrawer();" style="padding: 8px 14px;" title="Permanently Delete Farmer">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+          </button>
+        </div>
+      </div>
+    `;
+
+    openAppDrawer(titleHtml, bodyHtml);
+  };
+
+  if (farmer) {
+    renderDrawer(farmer);
+  } else {
+    openAppDrawer('<i data-lucide="loader-2" class="spin"></i> Loading Profile...', '<div style="padding: 32px; text-align: center;"><div class="loading-spinner"></div><p style="margin-top: 12px; color: var(--text-muted);">Fetching farmer records...</p></div>');
+  }
+
+  // Fetch full details and live shed telemetry from API
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/farmers/${encodeURIComponent(farmerId)}`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.farmer) {
+        farmer = data.farmer;
+        renderDrawer(farmer, data.shed);
+      }
+    }
+  } catch (err) {
+    console.warn('Farmer detailed profile fetch notice:', err);
+  }
+}
+
+async function openEditFarmerModal(farmerId) {
+  let farmer = (allFarmersData && allFarmersData.find(f => f.id === farmerId || f.username === farmerId)) || null;
+
+  if (!farmer) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/farmers/${encodeURIComponent(farmerId)}`, {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        farmer = d.farmer;
+      }
+    } catch (_) {}
+  }
+
+  if (!farmer) {
+    showToast('Farmer record not found', 'error');
+    return;
+  }
+
+  const shedOptions = (availableSheds && availableSheds.length > 0)
+    ? availableSheds.map(s => `<option value="${s.id}" ${s.id === farmer.shed_id ? 'selected' : ''}>${escapeHtml(s.name || s.id)} (${s.id})</option>`).join('')
+    : ['shed_01', 'shed_02', 'shed_03'].map(sid => `<option value="${sid}" ${sid === farmer.shed_id ? 'selected' : ''}>Rearing Shed ${sid.replace('shed_', '')} (${sid})</option>`).join('');
+
+  const stageOptions = [
+    { val: 1, label: 'Stage 1: 1st Instar (Chawki)' },
+    { val: 2, label: 'Stage 2: 2nd Instar (Chawki)' },
+    { val: 3, label: 'Stage 3: 3rd Instar (Active Feeding)' },
+    { val: 4, label: 'Stage 4: 4th Instar (High Feed)' },
+    { val: 5, label: 'Stage 5: 5th Instar (Peak Maturity)' }
+  ].map(st => `<option value="${st.val}" ${Number(farmer.current_stage || 3) === st.val ? 'selected' : ''}>${st.label}</option>`).join('');
+
+  const modalHtml = `
+    <form id="editFarmerForm" onsubmit="handleUpdateFarmer(event, '${farmer.id}')" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="editFarmerFullName"><i data-lucide="user"></i> Full Name *</label>
+          <input type="text" id="editFarmerFullName" value="${escapeHtml(farmer.full_name || '')}" required class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+        <div class="form-group">
+          <label for="editFarmerPhone"><i data-lucide="phone"></i> Mobile Phone *</label>
+          <input type="tel" id="editFarmerPhone" value="${escapeHtml(farmer.phone || '')}" required class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="editFarmerEmail"><i data-lucide="mail"></i> Official Email</label>
+          <input type="email" id="editFarmerEmail" value="${escapeHtml(farmer.official_email || '')}" placeholder="farmer@example.com" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+        <div class="form-group">
+          <label for="editFarmerWhatsApp"><i data-lucide="message-square"></i> WhatsApp Number</label>
+          <input type="tel" id="editFarmerWhatsApp" value="${escapeHtml(farmer.whatsapp_number || farmer.phone || '')}" placeholder="WhatsApp alert number" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="editFarmerFarmName"><i data-lucide="home"></i> Farm / Shed Name *</label>
+          <input type="text" id="editFarmerFarmName" value="${escapeHtml(farmer.farm_name || '')}" required class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+        <div class="form-group">
+          <label for="editFarmerRegion"><i data-lucide="map-pin"></i> Silk Belt / Region *</label>
+          <input type="text" id="editFarmerRegion" value="${escapeHtml(farmer.region || '')}" required class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="editFarmerShedSelect"><i data-lucide="cpu"></i> Assigned Rearing Shed *</label>
+          <select id="editFarmerShedSelect" class="form-control" required style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+            ${shedOptions}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editFarmerStage"><i data-lucide="activity"></i> Current Growth Stage *</label>
+          <select id="editFarmerStage" class="form-control" required style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+            ${stageOptions}
+          </select>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label for="editFarmerBatchId"><i data-lucide="tag"></i> Batch ID</label>
+          <input type="text" id="editFarmerBatchId" value="${escapeHtml(farmer.batch_id || 'SERI-2026-B01')}" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+        <div class="form-group">
+          <label for="editFarmerDfl"><i data-lucide="package"></i> DFL Capacity</label>
+          <input type="text" id="editFarmerDfl" value="${escapeHtml(farmer.dfl_capacity || '200 DFL')}" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+        <div class="form-group">
+          <label for="editFarmerBreed"><i data-lucide="dna"></i> Silkworm Breed</label>
+          <input type="text" id="editFarmerBreed" value="${escapeHtml(farmer.breed || 'Double Hybrid (FC1 x FC2)')}" class="form-control" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+        <button type="button" class="btn btn-skin" onclick="closeAppModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveFarmerProfile" style="display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="save"></i> <span>Save Changes</span>
+        </button>
+      </div>
+    </form>
+  `;
+
+  openAppModal(`Edit Farmer & Shed: ${farmer.full_name || farmer.username}`, modalHtml, 'lg');
+}
+
+async function handleUpdateFarmer(event, farmerId) {
+  event.preventDefault();
+  const btn = document.getElementById('btnSaveFarmerProfile');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Saving...</span>';
+  }
+
+  const payload = {
+    full_name: document.getElementById('editFarmerFullName').value.trim(),
+    phone: document.getElementById('editFarmerPhone').value.trim(),
+    official_email: document.getElementById('editFarmerEmail').value.trim() || null,
+    whatsapp_number: document.getElementById('editFarmerWhatsApp').value.trim() || null,
+    farm_name: document.getElementById('editFarmerFarmName').value.trim(),
+    region: document.getElementById('editFarmerRegion').value.trim(),
+    shed_id: document.getElementById('editFarmerShedSelect').value,
+    current_stage: parseInt(document.getElementById('editFarmerStage').value, 10) || 3,
+    batch_id: document.getElementById('editFarmerBatchId').value.trim(),
+    dfl_capacity: document.getElementById('editFarmerDfl').value.trim(),
+    breed: document.getElementById('editFarmerBreed').value.trim()
+  };
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/farmers/${encodeURIComponent(farmerId)}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update farmer record');
+    }
+
+    closeAppModal();
+    showToast('Farmer profile and rearing shed updated successfully!', 'success');
+    await loadFarmers();
+    
+    // If the drawer was open, refresh it
+    const drawer = document.getElementById('appDrawer');
+    if (drawer && drawer.classList.contains('open')) {
+      openFarmerDrawer(farmerId);
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="save"></i> <span>Save Changes</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+function openOrderDetailDrawer(orderId) {
+  if (typeof openOrderDetailsModal === 'function') {
+    openOrderDetailsModal(orderId);
+  }
+}
+
+function openTicketDetailDrawer(ticketId) {
+  if (typeof openTicketDetailsModal === 'function') {
+    openTicketDetailsModal(ticketId);
+  }
+}
+
+
 
 async function toggleFarmerStatus(farmerId, currentActive) {
   const newActive = !currentActive;
@@ -7775,6 +8150,11 @@ window.loadProducts = loadProducts;
 window.loadOrders = loadOrders;
 window.loadBilling = loadBilling;
 window.loadFarmers = loadFarmers;
+window.openFarmerDrawer = openFarmerDrawer;
+window.openEditFarmerModal = openEditFarmerModal;
+window.handleUpdateFarmer = handleUpdateFarmer;
+window.openOrderDetailDrawer = openOrderDetailDrawer;
+window.openTicketDetailDrawer = openTicketDetailDrawer;
 window.loadDevices = loadDevices;
 window.loadSensors = loadSensors;
 window.loadAlerts = loadAlerts;
