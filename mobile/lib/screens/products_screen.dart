@@ -32,9 +32,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     final provider = Provider.of<SetuProvider>(context, listen: false);
     try {
-      List<Map<String, dynamic>> list = await provider.firestoreService.getProducts();
+      // 1. Primary source of truth: backend catalogue API
+      List<Map<String, dynamic>> list = await provider.apiService.getProducts();
+      // 2. Offline fallback to local firestore cache if backend unreachable
       if (list.isEmpty) {
-        list = await provider.apiService.getProducts();
+        list = await provider.firestoreService.getProducts();
       }
       if (!mounted) return;
       setState(() {
@@ -486,6 +488,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         final inStock = stock > 0;
                         final category = p['category'] ?? 'Hardware';
 
+                        String? imageUrl;
+                        if (p['images'] != null && p['images'] is List && (p['images'] as List).isNotEmpty) {
+                          final img = (p['images'] as List).first?.toString();
+                          if (img != null && img.isNotEmpty) {
+                            if (img.startsWith('http://') || img.startsWith('https://')) {
+                              imageUrl = img;
+                            } else {
+                              const base = 'https://setu-8vh9.onrender.com';
+                              imageUrl = '$base$img';
+                            }
+                          }
+                        }
+
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
                           elevation: 1,
@@ -498,14 +513,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      width: 60,
-                                      height: 60,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFE8F5E9),
-                                        borderRadius: BorderRadius.circular(12),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        width: 60,
+                                        height: 60,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFE8F5E9),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: imageUrl != null
+                                            ? Image.network(
+                                                imageUrl,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32)),
+                                              )
+                                            : const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32)),
                                       ),
-                                      child: const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32)),
                                     ),
                                     const SizedBox(width: 14),
                                     Expanded(
