@@ -499,7 +499,7 @@ async function handleLogin(e) {
 // GOOGLE OAUTH & SOCIAL AUTHENTICATION
 // ==========================================================================
 
-let GOOGLE_CLIENT_ID = '';
+let GOOGLE_CLIENT_ID = '756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com';
 
 function parseJwt(token) {
   try {
@@ -650,8 +650,8 @@ function initGoogleAuth() {
 
 function redirectToGoogleOAuth() {
   const currentOrigin = window.location.origin;
-  const redirectUri = `${currentOrigin}/admin/`;
-  const state = encodeURIComponent(JSON.stringify({ returnTo: '/admin/' }));
+  const redirectUri = `${currentOrigin}${window.location.pathname.startsWith('/login') ? '/login' : '/admin/'}`;
+  const state = encodeURIComponent(JSON.stringify({ returnTo: window.location.pathname }));
   const scope = encodeURIComponent('openid email profile');
   const nonce = Math.random().toString(36).substring(2);
 
@@ -671,53 +671,92 @@ function redirectToGoogleOAuth() {
   }
 }
 
-function handleGoogleSignIn() {
+async function handleGoogleSignIn() {
   const errorEl = document.getElementById('loginError');
   if (errorEl) errorEl.classList.add('hidden');
 
-  // 1. Interactive Google Identity Services OAuth 2.0 popup
-  if (googleTokenClient) {
+  const googleBtn = document.getElementById('googleSignInBtn');
+  const originalHtml = googleBtn ? googleBtn.innerHTML : '';
+  if (googleBtn) {
+    googleBtn.disabled = true;
+    googleBtn.innerHTML = '<span>Opening Google Sign-In...</span>';
+  }
+
+  const resetButton = () => {
+    if (googleBtn) {
+      googleBtn.disabled = false;
+      googleBtn.innerHTML = originalHtml || '<span>Sign in with Google</span>';
+    }
+  };
+
+  // 1. Firebase Authentication with Google Provider
+  if (typeof firebase !== 'undefined' && firebase.auth) {
     try {
-      googleTokenClient.requestAccessToken({ prompt: 'select_account' });
-      return;
-    } catch (e) {
-      console.warn('GIS popup request failed, redirecting to OAuth:', e);
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await firebase.auth().signInWithPopup(provider);
+      if (result && result.user) {
+        const u = result.user;
+        await completeGoogleLogin({
+          email: u.email || '',
+          full_name: u.displayName || 'Google User',
+          google_id: u.uid
+        });
+        return;
+      }
+    } catch (fbErr) {
+      console.warn('Firebase popup notice:', fbErr);
+      if (fbErr.code === 'auth/popup-closed-by-user' || fbErr.code === 'auth/cancelled-popup-request') {
+        resetButton();
+        return;
+      }
     }
   }
 
+  // 2. Google Identity Services (GIS) Token Client Popup
   if (window.google && window.google.accounts && window.google.accounts.oauth2 && GOOGLE_CLIENT_ID) {
     try {
-      googleTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
-        prompt: 'select_account',
-        callback: async (tokenResponse) => {
-          if (tokenResponse.error) return;
-          try {
-            const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-              headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
-            });
-            const profile = await res.json();
-            if (profile && (profile.email || profile.sub)) {
-              await completeGoogleLogin({
-                email: profile.email || '',
-                full_name: profile.name || profile.given_name || 'Google User',
-                google_id: profile.sub
-              });
+      if (!googleTokenClient) {
+        googleTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email openid',
+          prompt: 'select_account',
+          callback: async (tokenResponse) => {
+            if (tokenResponse.error) {
+              resetButton();
+              return;
             }
-          } catch (err) {
-            showToast('Failed to fetch Google profile: ' + err.message, 'error');
+            try {
+              const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+              });
+              const profile = await res.json();
+              if (profile && (profile.email || profile.sub)) {
+                await completeGoogleLogin({
+                  email: profile.email || '',
+                  full_name: profile.name || profile.given_name || 'Google User',
+                  google_id: profile.sub
+                });
+              } else {
+                resetButton();
+              }
+            } catch (err) {
+              showToast('Failed to fetch Google profile: ' + err.message, 'error');
+              resetButton();
+            }
           }
-        }
-      });
+        });
+      }
       googleTokenClient.requestAccessToken({ prompt: 'select_account' });
       return;
     } catch (e) {
-      console.warn('Direct initTokenClient notice:', e);
+      console.warn('GIS Token Client notice, redirecting:', e);
     }
   }
 
-  // 2. Direct browser redirection to Google OAuth Consent Screen
+  // 3. Direct browser redirection fallback
   redirectToGoogleOAuth();
 }
 
