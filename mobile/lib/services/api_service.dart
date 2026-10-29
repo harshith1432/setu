@@ -520,7 +520,7 @@ class ApiService {
         }
       } catch (_) {}
     }
-    return defaultCatalogProducts;
+    return [];
   }
 
   Future<List<Map<String, dynamic>>> getOrders() async {

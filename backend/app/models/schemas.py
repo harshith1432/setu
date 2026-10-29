@@ -286,6 +286,9 @@ class EmployeeCreate(BaseModel):
     send_invitation: Optional[bool] = True
     password: Optional[str] = "Welcome@123"
     initial_password: Optional[str] = "Welcome@123"
+    assigned_area: Optional[str] = "Bengaluru"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
     @model_validator(mode="before")
     @classmethod

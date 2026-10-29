@@ -755,6 +755,7 @@ class InstallationUpdatePayload(BaseModel):
     status: str = Field(..., example="COMPLETED")
     remarks: Optional[str] = ""
     checklist_completed: Optional[List[str]] = None
+    completion_photo_url: Optional[str] = None
 
 @router.get("/installations")
 def get_installations(
@@ -791,13 +792,17 @@ def update_job_status(
     user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "operations_manager", "technician"]))
 ):
     actor = user.get("sub", "admin")
-    updated = update_installation_job(
-        job_id=job_id,
-        new_status=payload.status,
-        actor_id=actor,
-        remarks=payload.remarks or f"Transitioned to {payload.status}",
-        checklist=payload.checklist_completed
-    )
+    try:
+        updated = update_installation_job(
+            job_id=job_id,
+            new_status=payload.status,
+            actor_id=actor,
+            remarks=payload.remarks or f"Transitioned to {payload.status}",
+            checklist=payload.checklist_completed,
+            completion_photo_url=payload.completion_photo_url
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     if not updated:
         raise HTTPException(status_code=404, detail="Installation job not found")
     log_audit(actor, "INSTALLATION_UPDATE", f"Job {job_id} updated to {payload.status}")
@@ -808,14 +813,21 @@ def update_job_status(
 def get_installation_team(
     user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "technician"]))
 ):
+    from app.services.dispatch_service import ensure_technicians_seeded_for_bengaluru
+    ensure_technicians_seeded_for_bengaluru()
     from app.services.db_service import get_db_cursor
     with get_db_cursor(dict_cursor=True) as cur:
         cur.execute("""
-        SELECT u.id, u.username, u.full_name, u.phone, u.region,
+        SELECT u.id, u.username, u.full_name, u.phone,
+               COALESCE(e.assigned_area, u.region, 'Bengaluru') as region,
+               COALESCE(e.assigned_area, u.region, 'Bengaluru') as assigned_area,
+               COALESCE(e.latitude, u.latitude, 12.9716) as latitude,
+               COALESCE(e.longitude, u.longitude, 77.5946) as longitude,
                (SELECT COUNT(*) FROM installation_jobs WHERE technician_id = u.id AND status NOT IN ('COMPLETED', 'CANCELLED')) as active_jobs_count
         FROM users u
-        WHERE u.role = 'technician'
-        ORDER BY u.full_name ASC
+        LEFT JOIN employees e ON e.user_id = u.id
+        WHERE u.role = 'technician' OR e.role_code = 'technician'
+        ORDER BY active_jobs_count ASC, u.full_name ASC
         """)
         return [dict(r) for r in cur.fetchall()]
 

@@ -433,6 +433,16 @@ def init_enterprise_tables():
         # Seed public FAQs
         _seed_faqs(cursor, now_dt)
         _seed_orders_subscriptions_and_tickets(cursor, now_dt)
+
+        # Smart installation & dispatch schema extensions
+        cursor.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS assigned_area VARCHAR(128) DEFAULT 'Bengaluru';")
+        cursor.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION DEFAULT 12.9716;")
+        cursor.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION DEFAULT 77.5946;")
+        cursor.execute("ALTER TABLE installation_jobs ADD COLUMN IF NOT EXISTS completion_photo_url TEXT;")
+        cursor.execute("ALTER TABLE installation_jobs ADD COLUMN IF NOT EXISTS area VARCHAR(128) DEFAULT 'Bengaluru';")
+        cursor.execute("ALTER TABLE installation_jobs ADD COLUMN IF NOT EXISTS assigned_reason TEXT;")
+        cursor.execute("ALTER TABLE installation_jobs ADD COLUMN IF NOT EXISTS order_id VARCHAR(64);")
+
         # Seed system platform settings
         _seed_platform_settings(cursor, now_dt)
 
@@ -1648,6 +1658,56 @@ def create_customer_order(
         VALUES (%s, %s, %s, %s, %s, %s, 'INR', %s, 'SETU_PAY', %s, 'SUCCESS', %s)
         """, (pay_id, pay_ref, inv_id, order_id, user_id, total_amount, clean_method, f"pay_{uuid.uuid4().hex[:12]}", now_dt))
 
+        # Automatic dispatch for hardware products:
+        hardware_items = [
+            oi for oi in order_item_records
+            if oi.get("category") in ("Gateways", "Sensors", "Actuators", "Climate Control", "Controllers", "Hardware", "Heater")
+            or any(kw in (oi.get("product_name") or "") for kw in ("Gateway", "Sensor", "Probe", "Dimmer", "Humidifier", "Heater"))
+        ]
+        if hardware_items:
+            try:
+                from app.services.dispatch_service import find_best_technician_for_installation
+                f_region = u.get("region") or "Bengaluru"
+                f_lat = u.get("latitude") or 12.9716
+                f_lon = u.get("longitude") or 77.5946
+                tech, dispatch_reason = find_best_technician_for_installation(f_region, f_lat, f_lon)
+                tech_id = tech["user_id"] if tech else None
+
+                inst_job_id = f"job_{uuid.uuid4().hex[:12]}"
+                inst_job_num = f"INST-2026-{uuid.uuid4().hex[:6].upper()}"
+                inst_status = "ASSIGNED" if tech_id else "REQUESTED"
+                hardware_desc = f"Order {order_num} hardware installation: " + ", ".join(h.get("product_name", "Hardware") for h in hardware_items)
+
+                cursor.execute("""
+                INSERT INTO installation_jobs (
+                    id, job_number, shed_id, farmer_id, technician_id, status,
+                    scheduled_date, checklist_completed, technician_notes, area,
+                    assigned_reason, order_id, created_at, updated_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, '[]'::jsonb, %s, %s, %s, %s, %s, %s)
+                """, (
+                    inst_job_id,
+                    inst_job_num,
+                    u.get("shed_id") or "shed_01",
+                    user_id,
+                    tech_id,
+                    inst_status,
+                    now_dt + timedelta(days=2),
+                    hardware_desc,
+                    f_region,
+                    dispatch_reason,
+                    order_id,
+                    now_dt,
+                    now_dt
+                ))
+
+                cursor.execute("""
+                INSERT INTO installation_events (id, job_id, from_status, to_status, actor_id, remarks, created_at)
+                VALUES (%s, %s, NULL, %s, 'system', %s, %s)
+                """, (f"iev_{uuid.uuid4().hex[:12]}", inst_job_id, inst_status, dispatch_reason, now_dt))
+            except Exception as e:
+                print(f"Warning: Auto-dispatch installation job failed: {e}")
+
     log_audit(
         actor=u.get("username") or user_id,
         action="ORDER_CREATED",
@@ -1853,19 +1913,51 @@ def create_installation_job(job_data: Dict[str, Any], creator_id: str = "admin")
     now_dt = datetime.now(timezone.utc)
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     job_num = f"INST-2026-{uuid.uuid4().hex[:6].upper()}"
+    farmer_id = job_data["farmer_id"]
+    technician_id = job_data.get("technician_id")
+    assigned_reason = job_data.get("assigned_reason", "")
+    area = job_data.get("area")
+
+    if not technician_id:
+        from app.services.dispatch_service import find_best_technician_for_installation
+        with get_db_cursor(dict_cursor=True) as cur:
+            cur.execute("SELECT region, latitude, longitude FROM users WHERE id = %s", (farmer_id,))
+            farmer_row = cur.fetchone()
+            f_region = area or (farmer_row["region"] if farmer_row else "Bengaluru") or "Bengaluru"
+            f_lat = farmer_row.get("latitude") if farmer_row else None
+            f_lon = farmer_row.get("longitude") if farmer_row else None
+            area = f_region
+
+        tech, reason = find_best_technician_for_installation(f_region, f_lat, f_lon)
+        if tech:
+            technician_id = tech["user_id"]
+            assigned_reason = reason
+        else:
+            assigned_reason = f"Unassigned: {reason}"
+
+    status = "ASSIGNED" if technician_id else "REQUESTED"
+
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
-        INSERT INTO installation_jobs (id, job_number, shed_id, farmer_id, technician_id, status, scheduled_date, checklist_completed, technician_notes, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, 'REQUESTED', %s, '[]'::jsonb, %s, %s, %s)
+        INSERT INTO installation_jobs (
+            id, job_number, shed_id, farmer_id, technician_id, status,
+            scheduled_date, checklist_completed, technician_notes, area,
+            assigned_reason, order_id, created_at, updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, '[]'::jsonb, %s, %s, %s, %s, %s, %s)
         RETURNING *;
         """, (
             job_id,
             job_num,
-            job_data["shed_id"],
-            job_data["farmer_id"],
-            job_data.get("technician_id"),
+            job_data.get("shed_id") or "shed_01",
+            farmer_id,
+            technician_id,
+            status,
             job_data.get("scheduled_date"),
             job_data.get("technician_notes", ""),
+            area or "Bengaluru",
+            assigned_reason,
+            job_data.get("order_id"),
             now_dt,
             now_dt
         ))
@@ -1873,43 +1965,57 @@ def create_installation_job(job_data: Dict[str, Any], creator_id: str = "admin")
 
         cursor.execute("""
         INSERT INTO installation_events (id, job_id, from_status, to_status, actor_id, remarks, created_at)
-        VALUES (%s, %s, NULL, 'REQUESTED', %s, 'Installation job requested', %s)
-        """, (f"iev_{uuid.uuid4().hex[:12]}", job_id, creator_id, now_dt))
+        VALUES (%s, %s, NULL, %s, %s, %s, %s)
+        """, (f"iev_{uuid.uuid4().hex[:12]}", job_id, status, creator_id, assigned_reason or 'Installation job requested', now_dt))
 
         return row
 
 
-def update_installation_job(job_id: str, new_status: str, actor_id: str, remarks: str, checklist: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+def update_installation_job(
+    job_id: str,
+    new_status: str,
+    actor_id: str,
+    remarks: str,
+    checklist: Optional[List[str]] = None,
+    completion_photo_url: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     now_dt = datetime.now(timezone.utc)
     completed_at = now_dt if new_status == "COMPLETED" else None
+
+    if new_status == "COMPLETED" and not completion_photo_url:
+        raise ValueError("Photo proof of completed installation is required to complete the job.")
+
     import json
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT status FROM installation_jobs WHERE id = %s", (job_id,))
+        cursor.execute("SELECT status, completion_photo_url FROM installation_jobs WHERE id = %s", (job_id,))
         cur = cursor.fetchone()
         if not cur:
             return None
         from_status = cur["status"]
+        photo_to_store = completion_photo_url or cur.get("completion_photo_url")
 
         if checklist is not None:
             cursor.execute("""
             UPDATE installation_jobs
-            SET status = %s, checklist_completed = %s::jsonb, completed_at = COALESCE(%s, completed_at), updated_at = %s
+            SET status = %s, checklist_completed = %s::jsonb, completed_at = COALESCE(%s, completed_at),
+                completion_photo_url = COALESCE(%s, completion_photo_url), updated_at = %s
             WHERE id = %s
             RETURNING *;
-            """, (new_status, json.dumps(checklist), completed_at, now_dt, job_id))
+            """, (new_status, json.dumps(checklist), completed_at, photo_to_store, now_dt, job_id))
         else:
             cursor.execute("""
             UPDATE installation_jobs
-            SET status = %s, completed_at = COALESCE(%s, completed_at), updated_at = %s
+            SET status = %s, completed_at = COALESCE(%s, completed_at),
+                completion_photo_url = COALESCE(%s, completion_photo_url), updated_at = %s
             WHERE id = %s
             RETURNING *;
-            """, (new_status, completed_at, now_dt, job_id))
+            """, (new_status, completed_at, photo_to_store, now_dt, job_id))
         updated = dict(cursor.fetchone())
 
         cursor.execute("""
         INSERT INTO installation_events (id, job_id, from_status, to_status, actor_id, remarks, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (f"iev_{uuid.uuid4().hex[:12]}", job_id, from_status, new_status, actor_id, remarks, now_dt))
+        """, (f"iev_{uuid.uuid4().hex[:12]}", job_id, from_status, new_status, actor_id, remarks or f"Transitioned to {new_status}", now_dt))
 
         return updated
 

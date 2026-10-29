@@ -1483,6 +1483,9 @@ def create_employee_with_invitation(
     dept_id = data.get("department_id")
     manager_id = data.get("reporting_manager_id")
     scope = data.get("access_scope") or ("ASSIGNED_ONLY" if role_code in ["technician", "farmer"] else "GLOBAL")
+    assigned_area = data.get("assigned_area") or data.get("area") or "Bengaluru"
+    emp_lat = data.get("latitude") or 12.9716
+    emp_lon = data.get("longitude") or 77.5946
     resources = data.get("assigned_resources") or {"sheds": [], "devices": []}
     
     # 1. Privilege escalation check: cannot assign superadmin unless caller is superadmin
@@ -1620,7 +1623,7 @@ def update_employee(
     set_clauses = ["updated_at = %s"]
     params = [now_dt]
 
-    allowed_fields = ["department_id", "designation", "reporting_manager_id", "role_code", "access_scope"]
+    allowed_fields = ["department_id", "designation", "reporting_manager_id", "role_code", "access_scope", "assigned_area", "latitude", "longitude"]
     for f in allowed_fields:
         if f in updates and updates[f] is not None:
             set_clauses.append(f"{f} = %s")
@@ -1642,6 +1645,27 @@ def update_employee(
         SET {', '.join(set_clauses)}
         WHERE id = %s
         """, tuple(params))
+
+        user_updates = []
+        user_params = []
+        if "full_name" in updates and updates["full_name"]:
+            user_updates.append("full_name = %s")
+            user_params.append(updates["full_name"])
+        if "phone" in updates and updates["phone"]:
+            user_updates.append("phone = %s")
+            user_params.append(updates["phone"])
+        if "assigned_area" in updates and updates["assigned_area"]:
+            user_updates.append("region = %s")
+            user_params.append(updates["assigned_area"])
+        if "latitude" in updates and updates["latitude"] is not None:
+            user_updates.append("latitude = %s")
+            user_params.append(updates["latitude"])
+        if "longitude" in updates and updates["longitude"] is not None:
+            user_updates.append("longitude = %s")
+            user_params.append(updates["longitude"])
+        if user_updates:
+            user_params.append(emp["user_id"])
+            cursor.execute(f"UPDATE users SET {', '.join(user_updates)} WHERE id = %s", tuple(user_params))
 
         # Synchronize user full_name and role if provided
         u_clauses = []

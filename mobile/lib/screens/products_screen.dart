@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/setu_provider.dart';
@@ -489,10 +491,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         final category = p['category'] ?? 'Hardware';
 
                         String? imageUrl;
+                        Uint8List? imageBytes;
                         if (p['images'] != null && p['images'] is List && (p['images'] as List).isNotEmpty) {
                           final img = (p['images'] as List).first?.toString();
                           if (img != null && img.isNotEmpty) {
-                            if (img.startsWith('http://') || img.startsWith('https://')) {
+                            if (img.startsWith('data:image') && img.contains('base64,')) {
+                              try {
+                                imageBytes = base64Decode(img.split('base64,').last);
+                              } catch (_) {}
+                            } else if (img.startsWith('http://') || img.startsWith('https://')) {
                               imageUrl = img;
                             } else {
                               const base = 'https://setu-8vh9.onrender.com';
@@ -522,13 +529,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                           color: const Color(0xFFE8F5E9),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
-                                        child: imageUrl != null
-                                            ? Image.network(
-                                                imageUrl,
+                                        child: imageBytes != null
+                                            ? Image.memory(
+                                                imageBytes,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (_, __, ___) => const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32)),
                                               )
-                                            : const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32)),
+                                            : (imageUrl != null
+                                                ? Image.network(
+                                                    imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, __, ___) => const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32)),
+                                                  )
+                                                : const Icon(Icons.sensors_rounded, size: 32, color: Color(0xFF2E7D32))),
                                       ),
                                     ),
                                     const SizedBox(width: 14),
