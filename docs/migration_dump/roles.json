@@ -1,0 +1,145 @@
+[
+  {
+    "id": "role_custom_dedbd691",
+    "code": "cust_aud_7239",
+    "name": "Custom Auditor",
+    "description": "Custom role for compliance auditors",
+    "is_system": false,
+    "status": "ACTIVE",
+    "created_at": "2026-10-29T11:09:05.022921+05:30",
+    "updated_at": "2026-10-29T11:09:05.022921+05:30",
+    "_id": "role_custom_dedbd691"
+  },
+  {
+    "id": "role_company_admin",
+    "code": "company_admin",
+    "name": "Company Admin",
+    "description": "Full administrative control within the tenant organization: employee management, sheds, IoT hardware, and subscriptions.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_company_admin"
+  },
+  {
+    "id": "role_ceo",
+    "code": "ceo",
+    "name": "CEO / Executive",
+    "description": "Executive dashboard covering business KPIs, revenue, subscriptions, operational performance, and high-level reports.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_ceo"
+  },
+  {
+    "id": "role_hr",
+    "code": "hr",
+    "name": "HR / User Administrator",
+    "description": "Human resources and user operations: employee directory, pending invitations, onboarding workflows, and department structures.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_hr"
+  },
+  {
+    "id": "role_operations_manager",
+    "code": "operations_manager",
+    "name": "Operations Manager",
+    "description": "Field operations oversight: rearing shed monitoring, device health, incident interlocks, and technician deployments.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_operations_manager"
+  },
+  {
+    "id": "role_technician",
+    "code": "technician",
+    "name": "Installation Technician",
+    "description": "Field technical operations: assigned installation jobs, hardware checklists, sensor calibration, and diagnostic reports.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_technician"
+  },
+  {
+    "id": "role_sales",
+    "code": "sales",
+    "name": "Sales & Billing",
+    "description": "Commercial management: customer enquiries, product catalogue, orders, invoices, and subscription accounting.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_sales"
+  },
+  {
+    "id": "role_support",
+    "code": "support",
+    "name": "Support Agent",
+    "description": "Helpdesk and technical customer support: ticket triage, farmer assistance, incident monitoring, and order lookups.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_support"
+  },
+  {
+    "id": "role_analyst",
+    "code": "analyst",
+    "name": "Analyst / Researcher",
+    "description": "Data research & sericultural analytics: historical microclimate trends, sensor telemetry distributions, and exportable data.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_analyst"
+  },
+  {
+    "id": "role_farmer",
+    "code": "farmer",
+    "name": "Farmer",
+    "description": "End-user farmer: view assigned rearing shed conditions, target growth stages, control authorized actuators, and receive alerts.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_farmer"
+  },
+  {
+    "id": "role_custom_6b4193db",
+    "code": "cust_aud_8039",
+    "name": "Custom Auditor",
+    "description": "Custom role for compliance auditors",
+    "is_system": false,
+    "status": "ACTIVE",
+    "created_at": "2026-10-29T11:18:31.264312+05:30",
+    "updated_at": "2026-10-29T11:18:31.264312+05:30",
+    "_id": "role_custom_6b4193db"
+  },
+  {
+    "id": "role_superadmin",
+    "code": "superadmin",
+    "name": "Platform Super Admin",
+    "description": "Master administrative access across all tenant organizations, platform configurations, and security audits.",
+    "is_system": true,
+    "status": "ACTIVE",
+    "created_at": "2026-10-28T22:20:27.610473+05:30",
+    "updated_at": "2026-10-28T22:20:27.610473+05:30",
+    "_id": "role_superadmin"
+  },
+  {
+    "id": "role_custom_6aadef63",
+    "code": "cust_aud_5273",
+    "name": "Custom Auditor",
+    "description": "Custom role for compliance auditors",
+    "is_system": false,
+    "status": "ACTIVE",
+    "created_at": "2026-10-29T11:11:32.413204+05:30",
+    "updated_at": "2026-10-29T11:11:32.413204+05:30",
+    "_id": "role_custom_6aadef63"
+  }
+]

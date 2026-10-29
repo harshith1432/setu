@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'providers/setu_provider.dart';
 import 'l10n/app_localizations.dart';
 import 'screens/splash_screen.dart';
@@ -21,9 +22,11 @@ import 'widgets/user_profile_modal.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await Firebase.initializeApp();
-  } catch (_) {
-    // Allow local/offline mode even when Firebase config is not present yet.
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase.initializeApp notice: $e');
   }
   runApp(
     MultiProvider(

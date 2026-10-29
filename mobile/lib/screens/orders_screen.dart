@@ -31,7 +31,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     final provider = Provider.of<SetuProvider>(context, listen: false);
     try {
-      final list = await provider.apiService.getOrders();
+      List<Map<String, dynamic>> list = await provider.firestoreService.getOrders(provider.userId);
+      if (list.isEmpty) {
+        list = await provider.apiService.getOrders();
+      }
       if (!mounted) return;
       setState(() {
         _orders = list;

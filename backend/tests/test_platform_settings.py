@@ -33,9 +33,10 @@ async def test_get_platform_settings_and_categories(async_client, admin_token):
     assert res.status_code == 200
     data = res.json()
     assert "general" in data
-    assert "branding" in data
-    assert "cms" in data
     assert "security" in data
+    # branding and cms are completely removed
+    assert "branding" not in data
+    assert "cms" not in data
 
     # Verify General default parameters match Image 2
     general = data["general"]
@@ -73,6 +74,24 @@ async def test_update_platform_settings_general(async_client, admin_token):
         }
     }
     await async_client.put("/api/v1/platform/settings/general", json=revert_payload, headers=headers)
+
+
+@pytest.mark.anyio
+async def test_branding_and_cms_endpoints_rejected(async_client, admin_token):
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    res_branding = await async_client.put(
+        "/api/v1/platform/settings/branding",
+        json={"settings": {"app_name": "Test"}},
+        headers=headers
+    )
+    assert res_branding.status_code == 400
+
+    res_cms = await async_client.put(
+        "/api/v1/platform/settings/cms",
+        json={"settings": {"hero_headline": "Test"}},
+        headers=headers
+    )
+    assert res_cms.status_code == 400
 
 
 @pytest.mark.anyio

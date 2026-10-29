@@ -1,0 +1,4074 @@
+{
+  "alerts": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "alert_code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "alert_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "severity",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'WARNING'::character varying"
+      },
+      {
+        "column_name": "title",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "current_value",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "threshold_value",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ACTIVE'::character varying"
+      },
+      {
+        "column_name": "assigned_to",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "triggered_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "acknowledged_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "resolved_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "acknowledged_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "resolved_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 3
+  },
+  "audit_logs": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "nextval('audit_logs_id_seq'::regclass)"
+      },
+      {
+        "column_name": "timestamp",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "actor",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "action",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "details",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "target_resource",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "ip_address",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 11621
+  },
+  "departments": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "head_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ACTIVE'::character varying"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 131
+  },
+  "device_commands": {
+    "columns": [
+      {
+        "column_name": "command_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "requested_by",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "command_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "command_payload",
+        "data_type": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'REQUESTED'::character varying"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "expires_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "correlation_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "acknowledged_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "applied_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "error_message",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "organization_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'default_org'::character varying"
+      }
+    ],
+    "primary_key": [
+      "command_id"
+    ],
+    "foreign_keys": [],
+    "count": 424
+  },
+  "devices": {
+    "columns": [
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_name",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "device_key_hash",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "firmware_version",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'1.0.0'::character varying"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'ONLINE'::character varying"
+      },
+      {
+        "column_name": "last_sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "last_seen_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "cert_fingerprint_sha256",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "auth_mode",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'API_KEY'::character varying"
+      },
+      {
+        "column_name": "organization_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'default_org'::character varying"
+      }
+    ],
+    "primary_key": [
+      "device_id"
+    ],
+    "foreign_keys": [],
+    "count": 5
+  },
+  "employee_invitations": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "token",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "employee_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "email",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "role_code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "expires_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'PENDING'::character varying"
+      },
+      {
+        "column_name": "created_by",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "accepted_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "employee_id",
+        "foreign_table_name": "employees",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 55
+  },
+  "employees": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "employee_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "official_email",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "department_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "designation",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'Staff Member'::character varying"
+      },
+      {
+        "column_name": "reporting_manager_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "role_code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'farmer'::character varying"
+      },
+      {
+        "column_name": "role_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "access_scope",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ORGANIZATION'::character varying"
+      },
+      {
+        "column_name": "assigned_resources",
+        "data_type": "jsonb",
+        "is_nullable": "NO",
+        "column_default": "'{\"sheds\": [], \"devices\": []}'::jsonb"
+      },
+      {
+        "column_name": "employment_status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ACTIVE'::character varying"
+      },
+      {
+        "column_name": "invitation_status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'NONE'::character varying"
+      },
+      {
+        "column_name": "last_login",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "organization_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'default_org'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "department_id",
+        "foreign_table_name": "departments",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "reporting_manager_id",
+        "foreign_table_name": "employees",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "role_id",
+        "foreign_table_name": "roles",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 65
+  },
+  "enquiries": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "enquiry_reference",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "full_name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "organization",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "email",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "phone",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "state_region",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "product_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "product_name",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "enquiry_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'DEMO_REQUEST'::character varying"
+      },
+      {
+        "column_name": "message",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'NEW'::character varying"
+      },
+      {
+        "column_name": "assigned_to",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "notes",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "ip_address",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 109
+  },
+  "faqs": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "question",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "answer",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'General'::character varying"
+      },
+      {
+        "column_name": "display_order",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "is_published",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "true"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 9
+  },
+  "guidance_articles": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "slug",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "title",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "target_instar",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "language",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'en'::character varying"
+      },
+      {
+        "column_name": "summary",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "content",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "recommended_action",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "author",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'Central Sericultural Research & Training Institute'::character varying"
+      },
+      {
+        "column_name": "is_published",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "true"
+      },
+      {
+        "column_name": "published_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 4
+  },
+  "installation_events": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "job_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "from_status",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "to_status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "actor_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "remarks",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "job_id",
+        "foreign_table_name": "installation_jobs",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 0
+  },
+  "installation_jobs": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "job_number",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "farmer_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "technician_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'REQUESTED'::character varying"
+      },
+      {
+        "column_name": "scheduled_date",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "completed_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "checklist_completed",
+        "data_type": "jsonb",
+        "is_nullable": "YES",
+        "column_default": "'[]'::jsonb"
+      },
+      {
+        "column_name": "technician_notes",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "customer_signoff_name",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "gps_latitude",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "gps_longitude",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "farmer_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "technician_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 3
+  },
+  "integration_status": {
+    "columns": [
+      {
+        "column_name": "provider_key",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "is_configured",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "configuration_guidance",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "last_checked_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "config",
+        "data_type": "jsonb",
+        "is_nullable": "YES",
+        "column_default": "'{}'::jsonb"
+      },
+      {
+        "column_name": "masked_keys",
+        "data_type": "jsonb",
+        "is_nullable": "YES",
+        "column_default": "'{}'::jsonb"
+      }
+    ],
+    "primary_key": [
+      "provider_key"
+    ],
+    "foreign_keys": [],
+    "count": 5
+  },
+  "inventory_movements": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "product_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "movement_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "quantity_change",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "previous_quantity",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "new_quantity",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "reference_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "notes",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "product_id",
+        "foreign_table_name": "products",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 37
+  },
+  "invoices": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "invoice_number",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "order_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "subscription_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "subtotal_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "tax_amount_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "total_amount_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ISSUED'::character varying"
+      },
+      {
+        "column_name": "due_date",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "issued_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "paid_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 23
+  },
+  "order_items": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "order_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "product_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "quantity",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "unit_price_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "total_price_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "order_id",
+        "foreign_table_name": "orders",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "product_id",
+        "foreign_table_name": "products",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 370
+  },
+  "orders": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "order_number",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'PENDING'::character varying"
+      },
+      {
+        "column_name": "total_amount_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "currency",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'INR'::character varying"
+      },
+      {
+        "column_name": "shipping_address",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "notes",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 35
+  },
+  "organizations": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "domain",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "contact_email",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "contact_phone",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "address",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "subscription_tier",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ENTERPRISE'::character varying"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ACTIVE'::character varying"
+      },
+      {
+        "column_name": "max_users",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "100"
+      },
+      {
+        "column_name": "max_sheds",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "50"
+      },
+      {
+        "column_name": "settings",
+        "data_type": "jsonb",
+        "is_nullable": "NO",
+        "column_default": "'{}'::jsonb"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "payments": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "payment_reference",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "invoice_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "order_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "amount_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "currency",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'INR'::character varying"
+      },
+      {
+        "column_name": "method",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "provider",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'RAZORPAY'::character varying"
+      },
+      {
+        "column_name": "provider_payment_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'SUCCESS'::character varying"
+      },
+      {
+        "column_name": "failure_reason",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "invoice_id",
+        "foreign_table_name": "invoices",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 23
+  },
+  "permissions": {
+    "columns": [
+      {
+        "column_name": "code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "code"
+    ],
+    "foreign_keys": [],
+    "count": 36
+  },
+  "platform_settings": {
+    "columns": [
+      {
+        "column_name": "key",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "value",
+        "data_type": "jsonb",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "key"
+    ],
+    "foreign_keys": [],
+    "count": 4
+  },
+  "products": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "sku",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "price_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "currency",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'INR'::character varying"
+      },
+      {
+        "column_name": "stock_quantity",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "unit",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'unit'::character varying"
+      },
+      {
+        "column_name": "is_active",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "true"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "slug",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "short_description",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "images",
+        "data_type": "jsonb",
+        "is_nullable": "YES",
+        "column_default": "'[]'::jsonb"
+      },
+      {
+        "column_name": "specifications",
+        "data_type": "jsonb",
+        "is_nullable": "YES",
+        "column_default": "'{}'::jsonb"
+      },
+      {
+        "column_name": "compatibility",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "availability_status",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'AVAILABLE'::character varying"
+      },
+      {
+        "column_name": "publication_status",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'PUBLISHED'::character varying"
+      },
+      {
+        "column_name": "published_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 24
+  },
+  "revoked_tokens": {
+    "columns": [
+      {
+        "column_name": "jti",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "token_hash",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "revoked_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "expires_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "revoked_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "CURRENT_TIMESTAMP"
+      }
+    ],
+    "primary_key": [
+      "jti"
+    ],
+    "foreign_keys": [],
+    "count": 137
+  },
+  "role_permissions": {
+    "columns": [
+      {
+        "column_name": "role_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "permission_code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "permission_code",
+      "role_id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "role_id",
+        "foreign_table_name": "roles",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "permission_code",
+        "foreign_table_name": "permissions",
+        "foreign_column_name": "code"
+      }
+    ],
+    "count": 144
+  },
+  "roles": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "is_system",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ACTIVE'::character varying"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 12
+  },
+  "sensors": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "sensor_type",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "model",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "pin_or_bus",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "unit",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "min_safe_range",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "max_safe_range",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "reporting_interval_seconds",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "60"
+      },
+      {
+        "column_name": "calibration_offset",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "0.0"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ONLINE'::character varying"
+      },
+      {
+        "column_name": "last_reading_value",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "last_reading_time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "device_id",
+        "foreign_table_name": "devices",
+        "foreign_column_name": "device_id"
+      }
+    ],
+    "count": 4
+  },
+  "shed_settings": {
+    "columns": [
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "is_advanced_mode",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "is_auto_mode",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "true"
+      },
+      {
+        "column_name": "custom_temp_target",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "custom_hum_target",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "custom_air_quality_target",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": "80.0"
+      },
+      {
+        "column_name": "custom_light_lux_target",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": "25.0"
+      },
+      {
+        "column_name": "custom_light_brightness",
+        "data_type": "integer",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_by",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'farmer'::character varying"
+      }
+    ],
+    "primary_key": [
+      "shed_id"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 2469
+  },
+  "shed_telemetry_partitioned": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2026m08": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2026m09": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2026m10": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2026m11": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2026m12": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2027m01": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2027m02": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2027m03": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "shed_telemetry_y2027m04": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "bigint",
+        "is_nullable": "NO",
+        "column_default": "nextval('shed_telemetry_partitioned_id_seq'::regclass)"
+      },
+      {
+        "column_name": "time",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "device_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'node_default'::character varying"
+      },
+      {
+        "column_name": "sequence_number",
+        "data_type": "bigint",
+        "is_nullable": "YES",
+        "column_default": "0"
+      },
+      {
+        "column_name": "event_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "temperature",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "humidity",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "air_quality",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "88.0"
+      },
+      {
+        "column_name": "light_lux",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "22.0"
+      },
+      {
+        "column_name": "outside_temperature",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "outside_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "cooler",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "heater",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "fan",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "humidifier",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "light_brightness",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": "0"
+      },
+      {
+        "column_name": "mode",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'AUTO'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id",
+      "time"
+    ],
+    "foreign_keys": [],
+    "count": 0
+  },
+  "sheds": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "location",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'Local Rearing Shed'::character varying"
+      },
+      {
+        "column_name": "current_stage",
+        "data_type": "integer",
+        "is_nullable": "YES",
+        "column_default": "3"
+      },
+      {
+        "column_name": "target_temp",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": "25.5"
+      },
+      {
+        "column_name": "target_humidity",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": "75.0"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "CURRENT_TIMESTAMP"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 3
+  },
+  "stage_thresholds": {
+    "columns": [
+      {
+        "column_name": "stage_id",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "days",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "temp_min",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "temp_max",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "hum_min",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "hum_max",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "hysteresis_temp",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "0.5"
+      },
+      {
+        "column_name": "hysteresis_hum",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "3.0"
+      },
+      {
+        "column_name": "fan_trigger_offset",
+        "data_type": "double precision",
+        "is_nullable": "NO",
+        "column_default": "1.5"
+      },
+      {
+        "column_name": "description",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "stage_id"
+    ],
+    "foreign_keys": [],
+    "count": 5
+  },
+  "subscriptions": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "subscription_code",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "plan_name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "tier",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'STANDARD'::character varying"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'ACTIVE'::character varying"
+      },
+      {
+        "column_name": "monthly_price_minor_units",
+        "data_type": "integer",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "billing_cycle",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'MONTHLY'::character varying"
+      },
+      {
+        "column_name": "current_period_start",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "current_period_end",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "auto_renew",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "true"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 1
+  },
+  "support_messages": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "ticket_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "sender_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "sender_role",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "message",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "is_internal",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "ticket_id",
+        "foreign_table_name": "support_tickets",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "sender_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 42
+  },
+  "support_tickets": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "ticket_number",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "subject",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "category",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "priority",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'MEDIUM'::character varying"
+      },
+      {
+        "column_name": "status",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'OPEN'::character varying"
+      },
+      {
+        "column_name": "assigned_to",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "initial_message",
+        "data_type": "text",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "updated_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "resolved_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [
+      {
+        "column_name": "user_id",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      },
+      {
+        "column_name": "assigned_to",
+        "foreign_table_name": "users",
+        "foreign_column_name": "id"
+      }
+    ],
+    "count": 21
+  },
+  "user_sessions": {
+    "columns": [
+      {
+        "column_name": "session_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "user_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "username",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "role",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column_name": "last_activity",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": "CURRENT_TIMESTAMP"
+      },
+      {
+        "column_name": "expires_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "is_revoked",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "revoked_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "revocation_reason",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "user_agent",
+        "data_type": "text",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "ip_address",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "organization_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'default_org'::character varying"
+      }
+    ],
+    "primary_key": [
+      "session_id"
+    ],
+    "foreign_keys": [],
+    "count": 2587
+  },
+  "users": {
+    "columns": [
+      {
+        "column_name": "id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "username",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "hashed_password",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "full_name",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "phone",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "preferred_language",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'kn'::character varying"
+      },
+      {
+        "column_name": "role",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'farmer'::character varying"
+      },
+      {
+        "column_name": "farm_name",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'Green Valley Farm'::character varying"
+      },
+      {
+        "column_name": "region",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'Mulbagal, Kolar, KA'::character varying"
+      },
+      {
+        "column_name": "batch_id",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'SERI-2026-M04'::character varying"
+      },
+      {
+        "column_name": "dfl_capacity",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'200 DFL'::character varying"
+      },
+      {
+        "column_name": "breed",
+        "data_type": "character varying",
+        "is_nullable": "NO",
+        "column_default": "'Double Hybrid (FC1 x FC2)'::character varying"
+      },
+      {
+        "column_name": "is_active",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "true"
+      },
+      {
+        "column_name": "created_at",
+        "data_type": "timestamp with time zone",
+        "is_nullable": "NO",
+        "column_default": null
+      },
+      {
+        "column_name": "latitude",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "longitude",
+        "data_type": "double precision",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "shed_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'shed_01'::character varying"
+      },
+      {
+        "column_name": "whatsapp_number",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "whatsapp_verified",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "current_stage",
+        "data_type": "integer",
+        "is_nullable": "YES",
+        "column_default": "3"
+      },
+      {
+        "column_name": "official_email",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": null
+      },
+      {
+        "column_name": "mfa_enabled",
+        "data_type": "boolean",
+        "is_nullable": "NO",
+        "column_default": "false"
+      },
+      {
+        "column_name": "access_scope",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'ORGANIZATION'::character varying"
+      },
+      {
+        "column_name": "organization_id",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'default_org'::character varying"
+      },
+      {
+        "column_name": "sub_role",
+        "data_type": "character varying",
+        "is_nullable": "YES",
+        "column_default": "'Owner'::character varying"
+      }
+    ],
+    "primary_key": [
+      "id"
+    ],
+    "foreign_keys": [],
+    "count": 192
+  }
+}

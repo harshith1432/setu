@@ -19,7 +19,7 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="/admin/style.css?v=4.6" rel="stylesheet"/>
+<link href="/admin/style.css?v=5.0" rel="stylesheet"/>
   <style>
     .hidden { display: none !important; }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
@@ -2393,19 +2393,12 @@
     </div>
   </div>
 
-  <!-- Filter Controls Bar -->
-  <div class="audit-filter-panel card" style="padding: 16px 20px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); margin-bottom: 24px;">
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) auto; gap: 14px; align-items: end;">
-      <div>
-        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Organization Filter</label>
-        <select id="auditOrgFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
-          <option value="">All Organizations</option>
-          <option value="default_org">Setu Smart Farms HQ</option>
-        </select>
-      </div>
-      <div>
-        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Event Category</label>
-        <select id="auditCategoryFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+  <!-- Filter Controls Bar (Single Line) -->
+  <div class="audit-filter-panel card" style="padding: 14px 18px; border-radius: 12px; background: var(--bg-surface); border: 1px solid var(--border-color); margin-bottom: 24px; overflow-x: auto;">
+    <div style="display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: flex-end !important; gap: 12px !important; width: 100% !important; min-width: 800px !important;">
+      <div style="flex: 1.3; min-width: 140px;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px; white-space: nowrap;">Event Category</label>
+        <select id="auditCategoryFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; height: 38px; font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
           <option value="">All Categories</option>
           <option value="USER_LOGIN">USER_LOGIN</option>
           <option value="USER_LOGOUT">USER_LOGOUT</option>
@@ -2417,33 +2410,33 @@
           <option value="EMERGENCY_CONTROL">EMERGENCY_CONTROL</option>
         </select>
       </div>
-      <div style="min-width: 220px;">
-        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Search Event Logs</label>
-        <div class="search-input-wrap" style="position: relative;">
-          <input id="auditSearchInput" type="text" placeholder="Search actor, ID, IP, details..." oninput="debounceFilterAudit(this.value)" style="width: 100%; font-size: 0.82rem; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+      <div style="flex: 2.2; min-width: 200px;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px; white-space: nowrap;">Search Event Logs</label>
+        <div class="search-input-wrap" style="position: relative; width: 100%;">
+          <input id="auditSearchInput" type="text" placeholder="Search actor, ID, IP, details..." oninput="debounceFilterAudit(this.value)" style="width: 100%; height: 38px; font-size: 0.82rem; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
         </div>
       </div>
-      <div>
-        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Date Range</label>
-        <select id="auditDateRangeFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+      <div style="flex: 1; min-width: 120px;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px; white-space: nowrap;">Date Range</label>
+        <select id="auditDateRangeFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; height: 38px; font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
           <option value="all">All Time</option>
           <option value="today">Today</option>
           <option value="7d">Last 7 Days</option>
           <option value="30d">Last 30 Days</option>
         </select>
       </div>
-      <div>
-        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Status</label>
-        <select id="auditStatusFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+      <div style="flex: 1; min-width: 110px;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px; white-space: nowrap;">Status</label>
+        <select id="auditStatusFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; height: 38px; font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
           <option value="">All Status</option>
           <option value="SUCCESS">SUCCESS</option>
           <option value="FAILURE">FAILURE</option>
           <option value="WARNING">WARNING</option>
         </select>
       </div>
-      <div>
-        <label style="font-size: 0.76rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px;">Risk Level</label>
-        <select id="auditRiskFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; font-size: 0.82rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface);">
+      <div style="flex: 1; min-width: 110px;">
+        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 6px; white-space: nowrap;">Risk Level</label>
+        <select id="auditRiskFilter" onchange="filterAuditLogs()" class="form-select" style="width: 100%; height: 38px; font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); box-sizing: border-box;">
           <option value="">All Risks</option>
           <option value="Low">Low</option>
           <option value="Medium">Medium</option>
@@ -2451,8 +2444,8 @@
           <option value="Critical">Critical</option>
         </select>
       </div>
-      <div>
-        <button class="btn btn-outline btn-sm" onclick="resetAuditFilters()" type="button" style="padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+      <div style="flex-shrink: 0;">
+        <button class="btn btn-outline btn-sm" onclick="resetAuditFilters()" type="button" style="height: 38px; padding: 0 16px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; box-sizing: border-box;">
           <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Reset
         </button>
       </div>
@@ -2581,11 +2574,11 @@
   </div>
 
   <div class="settings-matrix-layout">
-    <!-- LEFT COLUMN: SETTINGS MATRIX (4 Modules) -->
+    <!-- LEFT COLUMN: SETTINGS MATRIX (2 Modules) -->
     <aside class="settings-matrix-card">
       <div class="settings-matrix-header">
         <span class="matrix-heading-label">SETTINGS MATRIX</span>
-        <span class="matrix-badge">4 Modules</span>
+        <span class="matrix-badge">2 Modules</span>
       </div>
       <div class="settings-matrix-nav">
         <!-- Module 1: General -->
@@ -2595,40 +2588,18 @@
           </div>
           <div class="matrix-nav-text">
             <span class="matrix-nav-title">General</span>
-            <span class="matrix-nav-sub">Platform identity & locale</span>
+            <span class="matrix-nav-sub">Platform identity &amp; locale</span>
           </div>
         </button>
 
-        <!-- Module 2: Branding -->
-        <button type="button" class="matrix-nav-btn" id="btnMatrixBranding" onclick="switchSettingsMatrix('branding')">
-          <div class="matrix-nav-icon">
-            <i data-lucide="palette"></i>
-          </div>
-          <div class="matrix-nav-text">
-            <span class="matrix-nav-title">Branding</span>
-            <span class="matrix-nav-sub">Logos, colors & typography</span>
-          </div>
-        </button>
-
-        <!-- Module 3: Super Admin Logins -->
+        <!-- Module 2: Super Admin Logins -->
         <button type="button" class="matrix-nav-btn" id="btnMatrixSuperAdmins" onclick="switchSettingsMatrix('superadmins')">
           <div class="matrix-nav-icon">
             <i data-lucide="user-cog"></i>
           </div>
           <div class="matrix-nav-text">
             <span class="matrix-nav-title">Super Admin Logins</span>
-            <span class="matrix-nav-sub">Change email, password & admins</span>
-          </div>
-        </button>
-
-        <!-- Module 4: Landing CMS -->
-        <button type="button" class="matrix-nav-btn" id="btnMatrixCms" onclick="switchSettingsMatrix('cms')">
-          <div class="matrix-nav-icon">
-            <i data-lucide="layout-template"></i>
-          </div>
-          <div class="matrix-nav-text">
-            <span class="matrix-nav-title">Landing CMS</span>
-            <span class="matrix-nav-sub">Homepage text & components</span>
+            <span class="matrix-nav-sub">Change email, password &amp; admins</span>
           </div>
         </button>
       </div>
@@ -2636,13 +2607,13 @@
 
     <!-- RIGHT PANE: MODULE VIEWS -->
     <main class="settings-content-pane">
-      <!-- ================= 1. GENERAL PLATFORM SETTINGS (Image 2) ================= -->
+      <!-- ================= 1. GENERAL PLATFORM SETTINGS ================= -->
       <div class="settings-module-panel" id="panelSettingsGeneral">
         <div class="settings-panel-card">
           <div class="panel-card-header">
             <div>
               <h3 class="panel-card-title">General Platform Settings</h3>
-              <p class="panel-card-subtitle">Configure global application branding identity, contact parameters, legal links, and system defaults.</p>
+              <p class="panel-card-subtitle">Configure global application security policies, sign-up controls, and system defaults.</p>
             </div>
             <button type="button" class="btn btn-blue" onclick="saveGeneralSettings()">
               <i data-lucide="check"></i>
@@ -2709,7 +2680,7 @@
             </div>
           </div>
 
-          <!-- Preserved Security & IoT Safety Thresholds from Image 1 -->
+          <!-- Preserved Security & IoT Safety Thresholds -->
           <div class="settings-environment-grid" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-subtle);">
             <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
               <i data-lucide="shield"></i> Security &amp; IoT Hardware Parameters
@@ -2733,57 +2704,7 @@
         </div>
       </div>
 
-      <!-- ================= 2. BRANDING & VISUAL IDENTITY ================= -->
-      <div class="settings-module-panel hidden" id="panelSettingsBranding">
-        <div class="settings-panel-card">
-          <div class="panel-card-header">
-            <div>
-              <h3 class="panel-card-title">Platform Branding &amp; Visual Identity</h3>
-              <p class="panel-card-subtitle">Manage official platform logos, typography colors, application titles, and legal references.</p>
-            </div>
-            <button type="button" class="btn btn-blue" onclick="saveBrandingSettings()">
-              <i data-lucide="check"></i>
-              <span>Save Branding</span>
-            </button>
-          </div>
-
-          <form id="brandingSettingsForm" onsubmit="event.preventDefault(); saveBrandingSettings();">
-            <div class="settings-form-grid">
-              <div class="form-group">
-                <label for="brandingAppName">Application Name *</label>
-                <input type="text" id="brandingAppName" class="form-input" value="Setu Platform (SeriCare)" required>
-              </div>
-              <div class="form-group">
-                <label for="brandingTagline">Platform Tagline</label>
-                <input type="text" id="brandingTagline" class="form-input" value="Smart Sericulture Monitoring &amp; Environment Management">
-              </div>
-              <div class="form-group">
-                <label for="brandingPrimaryColor">Primary Theme Accent</label>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <input type="color" id="brandingColorPicker" value="#176B45" style="width: 44px; height: 38px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;" onchange="document.getElementById('brandingPrimaryColor').value = this.value">
-                  <input type="text" id="brandingPrimaryColor" class="form-input" value="#176B45" style="width: 130px;" onchange="document.getElementById('brandingColorPicker').value = this.value">
-                  <span class="color-preset-pill" onclick="setColorPreset('#176B45')" style="cursor: pointer; padding: 4px 10px; border-radius: 12px; background: #E4F2EB; color: #176B45; font-size: 0.78rem; font-weight: 700;">Forest Green</span>
-                  <span class="color-preset-pill" onclick="setColorPreset('#0284c7')" style="cursor: pointer; padding: 4px 10px; border-radius: 12px; background: #e0f2fe; color: #0284c7; font-size: 0.78rem; font-weight: 700;">Ocean Blue</span>
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="brandingLogoUrl">Platform Logo Path</label>
-                <input type="text" id="brandingLogoUrl" class="form-input" value="assets/logo.png">
-              </div>
-              <div class="form-group">
-                <label for="brandingContactEmail">Official Support Email</label>
-                <input type="email" id="brandingContactEmail" class="form-input" value="support@sericare.in">
-              </div>
-              <div class="form-group">
-                <label for="brandingLegalLinks">Terms &amp; Privacy URL</label>
-                <input type="text" id="brandingLegalLinks" class="form-input" value="/privacy">
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- ================= 3. SUPER ADMIN CREDENTIALS & LOGINS (Image 3) ================= -->
+      <!-- ================= 2. SUPER ADMIN CREDENTIALS & LOGINS ================= -->
       <div class="settings-module-panel hidden" id="panelSettingsSuperAdmins">
         <div class="settings-panel-card">
           <div class="panel-card-header">
@@ -2926,47 +2847,6 @@
           </div>
         </div>
       </div>
-
-      <!-- ================= 4. LANDING CMS MODULE ================= -->
-      <div class="settings-module-panel hidden" id="panelSettingsCms">
-        <div class="settings-panel-card">
-          <div class="panel-card-header">
-            <div>
-              <h3 class="panel-card-title">Landing Page CMS &amp; Content</h3>
-              <p class="panel-card-subtitle">Manage public homepage headline copy, contact parameters, and promotional announcements.</p>
-            </div>
-            <button type="button" class="btn btn-blue" onclick="saveCmsSettings()">
-              <i data-lucide="check"></i>
-              <span>Save Landing CMS</span>
-            </button>
-          </div>
-
-          <form id="cmsSettingsForm" onsubmit="event.preventDefault(); saveCmsSettings();">
-            <div class="settings-form-grid">
-              <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="cmsHeroHeadline">Homepage Hero Headline *</label>
-                <input type="text" id="cmsHeroHeadline" class="form-input" value="Smarter Sericulture. Healthier Silkworms. Better Insights." required>
-              </div>
-              <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="cmsHeroSubtext">Homepage Hero Subtext</label>
-                <textarea id="cmsHeroSubtext" class="form-input" rows="3">Monitor rearing shed environments with Autonomous Environmental Control, understand changing conditions, and manage connected IoT devices through an intelligent platform designed to support modern sericulture operations.</textarea>
-              </div>
-              <div class="form-group">
-                <label for="cmsSupportPhone">Public Contact Phone</label>
-                <input type="text" id="cmsSupportPhone" class="form-input" value="+91 98450 99999">
-              </div>
-              <div class="form-group">
-                <label for="cmsCorporateAddress">Cluster Operations Address</label>
-                <input type="text" id="cmsCorporateAddress" class="form-input" value="Bengaluru &amp; Ramanagara Sericulture Hubs, Karnataka, India">
-              </div>
-              <div class="form-group" style="grid-column: 1 / -1;">
-                <label for="cmsAnnouncement">Optional Top Announcement Banner</label>
-                <input type="text" id="cmsAnnouncement" class="form-input" placeholder="e.g. CSRTI Guidance v4.2 released with updated bivoltine microclimate profiles">
-              </div>
-            </div>
-          </form>
-        </div>
-      </div>
     </main>
   </div>
 </section>
@@ -3028,9 +2908,7 @@
   </div>
 </div>
 
-</div>
-</main>
-</div>
+
 <!-- ================= ACTIONABLE GLOBAL SEARCH COMMAND PALETTE ================= -->
 <div class="command-palette-backdrop hidden" id="commandPaletteModal" onclick="handleCommandPaletteBackdrop(event)">
 <div class="command-palette-card">
@@ -3266,6 +3144,6 @@
 
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="/admin/table-manager.js?v=4.6"></script><script src="/admin/app.js?v=4.6" charset="UTF-8"></script>
+<script src="/admin/table-manager.js?v=5.0"></script><script src="/admin/app.js?v=5.0" charset="UTF-8"></script>
 </body>
 </html>

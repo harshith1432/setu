@@ -1,0 +1,254 @@
+[
+  {
+    "code": "org:read",
+    "name": "View Organization",
+    "category": "Organization",
+    "description": "View organization details and profiles",
+    "_id": "org:read"
+  },
+  {
+    "code": "org:write",
+    "name": "Manage Organization Settings",
+    "category": "Organization",
+    "description": "Edit organization profile, branding and settings",
+    "_id": "org:write"
+  },
+  {
+    "code": "ops:installations_read",
+    "name": "View Installations",
+    "category": "Operations",
+    "description": "View field installation jobs and team schedules",
+    "_id": "ops:installations_read"
+  },
+  {
+    "code": "ops:installations_write",
+    "name": "Manage Installations",
+    "category": "Operations",
+    "description": "Dispatch field technicians and verify sign-off checklists",
+    "_id": "ops:installations_write"
+  },
+  {
+    "code": "org:subscriptions",
+    "name": "Manage Subscriptions",
+    "category": "Organization",
+    "description": "Assign or upgrade organizational subscription plans",
+    "_id": "org:subscriptions"
+  },
+  {
+    "code": "users:read",
+    "name": "View Users",
+    "category": "Users",
+    "description": "Browse employee directory and view user profiles",
+    "_id": "users:read"
+  },
+  {
+    "code": "users:invite",
+    "name": "Invite Users",
+    "category": "Users",
+    "description": "Issue secure onboarding invitations to new employees",
+    "_id": "users:invite"
+  },
+  {
+    "code": "commercial:products_read",
+    "name": "View Products",
+    "category": "Commercial",
+    "description": "Browse sericulture equipment catalogue and inventory",
+    "_id": "commercial:products_read"
+  },
+  {
+    "code": "users:write",
+    "name": "Edit Users",
+    "category": "Users",
+    "description": "Modify employee records, departments, and designations",
+    "_id": "users:write"
+  },
+  {
+    "code": "users:suspend",
+    "name": "Suspend Users",
+    "category": "Users",
+    "description": "Activate, suspend, or revoke employee accounts",
+    "_id": "users:suspend"
+  },
+  {
+    "code": "commercial:products_write",
+    "name": "Manage Products",
+    "category": "Commercial",
+    "description": "Update product specifications, prices, and stock balance",
+    "_id": "commercial:products_write"
+  },
+  {
+    "code": "commercial:orders_read",
+    "name": "View Orders",
+    "category": "Commercial",
+    "description": "View customer equipment and sensor orders",
+    "_id": "commercial:orders_read"
+  },
+  {
+    "code": "commercial:orders_write",
+    "name": "Manage Orders",
+    "category": "Commercial",
+    "description": "Process orders and update fulfilment statuses",
+    "_id": "commercial:orders_write"
+  },
+  {
+    "code": "commercial:billing_read",
+    "name": "View Billing",
+    "category": "Commercial",
+    "description": "View invoices, subscriptions, and payment history",
+    "_id": "commercial:billing_read"
+  },
+  {
+    "code": "commercial:billing_write",
+    "name": "Manage Billing",
+    "category": "Commercial",
+    "description": "Create invoices, record payments, and manage subscription plans",
+    "_id": "commercial:billing_write"
+  },
+  {
+    "code": "analytics:read",
+    "name": "View Operational Analytics",
+    "category": "Analytics",
+    "description": "Access yield, mortality, and microclimate aggregations",
+    "_id": "analytics:read"
+  },
+  {
+    "code": "users:roles",
+    "name": "Assign Roles",
+    "category": "Users",
+    "description": "Assign authorized roles to employees",
+    "_id": "users:roles"
+  },
+  {
+    "code": "analytics:export",
+    "name": "Export Authorized Reports",
+    "category": "Analytics",
+    "description": "Export CSV/PDF audits and seasonal performance metrics",
+    "_id": "analytics:export"
+  },
+  {
+    "code": "roles:read",
+    "name": "View Roles",
+    "category": "Roles",
+    "description": "View system role templates and permissions",
+    "_id": "roles:read"
+  },
+  {
+    "code": "roles:write",
+    "name": "Manage Custom Roles",
+    "category": "Roles",
+    "description": "Create, modify, and delete custom organizational roles",
+    "_id": "roles:write"
+  },
+  {
+    "code": "roles:assign",
+    "name": "Assign Permitted Roles",
+    "category": "Roles",
+    "description": "Grant permitted roles to subordinate team members",
+    "_id": "roles:assign"
+  },
+  {
+    "code": "farmers:read",
+    "name": "View Farmers",
+    "category": "Farmers & Sheds",
+    "description": "View enrolled farmers and farm records",
+    "_id": "farmers:read"
+  },
+  {
+    "code": "farmers:write",
+    "name": "Manage Farmers",
+    "category": "Farmers & Sheds",
+    "description": "Create and edit farmer accounts and setups",
+    "_id": "farmers:write"
+  },
+  {
+    "code": "sheds:read",
+    "name": "View Assigned Sheds",
+    "category": "Farmers & Sheds",
+    "description": "View microclimate telemetry for authorized rearing sheds",
+    "_id": "sheds:read"
+  },
+  {
+    "code": "sheds:write",
+    "name": "Manage Shed Settings",
+    "category": "Farmers & Sheds",
+    "description": "Configure climate setpoints, stages, and thresholds",
+    "_id": "sheds:write"
+  },
+  {
+    "code": "iot:read",
+    "name": "View Devices",
+    "category": "IoT",
+    "description": "Browse registered gateways and IoT sensor nodes",
+    "_id": "iot:read"
+  },
+  {
+    "code": "iot:write",
+    "name": "Register Devices",
+    "category": "IoT",
+    "description": "Commission and pair new IoT hardware controllers",
+    "_id": "iot:write"
+  },
+  {
+    "code": "admin:audit_read",
+    "name": "View Audit Logs",
+    "category": "Administration",
+    "description": "Inspect immutable administrative and security audit trail",
+    "_id": "admin:audit_read"
+  },
+  {
+    "code": "admin:integrations",
+    "name": "Manage Integrations",
+    "category": "Administration",
+    "description": "Configure cloud, WhatsApp, and telemetry bridges",
+    "_id": "admin:integrations"
+  },
+  {
+    "code": "admin:settings",
+    "name": "Manage Platform Settings",
+    "category": "Administration",
+    "description": "Configure platform-wide policies and global setpoints",
+    "_id": "admin:settings"
+  },
+  {
+    "code": "iot:sensors",
+    "name": "Configure Sensors",
+    "category": "IoT",
+    "description": "Adjust calibration offsets and sensor polling rates",
+    "_id": "iot:sensors"
+  },
+  {
+    "code": "iot:telemetry",
+    "name": "View Telemetry",
+    "category": "IoT",
+    "description": "Stream live and historical sensor timeseries data",
+    "_id": "iot:telemetry"
+  },
+  {
+    "code": "iot:control",
+    "name": "Control Actuators",
+    "category": "IoT",
+    "description": "Trigger heaters, coolers, humidifiers, and ventilation relays",
+    "_id": "iot:control"
+  },
+  {
+    "code": "ops:incidents_read",
+    "name": "View Incidents",
+    "category": "Operations",
+    "description": "View climate warnings and emergency alerts",
+    "_id": "ops:incidents_read"
+  },
+  {
+    "code": "ops:incidents_ack",
+    "name": "Acknowledge Incidents",
+    "category": "Operations",
+    "description": "Acknowledge active alarms and assign responders",
+    "_id": "ops:incidents_ack"
+  },
+  {
+    "code": "ops:incidents_resolve",
+    "name": "Resolve Incidents",
+    "category": "Operations",
+    "description": "Mark incidents as safely resolved with post-mortem notes",
+    "_id": "ops:incidents_resolve"
+  }
+]

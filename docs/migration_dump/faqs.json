@@ -1,0 +1,101 @@
+[
+  {
+    "id": "faq_08",
+    "question": "How can I request a product quotation or scheduled demonstration?",
+    "answer": "<p>You can request a tailored quotation or live on-site demonstration through any of the following channels:</p>\n<ul class=\"faq-list\">\n  <li><strong>Online Demo Request:</strong> Complete the 'Request a Demo' form on this website with your shed dimensions and rearing batch schedule.</li>\n  <li><strong>Regional Coordination Hubs:</strong> Contact or visit our regional field offices in Bengaluru, Mysuru, Kolar, or Sidlaghatta.</li>\n  <li><strong>On-Site Technical Evaluation:</strong> Our field engineers will inspect your facility, evaluate electrical capacity, and provide a comprehensive equipment proposal.</li>\n</ul>",
+    "category": "Sales & Quotations",
+    "display_order": 8,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_08"
+  },
+  {
+    "id": "faq_03",
+    "question": "Which sensors and hardware devices are compatible?",
+    "answer": "<p>The platform supports open agricultural and industrial IoT hardware standards:</p>\n<ul class=\"faq-list\">\n  <li><strong>Supported Sensor Probes:</strong> Industrial RS-485 Modbus RTU and digital I\u00b2C sensors including Sensirion SHT3x/SHT4x, Winsen MQ-135, BH1750 lux meters, and Dallas DS18B20 temperature probes.</li>\n  <li><strong>Actuator Controllers:</strong> 4-channel solid-state contactors (rated up to 16A @ 230V AC), zero-crossing AC PWM light dimmers (up to 1,000W), and reversible ventilation blowers.</li>\n  <li><strong>Hardware Cryptography:</strong> Dual-core ESP32-S3 edge controllers secured with hardware cryptographic elements and mTLS X.509 device certificates.</li>\n</ul>",
+    "category": "Hardware & Connectivity",
+    "display_order": 3,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_03"
+  },
+  {
+    "id": "faq_06",
+    "question": "How are microclimate alerts delivered to farmers?",
+    "answer": "<p>When environmental conditions deviate beyond safe developmental margins, the platform broadcasts multi-tier instant notifications:</p>\n<ul class=\"faq-list\">\n  <li><strong>WhatsApp Text Notifications:</strong> One-line plain-language summary with real-time temperature/humidity and stage targets.</li>\n  <li><strong>WhatsApp Audio Voice Notes:</strong> Naturally spoken voice notes in the farmer's preferred regional language (Kannada, Telugu, or English).</li>\n  <li><strong>Mobile App Push Notifications:</strong> High-priority visual and haptic alerts on the SeriCare mobile application.</li>\n  <li><strong>Urgent Cellular SMS:</strong> Offline cellular SMS failover if mobile data is disabled or cellular coverage is limited.</li>\n</ul>",
+    "category": "Alerts & Notifications",
+    "display_order": 6,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_06"
+  },
+  {
+    "id": "faq_07",
+    "question": "Does automated control require special or proprietary equipment?",
+    "answer": "<p><strong>No.</strong> SeriCare is engineered to retrofit directly onto standard sericulture rearing infrastructure:</p>\n<ul class=\"faq-list\">\n  <li><strong>Standard Equipment Compatibility:</strong> Operates seamlessly with conventional desert evaporative coolers, room heaters, ceiling fans, and fogging machines.</li>\n  <li><strong>Standard 230V AC Relays:</strong> Connects to electrical appliances using standard industrial 230V AC contactors without proprietary plugs or wiring.</li>\n  <li><strong>Mutual Exclusion Hardware Guard:</strong> Physical interlock relays prevent simultaneous heater and cooler operation, protecting equipment and saving electricity.</li>\n</ul>",
+    "category": "Automation & Hardware",
+    "display_order": 7,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_07"
+  },
+  {
+    "id": "faq_05",
+    "question": "Is continuous internet connectivity required for shed operation?",
+    "answer": "<p><strong>No.</strong> Continuous internet connectivity is not required for real-time shed climate control:</p>\n<ul class=\"faq-list\">\n  <li><strong>Autonomous Edge Execution:</strong> The Setu IoT Gateway contains an on-board decision engine running closed-loop PID regulation completely locally.</li>\n  <li><strong>Local Telemetry Buffering:</strong> Up to 72 hours of timestamped sensor telemetry is buffered in non-volatile flash memory during rural cellular outages.</li>\n  <li><strong>Automatic Cloud Reconciliation:</strong> Once Wi-Fi or cellular connectivity is restored, all buffered packets seamlessly synchronize with the central PostgreSQL database.</li>\n</ul>",
+    "category": "Reliability & Offline",
+    "display_order": 5,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_05"
+  },
+  {
+    "id": "faq_02",
+    "question": "Which environmental parameters are measured and managed?",
+    "answer": "<p>The platform actively monitors and manages four critical physical parameters essential for larval growth and cocoon quality:</p>\n<ul class=\"faq-list\">\n  <li><strong>Temperature Control:</strong> \u00b10.2\u00b0C precision via dual-redundant Sensirion SHT31 industrial probes, preventing heat shock and larval stagnation.</li>\n  <li><strong>Relative Humidity:</strong> \u00b11.5% RH precision hygrometry regulating ultrasonic cold-mist foggers and evaporative cooling pads.</li>\n  <li><strong>Bed Air Quality &amp; Gases:</strong> Real-time detection of carbon dioxide (CO\u2082) and toxic ammonia fumes using pre-calibrated Winsen MQ-135 sensors.</li>\n  <li><strong>Circadian Illuminance:</strong> 0\u201365,535 Lux sensing via BH1750 digital sensors, maintaining optimal photoperiods for synchronized larval feeding.</li>\n</ul>\n<div class=\"faq-highlight-note\">\n  <strong>Automated Actuation:</strong> Industrial optocoupled controllers regulate evaporative coolers, heating elements, ultrasonic foggers, exhaust ventilation fans, and zero-crossing PWM lighting.\n</div>",
+    "category": "Sensors & Monitoring",
+    "display_order": 2,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_02"
+  },
+  {
+    "id": "faq_09",
+    "question": "How do I obtain technical support for active installations?",
+    "answer": "<p>Active subscribers and hardware owners receive comprehensive multi-channel technical support:</p>\n<ul class=\"faq-list\">\n  <li><strong>Direct Helpdesk &amp; WhatsApp Support:</strong> Rapid assistance for system configuration, threshold adjustments, and firmware updates.</li>\n  <li><strong>Regional Field Technician Dispatch:</strong> Certified field technicians dispatched from local district clusters (Ramanagara, Sidlaghatta, Chikkaballapura, Mysuru) under guaranteed SLA resolution windows.</li>\n  <li><strong>Hardware Warranty &amp; Calibration:</strong> Regular sensor probe re-calibration checks and on-site replacement for covered hardware components.</li>\n</ul>",
+    "category": "Support & Warranty",
+    "display_order": 9,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_09"
+  },
+  {
+    "id": "faq_04",
+    "question": "How does the on-site installation process work?",
+    "answer": "<p>Turnkey on-site deployment is executed by certified SeriCare field technicians in a structured 5-step process (typically 3 to 5 hours):</p>\n<ul class=\"faq-list\">\n  <li><strong>1. Shed Thermal Audit:</strong> Assessment of rearing shed dimensions, thermal insulation, airflow dead zones, and existing electrical distribution.</li>\n  <li><strong>2. Gateway Enclosure Mounting:</strong> Wall-mounting the weather-sealed IP65 industrial gateway enclosure adjacent to main electrical lines.</li>\n  <li><strong>3. Worm-Bed Sensor Cabling:</strong> Installing shielded RS-485 probe brackets across multi-tier rearing racks at worm-bed level.</li>\n  <li><strong>4. Safety Interlock Wiring:</strong> Wiring physical mutual-exclusion relays to ensure heating elements and evaporative coolers never run concurrently.</li>\n  <li><strong>5. Multi-Point Calibration:</strong> Performing reference-instrument calibration, pairing the farmer mobile application, and verifying automated actuation.</li>\n</ul>",
+    "category": "Installation & Setup",
+    "display_order": 4,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_04"
+  },
+  {
+    "id": "faq_01",
+    "question": "What does the SeriCare platform do?",
+    "answer": "<p>SeriCare is an industrial IoT microclimate automation and farm intelligence platform engineered specifically for silkworm rearing sheds (<em>Bombyx mori</em>):</p>\n<ul class=\"faq-list\">\n  <li><strong>Calibrated Sensor Arrays:</strong> Continuously samples ambient temperature, relative humidity, bed-level CO\u2082/ammonia gases, and illuminance.</li>\n  <li><strong>Automated Edge Controllers:</strong> Dual-core ESP32-S3 gateways execute real-time closed-loop climate regulation with fail-safe hardware interlocks.</li>\n  <li><strong>CSRTI Developmental Setpoints:</strong> Automatically adjusts target temperature and humidity bands for every instar stage (Chawki to 5th Instar).</li>\n  <li><strong>Multi-Lingual Voice Advisory:</strong> Dispatches real-time alerts and spoken voice notes to farmers in Kannada, Telugu, and English via WhatsApp.</li>\n</ul>\n<div class=\"faq-highlight-note\">\n  <strong>Complete Traceability:</strong> Maintains immutable historical telemetry records and batch lifecycle logs for enhanced cocoon harvest yields.\n</div>",
+    "category": "Platform Overview",
+    "display_order": 1,
+    "is_published": true,
+    "created_at": "2026-10-28T22:01:51.453549+05:30",
+    "updated_at": "2026-10-29T11:17:59.596355+05:30",
+    "_id": "faq_01"
+  }
+]

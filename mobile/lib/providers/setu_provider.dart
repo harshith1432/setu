@@ -10,12 +10,15 @@ import '../models/growth_stage.dart';
 import '../models/ai_advice.dart';
 import '../models/live_weather_data.dart';
 import '../services/api_service.dart';
+import '../services/firestore_service.dart';
 import '../services/location_weather_service.dart';
 
 class SetuProvider with ChangeNotifier {
   static const _secureStorage = FlutterSecureStorage();
   final ApiService _apiService = ApiService();
   ApiService get apiService => _apiService;
+  final FirestoreService _firestoreService = FirestoreService();
+  FirestoreService get firestoreService => _firestoreService;
   final LocationWeatherService _weatherService = LocationWeatherService();
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: '756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com',
@@ -1398,6 +1401,12 @@ class SetuProvider with ChangeNotifier {
                 ? nextLight
                 : nextFan;
     _apiService.manualActuatorOverride(_shedData.shedId, actuator, nextState);
+    _firestoreService.issueActuatorCommand(
+      shedId: _shedData.shedId,
+      actuator: actuator,
+      state: nextState,
+      source: 'mobile_app',
+    );
     _syncTelemetryToBackend();
     notifyListeners();
   }
@@ -1406,16 +1415,43 @@ class SetuProvider with ChangeNotifier {
     _lastUserActionTime = DateTime.now();
   }
 
+  StreamSubscription<ShedData?>? _firestoreTelemetrySub;
+
   void startAutoRefresh({Duration interval = const Duration(seconds: 3)}) {
     _telemetryPollTimer?.cancel();
     _telemetryPollTimer = Timer.periodic(interval, (_) async {
       await fetchLiveShedData(silent: true);
     });
+
+    // Centralized real-time Firestore microclimate subscription
+    _firestoreTelemetrySub?.cancel();
+    _firestoreTelemetrySub = _firestoreService.streamLatestTelemetry(_shedData.shedId).listen(
+      (serverShed) {
+        if (serverShed == null) return;
+        final isRecentAction = _lastUserActionTime != null &&
+            DateTime.now().difference(_lastUserActionTime!) < const Duration(seconds: 4);
+        if (!isRecentAction) {
+          _shedData = serverShed.copyWith(
+            outsideTemp: _liveWeather?.temperature ?? serverShed.outsideTemp,
+            outsideHumidity: _liveWeather?.humidity ?? serverShed.outsideHumidity,
+            region: (_region.isNotEmpty && _region != 'My Rearing Shed') ? _region : serverShed.region,
+            lastUpdated: DateTime.now(),
+          );
+          _lastSyncTime = DateTime.now();
+          notifyListeners();
+        }
+      },
+      onError: (err) {
+        debugPrint('Firestore real-time telemetry error: ');
+      },
+    );
   }
 
   void stopAutoRefresh() {
     _telemetryPollTimer?.cancel();
     _telemetryPollTimer = null;
+    _firestoreTelemetrySub?.cancel();
+    _firestoreTelemetrySub = null;
   }
 
   /// Pull-to-refresh handler called by RefreshIndicator on UI screens

@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for RBAC & Tenant Isolation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRole(roleName) {
+      return isAuthenticated() && request.auth.token.role == roleName;
+    }
+
+    function isAdmin() {
+      return hasRole('superadmin') || hasRole('ceo');
+    }
+
+    function isStaff() {
+      return hasRole('superadmin') || hasRole('ceo') || hasRole('technician') || hasRole('support') || hasRole('sales');
+    }
+
+    // 1. Users directory
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isStaff();
+      allow create: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Sheds & Farm configuration
+    match /sheds/{shedId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (hasRole('farmer') || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    // 3. High-throughput Real-time Telemetry
+    match /shed_telemetry/{telemetryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isStaff() || hasRole('farmer') || request.auth.token.firebase.sign_in_provider == 'custom');
+      allow update, delete: if isAdmin();
+    }
+
+    // 4. Silkworm Stage Thresholds (Master Agricultural Guidelines)
+    match /stage_thresholds/{stageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 5. Hardware Store Catalogue
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // 6. Orders & Procurement
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow update: if isStaff() || (isAuthenticated() && resource.data.user_id == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shipping_address', 'notes']));
+      allow delete: if isAdmin();
+    }
+
+    // 7. Support Tickets & Conversations
+    match /support_tickets/{ticketId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isStaff());
+      allow create: if isAuthenticated();
+      allow update: if isStaff() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+      
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+      }
+    }
+
+    // 8. Actuator Device Commands
+    match /device_commands/{commandId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // 9. Devices & Sensors
+    match /devices/{deviceId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+    }
+
+    match /sensors/{sensorId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+    }
+
+    // 10. Public Content (FAQs, Articles, Enquiries)
+    match /faqs/{faqId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /guidance_articles/{articleId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /enquiries/{enquiryId} {
+      allow create: if true;
+      allow read, update, delete: if isStaff();
+    }
+
+    // 11. Platform Settings & Alerts
+    match /platform_settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // 12. Immutable Audit Logs (SIEM)
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable!
+    }
+
+    // 13. Deny everything else by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

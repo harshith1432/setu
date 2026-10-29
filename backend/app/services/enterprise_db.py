@@ -2568,29 +2568,14 @@ def _seed_platform_settings(cursor, now_dt):
     WHERE username = 'superadmin' AND (official_email IS NULL OR official_email = '');
     """)
 
+    cursor.execute("DELETE FROM platform_settings WHERE key IN ('branding', 'cms');")
+
     defaults = [
         ("general", "general", {
             "self_service_signup": True,
             "email_otp_verification": True,
             "phone_otp_verification": False,
             "maintenance_mode": False
-        }),
-        ("branding", "branding", {
-            "app_name": "Setu Platform (SeriCare)",
-            "tagline": "Smart Sericulture Monitoring & Environment Management",
-            "primary_color": "#176B45",
-            "logo_url": "assets/logo.png",
-            "contact_email": "support@sericare.in",
-            "terms_url": "/terms",
-            "privacy_url": "/privacy"
-        }),
-        ("cms", "cms", {
-            "hero_headline": "Smarter Sericulture. Healthier Silkworms. Better Insights.",
-            "hero_subtext": "Monitor rearing shed environments with Autonomous Environmental Control, understand changing conditions, and manage connected IoT devices through an intelligent platform designed to support modern sericulture operations.",
-            "support_phone": "+91 98450 99999",
-            "corporate_address": "Bengaluru & Ramanagara Sericulture Hubs, Karnataka, India",
-            "demo_booking_url": "#demo-request",
-            "announcement_banner": ""
         }),
         ("security", "security", {
             "jwt_expiry_minutes": 10080,

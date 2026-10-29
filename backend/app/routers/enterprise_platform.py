@@ -1311,7 +1311,7 @@ def update_platform_settings_route(
     user: dict = Depends(require_roles(["superadmin", "admin"]))
 ):
     from app.services.enterprise_db import update_platform_settings_category
-    if category not in ["general", "branding", "cms", "security"]:
+    if category not in ["general", "security"]:
         raise HTTPException(status_code=400, detail="Invalid settings category")
     actor = user.get("username", "superadmin")
     updated = update_platform_settings_category(category, payload.settings, actor=actor)

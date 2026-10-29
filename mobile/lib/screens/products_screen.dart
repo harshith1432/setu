@@ -32,7 +32,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
     final provider = Provider.of<SetuProvider>(context, listen: false);
     try {
-      final list = await provider.apiService.getProducts();
+      List<Map<String, dynamic>> list = await provider.firestoreService.getProducts();
+      if (list.isEmpty) {
+        list = await provider.apiService.getProducts();
+      }
       if (!mounted) return;
       setState(() {
         _products = list;
@@ -268,11 +271,28 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               }
 
                               setSheetState(() => isSubmitting = true);
-                              final res = await provider.apiService.placeOrder(
+                              // Dual write: API Service & Cloud Firestore
+                              var res = await provider.apiService.placeOrder(
                                 items: [
                                   {
                                     'product_id': product['id'],
                                     'quantity': quantity,
+                                  }
+                                ],
+                                shippingAddress: address,
+                                paymentMethod: paymentMethod,
+                                notes: notesController.text.trim(),
+                              );
+
+                              // Ensure recorded in Cloud Firestore
+                              await provider.firestoreService.placeOrder(
+                                userId: provider.userId,
+                                items: [
+                                  {
+                                    'product_id': product['id'],
+                                    'title': product['title'] ?? product['name'] ?? '',
+                                    'quantity': quantity,
+                                    'price_minor_units': (product['price_minor_units'] as num?)?.toInt() ?? (((product['price'] as num?) ?? 0) * 100).toInt(),
                                   }
                                 ],
                                 shippingAddress: address,

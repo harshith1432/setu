@@ -1,0 +1,32 @@
+[
+  {
+    "id": "shed_01",
+    "name": "Shed 01 - Main Chawki Hub",
+    "location": "Kolar Rearing Center",
+    "current_stage": 3,
+    "target_temp": 26.0,
+    "target_humidity": 75.0,
+    "created_at": "2026-10-29T09:20:00.663066+05:30",
+    "_id": "shed_01"
+  },
+  {
+    "id": "shed_02",
+    "name": "Shed 02 - Late Age Rearing",
+    "location": "Mysuru Facility",
+    "current_stage": 4,
+    "target_temp": 25.0,
+    "target_humidity": 70.0,
+    "created_at": "2026-10-29T09:20:00.663066+05:30",
+    "_id": "shed_02"
+  },
+  {
+    "id": "shed_03",
+    "name": "Shed 03 - Commercial Batch",
+    "location": "Bengaluru Rural",
+    "current_stage": 2,
+    "target_temp": 27.0,
+    "target_humidity": 80.0,
+    "created_at": "2026-10-29T09:20:00.663066+05:30",
+    "_id": "shed_03"
+  }
+]

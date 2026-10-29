@@ -287,12 +287,9 @@ def view_audit_trail(
     org_id: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
-    admin_user: dict = Depends(require_roles(["superadmin", "admin", "ceo", "company_admin", "hr"]))
+    admin_user: dict = Depends(require_roles(["superadmin", "admin", "ceo", "company_admin", "hr", "farmer", "operations_manager", "technician"]))
 ):
-    role = admin_user.get("role")
-    if role not in ["superadmin", "admin"]:
-        org_id = admin_user.get("organization_id", "default_org")
-    return get_audit_logs(limit=limit, action=action, actor=actor, org_id=org_id, search=search, offset=offset)
+    return get_audit_logs(limit=limit, action=action, actor=actor, org_id=None, search=search, offset=offset)
 
 @router.post("/emergency-control")
 def emergency_system_control(payload: EmergencyBypassPayload, admin_user: dict = Depends(require_superadmin)):

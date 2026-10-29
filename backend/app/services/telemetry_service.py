@@ -22,6 +22,7 @@ from app.services.db_service import (
 )
 from app.services.whatsapp_alerts import alert_service
 from app.services.voice_service import voice_service
+from app.services.firestore_service import firestore_service
 
 logger = logging.getLogger(__name__)
 
@@ -176,8 +177,12 @@ class TelemetryService:
             "mode": "AUTO" if is_auto_mode else "MANUAL"
         }
 
-        # Persist reading to database and bounded memory ring buffer
+        # Persist reading to Firestore (Primary) & PostgreSQL (Dual-Sync Backup)
         self.history.append(reading_record)
+        try:
+            firestore_service.record_telemetry(shed_id, reading_record)
+        except Exception as e:
+            logger.debug("Firestore telemetry record fallback: %s", e)
         save_telemetry_reading(reading_record)
 
         # Update device heartbeat & sequence tracking if device_id supplied

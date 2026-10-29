@@ -1,0 +1,62 @@
+[
+  {
+    "key": "branding",
+    "category": "branding",
+    "value": {
+      "tagline": "Smart Sericulture Monitoring & Environment Management",
+      "app_name": "Setu Platform (SeriCare)",
+      "logo_url": "assets/logo.png",
+      "terms_url": "/terms",
+      "privacy_url": "/privacy",
+      "contact_email": "support@sericare.in",
+      "primary_color": "#176B45"
+    },
+    "updated_at": "2026-10-29T11:02:26.351261+05:30",
+    "updated_by": "system",
+    "_id": "branding"
+  },
+  {
+    "key": "cms",
+    "category": "cms",
+    "value": {
+      "hero_subtext": "Monitor rearing shed environments with Autonomous Environmental Control, understand changing conditions, and manage connected IoT devices through an intelligent platform designed to support modern sericulture operations.",
+      "hero_headline": "Smarter Sericulture. Healthier Silkworms. Better Insights.",
+      "support_phone": "+91 98450 99999",
+      "demo_booking_url": "#demo-request",
+      "corporate_address": "Bengaluru & Ramanagara Sericulture Hubs, Karnataka, India",
+      "announcement_banner": ""
+    },
+    "updated_at": "2026-10-29T11:02:26.351261+05:30",
+    "updated_by": "system",
+    "_id": "cms"
+  },
+  {
+    "key": "security",
+    "category": "security",
+    "value": {
+      "password_hashing": "Bcrypt (Salt rounds 12)",
+      "hardware_interlock": "Strict Exclusion (Heater != Cooler)",
+      "jwt_expiry_minutes": 10080,
+      "rate_limit_per_min": 30,
+      "hysteresis_humidity": 3.0,
+      "hysteresis_temperature": 0.5,
+      "inactivity_timeout_min": 30
+    },
+    "updated_at": "2026-10-29T11:02:26.351261+05:30",
+    "updated_by": "system",
+    "_id": "security"
+  },
+  {
+    "key": "general",
+    "category": "general",
+    "value": {
+      "maintenance_mode": false,
+      "self_service_signup": true,
+      "email_otp_verification": true,
+      "phone_otp_verification": false
+    },
+    "updated_at": "2026-10-29T11:18:34.176879+05:30",
+    "updated_by": "superadmin",
+    "_id": "general"
+  }
+]
