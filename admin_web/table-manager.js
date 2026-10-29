@@ -573,7 +573,15 @@
         const token = getAuthToken();
         const base = getApiBaseUrl();
 
-        for (const id of ids) {
+        // Exclude currently logged-in operator to protect the active tab session
+        const currentUid = (window.currentUser && (window.currentUser.id || window.currentUser.user_id)) || '';
+        const currentSub = (window.currentUser && window.currentUser.username) || '';
+        const safeIds = ids.filter(id => id !== currentUid && id !== currentSub);
+        if (safeIds.length < ids.length && typeof window.showToast === 'function') {
+          window.showToast('Your own active account was excluded from bulk deletion.', 'info');
+        }
+
+        for (const id of safeIds) {
           try {
             let endpoint = '';
             if (tableId === 'productsTable') {
@@ -601,9 +609,11 @@
             }
 
             if (endpoint) {
+              const reqHeaders = { 'Content-Type': 'application/json' };
+              if (token) reqHeaders['Authorization'] = `Bearer ${token}`;
               const res = await fetch(endpoint, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: reqHeaders
               });
               if (res.ok || res.status === 404) {
                 successCount++;

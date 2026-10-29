@@ -26,7 +26,7 @@ router = APIRouter(prefix="/admin", tags=["Super Admin"])
 
 def require_superadmin(payload: dict = Depends(get_current_user_payload)):
     role = payload.get("role")
-    if role not in ["admin", "superadmin", "company_admin"]:
+    if role not in ["admin", "superadmin", "company_admin", "ceo"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super Admin privileges required"
@@ -217,10 +217,18 @@ def change_farmer_status(
 
 @router.delete("/farmers/{farmer_id}")
 def remove_farmer(farmer_id: str, admin_user: dict = Depends(require_superadmin)):
+    current_uid = admin_user.get("user_id")
+    current_sub = admin_user.get("sub")
+    if farmer_id in [current_uid, current_sub]:
+        raise HTTPException(status_code=400, detail="Cannot delete your own active account while logged in")
+
     user = get_user_by_id(farmer_id) or get_user_by_username(farmer_id)
     if not user:
         raise HTTPException(status_code=404, detail=f"Farmer '{farmer_id}' not found")
     
+    if user.get("id") == current_uid or user.get("username") == current_sub:
+        raise HTTPException(status_code=400, detail="Cannot delete your own active account while logged in")
+
     farmer_name = user.get("full_name") or user.get("username") or farmer_id
     success = delete_user(farmer_id)
     if not success:

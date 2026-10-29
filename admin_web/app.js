@@ -105,7 +105,8 @@ window.fetch = async function(resource, init = {}) {
   const res = await _originalFetch.call(this, resource, init);
   if (res.status === 401 && adminToken) {
     const urlStr = typeof resource === 'string' ? resource : (resource.url || '');
-    if (!urlStr.includes('/auth/login') && !urlStr.includes('/auth/check-farmer')) {
+    // Only disconnect if the authoritative session/identity check itself fails (prevents rogue 401s on data operations from destroying valid user sessions)
+    if (urlStr.includes('/auth/me') || urlStr.includes('/auth/sessions') || urlStr.includes('/auth/refresh')) {
       console.warn(`[MultiTab] Session invalidated for tab ${tabId}. Disconnecting.`);
       handleLogout('Your tab session has expired or was terminated.');
     }
@@ -459,8 +460,11 @@ async function handleLogin(e) {
     }
 
     adminToken = data.access_token;
+    window.adminToken = adminToken;
     currentSessionId = data.session_id || null;
+    window.currentSessionId = currentSessionId;
     currentUser = data.user;
+    window.currentUser = currentUser;
 
     // Persist to tab sessionStorage AND localStorage fallback
     TAB_STORAGE.setItem('setu_tab_token', adminToken);
@@ -556,8 +560,11 @@ async function completeGoogleLogin(googleUserData) {
     }
 
     adminToken = data.access_token;
+    window.adminToken = adminToken;
     currentSessionId = data.session_id || null;
+    window.currentSessionId = currentSessionId;
     currentUser = data.user;
+    window.currentUser = currentUser;
 
     // Persist to tab sessionStorage AND localStorage fallback
     TAB_STORAGE.setItem('setu_tab_token', adminToken);
@@ -2090,6 +2097,13 @@ async function toggleFarmerStatus(farmerId, currentActive) {
 }
 
 async function confirmDeleteFarmer(farmerId) {
+  const currentUid = (currentUser && (currentUser.id || currentUser.user_id)) || (window.currentUser && (window.currentUser.id || window.currentUser.user_id));
+  const currentSub = (currentUser && currentUser.username) || (window.currentUser && window.currentUser.username);
+  if (farmerId === currentUid || farmerId === currentSub) {
+    showToast('Cannot delete your own active administrator account while logged in.', 'warning');
+    return;
+  }
+
   showConfirmActionModal({
     title: 'Delete Farmer Record',
     subtitle: 'Permanent deletion from database',
@@ -2098,9 +2112,13 @@ async function confirmDeleteFarmer(farmerId) {
     confirmDanger: true,
     onConfirm: async () => {
       try {
+        const token = adminToken || window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
         const res = await fetch(`${API_BASE_URL}/admin/farmers/${farmerId}`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${adminToken}` }
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
         });
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
