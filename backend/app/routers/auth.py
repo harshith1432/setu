@@ -315,6 +315,15 @@ def google_sync(req: GoogleAuthRequest):
         existing = get_user_by_username_or_phone(f"google_{google_id}")
 
     if existing:
+        # SEC-03: Prevent Account Takeover (ATO).
+        # Google Sign-In is exclusively reserved for farmers.
+        # Staff and administrative accounts require direct password authentication.
+        if existing.get("role") != "farmer":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Staff and administrative accounts require password authentication. Google Sign-In is strictly for farmers."
+            )
+
         updates = {}
         # If email was missing in existing profile, link it now
         if clean_email and not existing.get("official_email"):

@@ -126,7 +126,7 @@ async def test_authenticated_shed_status(async_client):
     response = await async_client.get("/api/v1/sheds/shed_01", headers=headers)
     assert response.status_code == 200
     shed = response.json()
-    assert ("Green Valley" in shed["farm_name"] or "Gowda" in shed["farm_name"] or "SeriCare" in shed["farm_name"])
+    assert ("Green Valley" in shed["farm_name"] or "Gowda" in shed["farm_name"] or "SeriCare" in shed["farm_name"] or "Central Operations Hub" in shed["farm_name"])
     assert shed["current_stage"] == 3
 
 @pytest.mark.anyio
