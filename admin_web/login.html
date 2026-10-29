@@ -19,7 +19,7 @@
 <!-- Google Identity Services (OAuth / GIS) -->
 <script async="" defer="" src="https://accounts.google.com/gsi/client"></script>
 <!-- Enterprise Design System Stylesheet -->
-<link href="/admin/style.css?v=4.4" rel="stylesheet"/>
+<link href="/admin/style.css?v=4.5" rel="stylesheet"/>
   <style>
     .hidden { display: none !important; }
     body { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; }
@@ -2435,30 +2435,463 @@
 <!-- Dynamically populated from integration_status table -->
 </div>
 </section>
-<!-- ================= 22. VIEW: PLATFORM SETTINGS ================= -->
+<!-- ================= 22. VIEW: SYSTEM CONFIGURATION ================= -->
 <section class="view-section hidden" id="section-settings">
-<div class="table-card" style="padding: 24px;">
-<div class="table-title">
-<i data-lucide="settings"></i>
-<span>Platform Security &amp; Environment Configuration</span>
-</div>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 18px;">
-<div class="detail-card">
-<h4>Security &amp; Sessions</h4>
-<div class="detail-row"><span class="detail-label">JWT Token Expiry:</span><span class="detail-value">7 Days (10080 min)</span></div>
-<div class="detail-row"><span class="detail-label">Password Hashing:</span><span class="detail-value">Bcrypt (Salt rounds 12)</span></div>
-<div class="detail-row"><span class="detail-label">Brute-Force Rate Limiting:</span><span class="detail-value">30 req / min</span></div>
-<div class="detail-row"><span class="detail-label">Inactivity Timeout:</span><span class="detail-value">30 Minutes</span></div>
-</div>
-<div class="detail-card">
-<h4>IoT Safety Thresholds</h4>
-<div class="detail-row"><span class="detail-label">Hysteresis Temperature:</span><span class="detail-value">0.5°C</span></div>
-<div class="detail-row"><span class="detail-label">Hysteresis Humidity:</span><span class="detail-value">3.0%</span></div>
-<div class="detail-row"><span class="detail-label">Hardware Interlock:</span><span class="detail-value">Strict Exclusion (Heater != Cooler)</span></div>
-</div>
-</div>
-</div>
+  <div class="settings-page-header">
+    <div class="settings-title-group">
+      <h2 class="settings-page-title">System Configuration</h2>
+      <p class="settings-page-subtitle">Manage global platform parameters and maintenance states.</p>
+    </div>
+  </div>
+
+  <div class="settings-matrix-layout">
+    <!-- LEFT COLUMN: SETTINGS MATRIX (4 Modules) -->
+    <aside class="settings-matrix-card">
+      <div class="settings-matrix-header">
+        <span class="matrix-heading-label">SETTINGS MATRIX</span>
+        <span class="matrix-badge">4 Modules</span>
+      </div>
+      <div class="settings-matrix-nav">
+        <!-- Module 1: General -->
+        <button type="button" class="matrix-nav-btn active" id="btnMatrixGeneral" onclick="switchSettingsMatrix('general')">
+          <div class="matrix-nav-icon">
+            <i data-lucide="sliders"></i>
+          </div>
+          <div class="matrix-nav-text">
+            <span class="matrix-nav-title">General</span>
+            <span class="matrix-nav-sub">Platform identity & locale</span>
+          </div>
+        </button>
+
+        <!-- Module 2: Branding -->
+        <button type="button" class="matrix-nav-btn" id="btnMatrixBranding" onclick="switchSettingsMatrix('branding')">
+          <div class="matrix-nav-icon">
+            <i data-lucide="palette"></i>
+          </div>
+          <div class="matrix-nav-text">
+            <span class="matrix-nav-title">Branding</span>
+            <span class="matrix-nav-sub">Logos, colors & typography</span>
+          </div>
+        </button>
+
+        <!-- Module 3: Super Admin Logins -->
+        <button type="button" class="matrix-nav-btn" id="btnMatrixSuperAdmins" onclick="switchSettingsMatrix('superadmins')">
+          <div class="matrix-nav-icon">
+            <i data-lucide="user-cog"></i>
+          </div>
+          <div class="matrix-nav-text">
+            <span class="matrix-nav-title">Super Admin Logins</span>
+            <span class="matrix-nav-sub">Change email, password & admins</span>
+          </div>
+        </button>
+
+        <!-- Module 4: Landing CMS -->
+        <button type="button" class="matrix-nav-btn" id="btnMatrixCms" onclick="switchSettingsMatrix('cms')">
+          <div class="matrix-nav-icon">
+            <i data-lucide="layout-template"></i>
+          </div>
+          <div class="matrix-nav-text">
+            <span class="matrix-nav-title">Landing CMS</span>
+            <span class="matrix-nav-sub">Homepage text & components</span>
+          </div>
+        </button>
+      </div>
+    </aside>
+
+    <!-- RIGHT PANE: MODULE VIEWS -->
+    <main class="settings-content-pane">
+      <!-- ================= 1. GENERAL PLATFORM SETTINGS (Image 2) ================= -->
+      <div class="settings-module-panel" id="panelSettingsGeneral">
+        <div class="settings-panel-card">
+          <div class="panel-card-header">
+            <div>
+              <h3 class="panel-card-title">General Platform Settings</h3>
+              <p class="panel-card-subtitle">Configure global application branding identity, contact parameters, legal links, and system defaults.</p>
+            </div>
+            <button type="button" class="btn btn-blue" onclick="saveGeneralSettings()">
+              <i data-lucide="check"></i>
+              <span>Save General</span>
+            </button>
+          </div>
+
+          <div class="settings-toggle-list">
+            <!-- Row 1: Self-Service Sign-up -->
+            <div class="settings-toggle-row">
+              <div class="toggle-row-info">
+                <span class="toggle-row-title">Self-Service Sign-up</span>
+                <span class="toggle-row-desc">Allow new organizations to create accounts online without manual admin approval</span>
+              </div>
+              <label class="switch-control">
+                <input type="checkbox" id="settingSelfService" checked onchange="markSettingsDirty('general')">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <!-- Row 2: Email OTP Verification -->
+            <div class="settings-toggle-row">
+              <div class="toggle-row-info">
+                <span class="toggle-row-title">
+                  <i data-lucide="mail" class="toggle-icon"></i>
+                  Email OTP Verification
+                </span>
+                <span class="toggle-row-desc">Require new organizations to verify their email address via 6-digit OTP during registration</span>
+              </div>
+              <label class="switch-control">
+                <input type="checkbox" id="settingEmailOtp" checked onchange="markSettingsDirty('general')">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <!-- Row 3: Phone OTP Verification -->
+            <div class="settings-toggle-row">
+              <div class="toggle-row-info">
+                <span class="toggle-row-title">
+                  <i data-lucide="smartphone" class="toggle-icon"></i>
+                  Phone OTP Verification
+                </span>
+                <span class="toggle-row-desc">Require new organizations to verify their phone number via 6-digit OTP during registration</span>
+              </div>
+              <label class="switch-control">
+                <input type="checkbox" id="settingPhoneOtp" onchange="markSettingsDirty('general')">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <!-- Row 4: Maintenance Mode (Danger / Alert) -->
+            <div class="settings-toggle-row danger-row">
+              <div class="toggle-row-info">
+                <span class="toggle-row-title danger-text">
+                  <i data-lucide="alert-triangle" class="toggle-icon danger-icon"></i>
+                  Maintenance Mode
+                </span>
+                <span class="toggle-row-desc">Restrict non-super-admin access for scheduled platform upgrades</span>
+              </div>
+              <label class="switch-control">
+                <input type="checkbox" id="settingMaintenanceMode" onchange="markSettingsDirty('general')">
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Preserved Security & IoT Safety Thresholds from Image 1 -->
+          <div class="settings-environment-grid" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-subtle);">
+            <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="shield"></i> Security &amp; IoT Hardware Parameters
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+              <div class="detail-card">
+                <h4>Security &amp; Sessions</h4>
+                <div class="detail-row"><span class="detail-label">JWT Token Expiry:</span><span class="detail-value">7 Days (10080 min)</span></div>
+                <div class="detail-row"><span class="detail-label">Password Hashing:</span><span class="detail-value">Bcrypt (Salt rounds 12)</span></div>
+                <div class="detail-row"><span class="detail-label">Brute-Force Rate Limiting:</span><span class="detail-value">30 req / min</span></div>
+                <div class="detail-row"><span class="detail-label">Inactivity Timeout:</span><span class="detail-value">30 Minutes</span></div>
+              </div>
+              <div class="detail-card">
+                <h4>IoT Safety Thresholds</h4>
+                <div class="detail-row"><span class="detail-label">Hysteresis Temperature:</span><span class="detail-value">0.5°C</span></div>
+                <div class="detail-row"><span class="detail-label">Hysteresis Humidity:</span><span class="detail-value">3.0%</span></div>
+                <div class="detail-row"><span class="detail-label">Hardware Interlock:</span><span class="detail-value">Strict Exclusion (Heater != Cooler)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 2. BRANDING & VISUAL IDENTITY ================= -->
+      <div class="settings-module-panel hidden" id="panelSettingsBranding">
+        <div class="settings-panel-card">
+          <div class="panel-card-header">
+            <div>
+              <h3 class="panel-card-title">Platform Branding &amp; Visual Identity</h3>
+              <p class="panel-card-subtitle">Manage official platform logos, typography colors, application titles, and legal references.</p>
+            </div>
+            <button type="button" class="btn btn-blue" onclick="saveBrandingSettings()">
+              <i data-lucide="check"></i>
+              <span>Save Branding</span>
+            </button>
+          </div>
+
+          <form id="brandingSettingsForm" onsubmit="event.preventDefault(); saveBrandingSettings();">
+            <div class="settings-form-grid">
+              <div class="form-group">
+                <label for="brandingAppName">Application Name *</label>
+                <input type="text" id="brandingAppName" class="form-input" value="Setu Platform (SeriCare)" required>
+              </div>
+              <div class="form-group">
+                <label for="brandingTagline">Platform Tagline</label>
+                <input type="text" id="brandingTagline" class="form-input" value="Smart Sericulture Monitoring &amp; Environment Management">
+              </div>
+              <div class="form-group">
+                <label for="brandingPrimaryColor">Primary Theme Accent</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input type="color" id="brandingColorPicker" value="#176B45" style="width: 44px; height: 38px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer;" onchange="document.getElementById('brandingPrimaryColor').value = this.value">
+                  <input type="text" id="brandingPrimaryColor" class="form-input" value="#176B45" style="width: 130px;" onchange="document.getElementById('brandingColorPicker').value = this.value">
+                  <span class="color-preset-pill" onclick="setColorPreset('#176B45')" style="cursor: pointer; padding: 4px 10px; border-radius: 12px; background: #E4F2EB; color: #176B45; font-size: 0.78rem; font-weight: 700;">Forest Green</span>
+                  <span class="color-preset-pill" onclick="setColorPreset('#0284c7')" style="cursor: pointer; padding: 4px 10px; border-radius: 12px; background: #e0f2fe; color: #0284c7; font-size: 0.78rem; font-weight: 700;">Ocean Blue</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="brandingLogoUrl">Platform Logo Path</label>
+                <input type="text" id="brandingLogoUrl" class="form-input" value="assets/logo.png">
+              </div>
+              <div class="form-group">
+                <label for="brandingContactEmail">Official Support Email</label>
+                <input type="email" id="brandingContactEmail" class="form-input" value="support@sericare.in">
+              </div>
+              <div class="form-group">
+                <label for="brandingLegalLinks">Terms &amp; Privacy URL</label>
+                <input type="text" id="brandingLegalLinks" class="form-input" value="/privacy">
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ================= 3. SUPER ADMIN CREDENTIALS & LOGINS (Image 3) ================= -->
+      <div class="settings-module-panel hidden" id="panelSettingsSuperAdmins">
+        <div class="settings-panel-card">
+          <div class="panel-card-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="panel-header-icon-wrap">
+                <i data-lucide="user-check"></i>
+              </div>
+              <div>
+                <h3 class="panel-card-title">Super Admin Credentials &amp; Logins</h3>
+                <p class="panel-card-subtitle">Change your Super Admin email ID and password, and create or manage additional administrator logins.</p>
+              </div>
+            </div>
+            <button type="button" class="btn btn-blue" onclick="openAddSuperAdminModal()">
+              <i data-lucide="user-plus"></i>
+              <span>Add Super Admin</span>
+            </button>
+          </div>
+
+          <!-- TOP TWO CARDS GRID -->
+          <div class="super-admin-top-grid">
+            <!-- Left Card: Update My Admin Credentials -->
+            <div class="admin-creds-card">
+              <div class="card-inner-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div class="creds-icon-circle">
+                    <i data-lucide="key"></i>
+                  </div>
+                  <div>
+                    <h4 class="card-inner-title">Update My Admin Credentials</h4>
+                    <p class="card-inner-sub">Modify email address &amp; password for active account</p>
+                  </div>
+                </div>
+              </div>
+
+              <form id="updateMyCredentialsForm" onsubmit="handleUpdateMyCredentials(event)" style="margin-top: 18px;">
+                <div class="form-group" style="margin-bottom: 14px;">
+                  <label for="myAdminEmail">New Email Address <span style="color: #ef4444;">*</span></label>
+                  <input type="email" id="myAdminEmail" class="form-input" placeholder="e.g. harshithkd6@gmail.com" value="harshithkd6@gmail.com" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 14px;">
+                  <label for="myCurrentPassword">Current Password <span style="color: #ef4444;">*</span></label>
+                  <div class="password-input-wrapper">
+                    <input type="password" id="myCurrentPassword" class="form-input" placeholder="Verify active password" required>
+                    <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('myCurrentPassword', this)" title="Show/Hide Password">
+                      <i data-lucide="eye"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="form-row-2col" style="margin-bottom: 18px;">
+                  <div class="form-group">
+                    <label for="myNewPassword">New Password (optional)</label>
+                    <div class="password-input-wrapper">
+                      <input type="password" id="myNewPassword" class="form-input" placeholder="Min 6 characters">
+                      <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('myNewPassword', this)" title="Show/Hide Password">
+                        <i data-lucide="eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label for="myConfirmPassword">Confirm New Password</label>
+                    <div class="password-input-wrapper">
+                      <input type="password" id="myConfirmPassword" class="form-input" placeholder="Repeat new password">
+                      <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('myConfirmPassword', this)" title="Show/Hide Password">
+                        <i data-lucide="eye"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" class="btn btn-blue" id="btnUpdateMyCreds" style="width: 100%; justify-content: center;">
+                  <i data-lucide="save"></i>
+                  <span>Update My Credentials</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Right Card: Super Admin Access Policy -->
+            <div class="admin-policy-card">
+              <div class="policy-card-top">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div class="policy-icon-circle">
+                    <i data-lucide="shield-check"></i>
+                  </div>
+                  <div>
+                    <h4 class="card-inner-title">Super Admin Access Policy</h4>
+                    <p class="card-inner-sub">Multi-administrator security &amp; role governance</p>
+                  </div>
+                </div>
+                <span class="policy-count-badge" id="superAdminCountBadge">2 Accounts</span>
+              </div>
+
+              <div class="policy-info-box blue-box" style="margin-top: 18px;">
+                <div class="info-box-icon"><i data-lucide="info"></i></div>
+                <div class="info-box-text">
+                  <strong>Multi-Admin Accounts:</strong> You can add multiple Super Admin logins with granular sub-roles (Owner, Billing, Support, Platform Operations).
+                </div>
+              </div>
+
+              <div class="policy-info-box neutral-box" style="margin-top: 14px;">
+                <div class="info-box-icon"><i data-lucide="lock"></i></div>
+                <div class="info-box-text">
+                  <strong>Credential Security:</strong> Password hashes are encrypted using Bcrypt. Verification of your current password is mandatory when modifying email or credentials.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM SECTION: ALL SUPER ADMIN LOGINS TABLE -->
+          <div class="super-admins-table-section" style="margin-top: 28px;">
+            <div class="section-sub-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="users" style="color: #2563eb; width: 20px; height: 20px;"></i>
+                <h4 style="font-size: 1.1rem; font-weight: 700; color: var(--text-main); margin: 0;">All Super Admin Logins</h4>
+              </div>
+              <button type="button" class="btn btn-outline btn-sm" onclick="fetchSuperAdminsTable()">
+                <i data-lucide="refresh-cw"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table" id="tableSuperAdmins">
+                <thead>
+                  <tr>
+                    <th>ADMIN USER</th>
+                    <th>EMAIL ADDRESS</th>
+                    <th>SUB-ROLE</th>
+                    <th>STATUS</th>
+                    <th>CREATED DATE</th>
+                    <th style="text-align: right;">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody id="tbodySuperAdmins">
+                  <!-- Populated dynamically via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 4. LANDING CMS MODULE ================= -->
+      <div class="settings-module-panel hidden" id="panelSettingsCms">
+        <div class="settings-panel-card">
+          <div class="panel-card-header">
+            <div>
+              <h3 class="panel-card-title">Landing Page CMS &amp; Content</h3>
+              <p class="panel-card-subtitle">Manage public homepage headline copy, contact parameters, and promotional announcements.</p>
+            </div>
+            <button type="button" class="btn btn-blue" onclick="saveCmsSettings()">
+              <i data-lucide="check"></i>
+              <span>Save Landing CMS</span>
+            </button>
+          </div>
+
+          <form id="cmsSettingsForm" onsubmit="event.preventDefault(); saveCmsSettings();">
+            <div class="settings-form-grid">
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="cmsHeroHeadline">Homepage Hero Headline *</label>
+                <input type="text" id="cmsHeroHeadline" class="form-input" value="Smarter Sericulture. Healthier Silkworms. Better Insights." required>
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="cmsHeroSubtext">Homepage Hero Subtext</label>
+                <textarea id="cmsHeroSubtext" class="form-input" rows="3">Monitor rearing shed environments with Autonomous Environmental Control, understand changing conditions, and manage connected IoT devices through an intelligent platform designed to support modern sericulture operations.</textarea>
+              </div>
+              <div class="form-group">
+                <label for="cmsSupportPhone">Public Contact Phone</label>
+                <input type="text" id="cmsSupportPhone" class="form-input" value="+91 98450 99999">
+              </div>
+              <div class="form-group">
+                <label for="cmsCorporateAddress">Cluster Operations Address</label>
+                <input type="text" id="cmsCorporateAddress" class="form-input" value="Bengaluru &amp; Ramanagara Sericulture Hubs, Karnataka, India">
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label for="cmsAnnouncement">Optional Top Announcement Banner</label>
+                <input type="text" id="cmsAnnouncement" class="form-input" placeholder="e.g. CSRTI Guidance v4.2 released with updated bivoltine microclimate profiles">
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
 </section>
+
+<!-- ================= MODAL: ADD SUPER ADMIN ================= -->
+<div class="app-modal-backdrop hidden" id="addSuperAdminModalBackdrop">
+  <div class="modal-card" style="max-width: 500px;">
+    <div class="modal-header">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="width: 36px; height: 36px; border-radius: 8px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="user-plus"></i>
+        </div>
+        <div>
+          <h3 class="modal-title">Add Super Admin</h3>
+          <p class="modal-subtitle">Provision a privileged administrator account</p>
+        </div>
+      </div>
+      <button type="button" class="modal-close-btn" onclick="closeAddSuperAdminModal()"><i data-lucide="x"></i></button>
+    </div>
+    <form id="addSuperAdminForm" onsubmit="handleAddSuperAdminSubmit(event)" style="padding: 20px;">
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="newAdminFullName">Full Name <span style="color: #ef4444;">*</span></label>
+        <input type="text" id="newAdminFullName" class="form-input" placeholder="e.g. Ramesh Kumar" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="newAdminUsername">Username <span style="color: #ef4444;">*</span></label>
+        <input type="text" id="newAdminUsername" class="form-input" placeholder="e.g. ramesh_admin" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="newAdminEmail">Email Address <span style="color: #ef4444;">*</span></label>
+        <input type="email" id="newAdminEmail" class="form-input" placeholder="e.g. ramesh@setu.ag" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 12px;">
+        <label for="newAdminPassword">Initial Password <span style="color: #ef4444;">*</span></label>
+        <div class="password-input-wrapper">
+          <input type="password" id="newAdminPassword" class="form-input" placeholder="Min 6 characters" required>
+          <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('newAdminPassword', this)">
+            <i data-lucide="eye"></i>
+          </button>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label for="newAdminSubRole">Sub-Role Assignment</label>
+        <select id="newAdminSubRole" class="form-input">
+          <option value="Owner">Owner (Full Governance &amp; Security)</option>
+          <option value="Billing">Billing (Invoices, Contracts &amp; Payments)</option>
+          <option value="Platform Operations" selected>Platform Operations (IoT &amp; Clusters)</option>
+          <option value="Support">Support (Helpdesk &amp; Field Oversight)</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+        <button type="button" class="btn btn-outline" onclick="closeAddSuperAdminModal()">Cancel</button>
+        <button type="submit" class="btn btn-blue" id="btnSubmitAddAdmin">
+          <i data-lucide="user-plus"></i>
+          <span>Create Super Admin</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
 </div>
 </main>
 </div>
@@ -2562,6 +2995,6 @@
 <!-- Toast Notification Container -->
 <div class="toast-container" id="toastContainer"></div>
 <!-- Application Controller -->
-<script src="/admin/table-manager.js?v=4.4"></script><script src="/admin/app.js?v=4.4" charset="UTF-8"></script>
+<script src="/admin/table-manager.js?v=4.5"></script><script src="/admin/app.js?v=4.5" charset="UTF-8"></script>
 </body>
 </html>

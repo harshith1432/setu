@@ -19,7 +19,8 @@ from app.services.org_employee_db import (
     update_employee,
     update_employee_status,
     resend_employee_invitation,
-    revoke_employee_invitation
+    revoke_employee_invitation,
+    delete_employee_record
 )
 
 router = APIRouter(prefix="/employees", tags=["Employee Management"])
@@ -211,3 +212,30 @@ def revoke_invitation(
 
     success = revoke_employee_invitation(employee_id=emp["id"], actor=current_user.get("sub", "admin"))
     return {"status": "success", "message": "Pending invitation revoked successfully."}
+
+
+
+@router.delete("/{employee_id}")
+def delete_employee(
+    employee_id: str,
+    current_user: dict = Depends(require_permission("users:write"))
+):
+    """
+    Permanently deletes an employee record, associated invitations, and user credentials.
+    Root platform administrator accounts are strictly protected.
+    """
+    try:
+        actor = current_user.get("username", "admin")
+        success = delete_employee_record(employee_id, actor=actor)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Employee '{employee_id}' not found.")
+        return {
+            "status": "success",
+            "message": f"Employee '{employee_id}' successfully deleted."
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete employee: {str(e)}")

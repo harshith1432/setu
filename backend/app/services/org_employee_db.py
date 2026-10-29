@@ -1668,6 +1668,73 @@ def update_employee(
     return get_employee_detail(emp["id"])
 
 
+def delete_employee_record(
+    identifier: str,
+    actor: str = "superadmin"
+) -> bool:
+    """
+    Permanently deletes an employee record and associated user account/invitations.
+    Protects root administrative accounts (superadmin / admin / EMP-001) from accidental deletion.
+    """
+    emp = get_employee_detail(identifier)
+    if not emp:
+        # Check if identifier matches a user directly with employee record
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("SELECT id, username, role FROM users WHERE id = %s OR username = %s", (identifier, identifier))
+            u = cursor.fetchone()
+            if not u:
+                return False
+            if u["role"] == "superadmin" or u["username"] in ("admin", "superadmin"):
+                raise ValueError("Cannot delete root superadmin account")
+            from app.services.db_service import delete_user, invalidate_user_cache
+            deleted = delete_user(u["id"])
+            invalidate_user_cache()
+            return deleted
+
+    # Root admin protection
+    if emp.get("role_code") == "superadmin" or emp.get("username") in ("admin", "superadmin") or emp.get("employee_id") == "EMP-001":
+        raise ValueError("Cannot delete root platform administrator account")
+
+    emp_id = emp["id"]
+    user_id = emp["user_id"]
+    emp_code = emp.get("employee_id", emp_id)
+    email = emp.get("official_email", "")
+
+    with get_db_cursor(commit=True) as cursor:
+        # 1. Nullify reporting manager for subordinates
+        cursor.execute("UPDATE employees SET reporting_manager_id = NULL WHERE reporting_manager_id = %s", (emp_id,))
+        # 2. Nullify department head
+        try:
+            cursor.execute("UPDATE departments SET head_id = NULL WHERE head_id = %s OR head_id = %s", (emp_id, user_id))
+        except Exception:
+            pass
+        # 3. Clean up invitations
+        try:
+            cursor.execute("DELETE FROM employee_invitations WHERE employee_id = %s OR user_id = %s", (emp_id, user_id))
+        except Exception:
+            pass
+        # 4. Delete from employees
+        cursor.execute("DELETE FROM employees WHERE id = %s", (emp_id,))
+
+    # 5. Clean up user, tokens, and sessions
+    from app.services.db_service import delete_user, invalidate_user_cache
+    delete_user(user_id)
+    invalidate_user_cache()
+
+    # 6. Audit log
+    try:
+        log_security_audit(
+            actor=actor,
+            action="EMPLOYEE_DELETED",
+            details=f"Permanently deleted employee {emp_code} ({email}) and associated credentials",
+            target_resource=emp_code
+        )
+    except Exception:
+        pass
+
+    return True
+
+
 def update_employee_status(
     employee_id: str,
     new_status: str,

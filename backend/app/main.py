@@ -138,8 +138,18 @@ def startup_db_init():
 
 # Mount Super Admin Web Application
 admin_web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "admin_web"))
+
+@app.get("/admin")
+@app.get("/admin/")
+def admin_portal_page():
+    """Super Admin & Enterprise Platform Console."""
+    admin_html = os.path.join(admin_web_dir, "admin.html")
+    if os.path.exists(admin_html):
+        return FileResponse(admin_html)
+    return FileResponse(os.path.join(admin_web_dir, "index.html"))
+
 if os.path.exists(admin_web_dir):
-    app.mount("/admin", StaticFiles(directory=admin_web_dir, html=True), name="admin_web")
+    app.mount("/admin", StaticFiles(directory=admin_web_dir, html=False), name="admin_web")
 
 # Mount Public Landing Page
 landing_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "landing"))
@@ -197,15 +207,6 @@ def farmer_registration_page():
     if os.path.exists(register_html):
         return FileResponse(register_html)
     return FileResponse(os.path.join(admin_web_dir, "login.html"))
-
-@app.get("/admin")
-@app.get("/admin/")
-def admin_portal_page():
-    """Super Admin & Enterprise Platform Console."""
-    admin_html = os.path.join(admin_web_dir, "admin.html")
-    if os.path.exists(admin_html):
-        return FileResponse(admin_html)
-    return FileResponse(os.path.join(admin_web_dir, "index.html"))
 
 @app.get("/admin.html")
 def serve_root_admin_html():

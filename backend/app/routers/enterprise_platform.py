@@ -1270,3 +1270,118 @@ def patch_invoice_status(
         raise HTTPException(status_code=404, detail="Invoice not found")
     log_audit(user.get("sub", "admin"), "UPDATE_INVOICE_STATUS", f"Updated invoice {invoice_id} to {new_status}")
     return {"status": "success", "invoice_id": invoice_id, "new_status": new_status}
+
+
+# ==============================================================================
+# 17. SYSTEM CONFIGURATION & SUPER ADMIN MANAGEMENT
+# ==============================================================================
+
+class PlatformCategoryUpdateIn(BaseModel):
+    settings: Dict[str, Any]
+
+
+class AddSuperAdminIn(BaseModel):
+    username: str
+    full_name: str
+    email: str
+    password: str
+    sub_role: str = "Platform Operations"
+    phone: str = "+91 98450 00000"
+
+
+class UpdateAdminCredentialsIn(BaseModel):
+    current_password: str
+    new_email: str
+    new_password: Optional[str] = None
+    confirm_new_password: Optional[str] = None
+
+
+@router.get("/platform/settings")
+def get_platform_settings_route(
+    user: dict = Depends(require_roles(["superadmin", "admin", "ceo"]))
+):
+    from app.services.enterprise_db import get_all_platform_settings
+    return get_all_platform_settings()
+
+
+@router.put("/platform/settings/{category}")
+def update_platform_settings_route(
+    category: str,
+    payload: PlatformCategoryUpdateIn,
+    user: dict = Depends(require_roles(["superadmin", "admin"]))
+):
+    from app.services.enterprise_db import update_platform_settings_category
+    if category not in ["general", "branding", "cms", "security"]:
+        raise HTTPException(status_code=400, detail="Invalid settings category")
+    actor = user.get("username", "superadmin")
+    updated = update_platform_settings_category(category, payload.settings, actor=actor)
+    return {"status": "success", "category": category, "settings": updated}
+
+
+@router.get("/platform/superadmins")
+def get_superadmins_route(
+    user: dict = Depends(require_roles(["superadmin", "admin"]))
+):
+    from app.services.enterprise_db import get_all_superadmins
+    admins = get_all_superadmins()
+    return {"status": "success", "total": len(admins), "admins": admins}
+
+
+@router.post("/platform/superadmins")
+def add_superadmin_route(
+    payload: AddSuperAdminIn,
+    user: dict = Depends(require_roles(["superadmin", "admin"]))
+):
+    from app.services.enterprise_db import create_superadmin
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    actor = user.get("username", "superadmin")
+    try:
+        new_admin = create_superadmin(payload.dict(), actor=actor)
+        return {"status": "success", "admin": new_admin}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/platform/superadmins/credentials")
+def update_admin_credentials_route(
+    payload: UpdateAdminCredentialsIn,
+    user: dict = Depends(require_roles(["superadmin", "admin"]))
+):
+    from app.services.enterprise_db import update_superadmin_credentials
+    username = user.get("sub", user.get("username", "admin"))
+    if payload.new_password:
+        if len(payload.new_password) < 6:
+            raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+        if payload.confirm_new_password and payload.new_password != payload.confirm_new_password:
+            raise HTTPException(status_code=400, detail="New passwords do not match")
+
+    try:
+        res = update_superadmin_credentials(
+            username=username,
+            current_password=payload.current_password,
+            new_email=payload.new_email,
+            new_password=payload.new_password,
+            actor=username
+        )
+        return {"status": "success", "message": "Admin credentials successfully updated", "data": res}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/platform/superadmins/{user_id}/status")
+def toggle_superadmin_status_route(
+    user_id: str,
+    payload: dict,
+    user: dict = Depends(require_roles(["superadmin", "admin"]))
+):
+    from app.services.enterprise_db import update_superadmin_status
+    actor = user.get("sub", user.get("username", "admin"))
+    is_active = bool(payload.get("is_active", True))
+    try:
+        success = update_superadmin_status(user_id, is_active, actor=actor)
+        if not success:
+            raise HTTPException(status_code=404, detail="Super Admin user not found")
+        return {"status": "success", "user_id": user_id, "is_active": is_active}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

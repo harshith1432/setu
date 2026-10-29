@@ -433,6 +433,8 @@ def init_enterprise_tables():
         # Seed public FAQs
         _seed_faqs(cursor, now_dt)
         _seed_orders_subscriptions_and_tickets(cursor, now_dt)
+        # Seed system platform settings
+        _seed_platform_settings(cursor, now_dt)
 
 
 def _seed_enterprise_users(cursor, now_dt):
@@ -2539,6 +2541,214 @@ def update_invoice_status(invoice_id: str, new_status: str) -> bool:
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("UPDATE invoices SET status = %s WHERE id = %s", (new_status, invoice_id))
         return cursor.rowcount > 0
+
+
+
+def _seed_platform_settings(cursor, now_dt):
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS platform_settings (
+        key VARCHAR(64) PRIMARY KEY,
+        category VARCHAR(32) NOT NULL,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL,
+        updated_by VARCHAR(64)
+    );
+    """)
+    cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS sub_role VARCHAR(64) DEFAULT 'Owner';")
+    
+    # Update default admins with sub-roles and emails if not present
+    cursor.execute("""
+    UPDATE users 
+    SET full_name = 'Harshith', official_email = 'harshithkd06@gmail.com', sub_role = 'Billing'
+    WHERE username = 'admin' AND (official_email IS NULL OR official_email = '' OR official_email = 'admin@sericare.io');
+    """)
+    cursor.execute("""
+    UPDATE users 
+    SET full_name = 'Setu Super Admin', official_email = 'admin@setu.ag', sub_role = 'Owner'
+    WHERE username = 'superadmin' AND (official_email IS NULL OR official_email = '');
+    """)
+
+    defaults = [
+        ("general", "general", {
+            "self_service_signup": True,
+            "email_otp_verification": True,
+            "phone_otp_verification": False,
+            "maintenance_mode": False
+        }),
+        ("branding", "branding", {
+            "app_name": "Setu Platform (SeriCare)",
+            "tagline": "Smart Sericulture Monitoring & Environment Management",
+            "primary_color": "#176B45",
+            "logo_url": "assets/logo.png",
+            "contact_email": "support@sericare.in",
+            "terms_url": "/terms",
+            "privacy_url": "/privacy"
+        }),
+        ("cms", "cms", {
+            "hero_headline": "Smarter Sericulture. Healthier Silkworms. Better Insights.",
+            "hero_subtext": "Monitor rearing shed environments with Autonomous Environmental Control, understand changing conditions, and manage connected IoT devices through an intelligent platform designed to support modern sericulture operations.",
+            "support_phone": "+91 98450 99999",
+            "corporate_address": "Bengaluru & Ramanagara Sericulture Hubs, Karnataka, India",
+            "demo_booking_url": "#demo-request",
+            "announcement_banner": ""
+        }),
+        ("security", "security", {
+            "jwt_expiry_minutes": 10080,
+            "password_hashing": "Bcrypt (Salt rounds 12)",
+            "rate_limit_per_min": 30,
+            "inactivity_timeout_min": 30,
+            "hysteresis_temperature": 0.5,
+            "hysteresis_humidity": 3.0,
+            "hardware_interlock": "Strict Exclusion (Heater != Cooler)"
+        })
+    ]
+
+    for k, cat, val in defaults:
+        cursor.execute("SELECT key FROM platform_settings WHERE key = %s", (k,))
+        if not cursor.fetchone():
+            cursor.execute("""
+            INSERT INTO platform_settings (key, category, value, updated_at, updated_by)
+            VALUES (%s, %s, %s, %s, %s)
+            """, (k, cat, json.dumps(val), now_dt, "system"))
+
+
+def get_all_platform_settings() -> Dict[str, Any]:
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("SELECT key, category, value, updated_at, updated_by FROM platform_settings")
+        rows = cursor.fetchall()
+        settings = {}
+        for r in rows:
+            val = r["value"] if isinstance(r["value"], dict) else json.loads(r["value"])
+            settings[r["key"]] = val
+        return settings
+
+
+def update_platform_settings_category(category: str, new_value: dict, actor: str = "superadmin") -> dict:
+    now_dt = datetime.now(timezone.utc)
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("SELECT value FROM platform_settings WHERE key = %s", (category,))
+        existing = cursor.fetchone()
+        merged = {}
+        if existing:
+            current_val = existing["value"] if isinstance(existing["value"], dict) else json.loads(existing["value"])
+            merged.update(current_val)
+        merged.update(new_value)
+        cursor.execute("""
+        INSERT INTO platform_settings (key, category, value, updated_at, updated_by)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = EXCLUDED.updated_at,
+            updated_by = EXCLUDED.updated_by
+        """, (category, category, json.dumps(merged), now_dt, actor))
+        log_audit(actor, "UPDATE_PLATFORM_SETTINGS", f"Updated {category} platform configuration")
+        return merged
+
+
+def get_all_superadmins() -> List[Dict[str, Any]]:
+    with get_db_cursor(dict_cursor=True) as cursor:
+        cursor.execute("""
+        SELECT id, username, full_name, official_email, sub_role, is_active, created_at
+        FROM users
+        WHERE role IN ('superadmin', 'admin')
+        ORDER BY created_at ASC
+        """)
+        rows = cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            if isinstance(d.get("created_at"), datetime):
+                d["created_at_fmt"] = d["created_at"].strftime("%Y-%m-%d")
+                d["created_at"] = d["created_at"].isoformat()
+            else:
+                d["created_at_fmt"] = "2026-09-11"
+            if not d.get("official_email"):
+                d["official_email"] = f"{d['username']}@setu.ag"
+            if not d.get("sub_role"):
+                d["sub_role"] = "Owner"
+            d["status"] = "Active" if d.get("is_active", True) else "Inactive"
+            results.append(d)
+        return results
+
+
+def create_superadmin(data: dict, actor: str = "superadmin") -> dict:
+    from app.core.security import get_password_hash
+    now_dt = datetime.now(timezone.utc)
+    uid = f"usr_sa_{uuid.uuid4().hex[:8]}"
+    username = data["username"].strip().lower()
+    full_name = data.get("full_name", username.title()).strip()
+    email = data.get("email", "").strip()
+    raw_password = data["password"]
+    sub_role = data.get("sub_role", "Platform Operations").strip()
+    phone = data.get("phone", "+91 98450 00000").strip()
+
+    with get_db_cursor(commit=True) as cursor:
+        cursor.execute("SELECT id FROM users WHERE username = %s OR (official_email = %s AND %s != '')", (username, email, email))
+        if cursor.fetchone():
+            raise ValueError(f"User with username '{username}' or email '{email}' already exists.")
+        
+        cursor.execute("""
+        INSERT INTO users (
+            id, username, hashed_password, full_name, phone, preferred_language,
+            role, sub_role, official_email, farm_name, region, shed_id, batch_id,
+            dfl_capacity, breed, is_active, created_at
+        ) VALUES (
+            %s, %s, %s, %s, %s, 'en',
+            'superadmin', %s, %s, 'Central Sericulture Command', 'Central HQ', 'shed_01', 'CENTRAL-HQ',
+            'N/A', 'N/A', TRUE, %s
+        )
+        """, (uid, username, get_password_hash(raw_password), full_name, phone, sub_role, email, now_dt))
+        log_audit(actor, "CREATE_SUPERADMIN", f"Created new Super Admin {username} with sub-role {sub_role}")
+        return {
+            "id": uid,
+            "username": username,
+            "full_name": full_name,
+            "official_email": email,
+            "sub_role": sub_role,
+            "status": "Active",
+            "created_at_fmt": now_dt.strftime("%Y-%m-%d")
+        }
+
+
+def update_superadmin_credentials(username: str, current_password: str, new_email: str, new_password: Optional[str] = None, actor: str = "superadmin") -> dict:
+    from app.core.security import verify_password, get_password_hash
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("SELECT id, hashed_password, official_email, full_name FROM users WHERE username = %s", (username,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"User '{username}' not found.")
+        
+        if not verify_password(current_password, row["hashed_password"]):
+            raise ValueError("Verification failed: Current password is incorrect.")
+        
+        updates = ["official_email = %s"]
+        params = [new_email.strip()]
+
+        if new_password and len(new_password.strip()) >= 6:
+            updates.append("hashed_password = %s")
+            params.append(get_password_hash(new_password.strip()))
+        
+        params.append(username)
+        cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = %s", tuple(params))
+        log_audit(actor, "UPDATE_SUPERADMIN_CREDENTIALS", f"Updated email and credentials for Super Admin {username}")
+        return {
+            "username": username,
+            "official_email": new_email.strip(),
+            "password_updated": bool(new_password)
+        }
+
+
+def update_superadmin_status(user_id: str, is_active: bool, actor: str = "superadmin") -> bool:
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("SELECT username, role FROM users WHERE id = %s", (user_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        if row["username"] == actor:
+            raise ValueError("Cannot deactivate your own active super admin account.")
+        cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (is_active, user_id))
+        log_audit(actor, "UPDATE_SUPERADMIN_STATUS", f"Changed status of {row['username']} to {'Active' if is_active else 'Inactive'}")
+        return True
 
 
 # Initialize enterprise tables safely on import

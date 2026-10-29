@@ -568,6 +568,8 @@
       const doDelete = async () => {
         const ids = Array.from(state.selectedIds);
         let successCount = 0;
+        let failCount = 0;
+        let lastError = '';
         const token = getAuthToken();
         const base = getApiBaseUrl();
 
@@ -603,13 +605,15 @@
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
               });
-              if (res.ok) {
+              if (res.ok || res.status === 404) {
                 successCount++;
-              } else {
-                // If backend already deleted or returns 404, still count as removed
                 const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`);
                 if (row) row.remove();
-                successCount++;
+              } else {
+                failCount++;
+                const errData = await res.json().catch(() => ({}));
+                lastError = errData.detail || `Server returned ${res.status}`;
+                console.error(`Failed to delete record ${id} from ${endpoint}:`, lastError);
               }
             } else {
               const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`);
@@ -617,16 +621,25 @@
               successCount++;
             }
           } catch (e) {
+            failCount++;
+            lastError = e.message || 'Network error';
             console.error('Error deleting record:', id, e);
-            const row = document.querySelector(`#${tableId} tr[data-id="${id}"]`);
-            if (row) row.remove();
-            successCount++;
           }
         }
 
         state.selectedIds.clear();
-        if (typeof window.showToast === 'function') {
-          window.showToast(`Successfully deleted ${successCount} ${name}`, 'success');
+        if (failCount > 0 && successCount === 0) {
+          if (typeof window.showToast === 'function') {
+            window.showToast(`Failed to delete ${failCount} ${name}: ${lastError}`, 'danger');
+          }
+        } else if (failCount > 0 && successCount > 0) {
+          if (typeof window.showToast === 'function') {
+            window.showToast(`Deleted ${successCount} ${name}, but ${failCount} failed (${lastError})`, 'warning');
+          }
+        } else if (successCount > 0) {
+          if (typeof window.showToast === 'function') {
+            window.showToast(`Successfully deleted ${successCount} ${name}`, 'success');
+          }
         }
 
         // Refresh table data
