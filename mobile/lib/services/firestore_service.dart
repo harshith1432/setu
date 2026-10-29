@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import '../models/shed_data.dart';
-import 'api_service.dart';
 
 /// Centralized Firestore Database Service for SeriCare Mobile.
 /// Connects directly to Cloud Firestore project 'setu-a767c' with real-time snapshots,

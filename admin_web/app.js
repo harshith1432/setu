@@ -4155,13 +4155,103 @@ function toggleEmployeeStatus(empId, currStatus) {
   });
 }
 
+function resolveProductImageUrl(url) {
+  if (!url) return null;
+  const s = String(url).trim();
+  if (!s) return null;
+  if (s.startsWith('data:') || s.startsWith('blob:') || s.startsWith('http://') || s.startsWith('https://')) {
+    return s;
+  }
+  let backendBase = '';
+  if (typeof API_BASE_URL === 'string' && API_BASE_URL) {
+    backendBase = API_BASE_URL.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+  }
+  if (!backendBase && typeof window !== 'undefined' && window.location) {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      backendBase = 'https://setu-8vh9.onrender.com';
+    }
+  }
+  const cleanPath = s.startsWith('/') ? s : '/' + s;
+  return `${backendBase}${cleanPath}`;
+}
+
+function readImageAsDataUrl(file, maxDimension = 800, quality = 0.85) {
+  return new Promise((resolve) => {
+    if (!file) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      if (file.type === 'image/svg+xml') {
+        return resolve(dataUrl);
+      }
+      const img = new Image();
+      img.onload = function() {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDimension || h > maxDimension) {
+          if (w > h) {
+            h = Math.round((h * maxDimension) / w);
+            w = maxDimension;
+          } else {
+            w = Math.round((w * maxDimension) / h);
+            h = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      };
+      img.onerror = function() {
+        resolve(dataUrl);
+      };
+      img.src = dataUrl;
+    };
+    reader.onerror = function() {
+      resolve(null);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 window.handleProductCardImgFallback = function(img, prodId) {
   if (!img) return;
   img.onerror = null;
-  const prod = (typeof allProductsCache !== 'undefined' ? allProductsCache : []).find(x => x.id === prodId) || { id: prodId, name: '', sku: '' };
+  const list = (typeof allProductsCache !== 'undefined' && allProductsCache.length > 0)
+    ? allProductsCache 
+    : (typeof allProductsList !== 'undefined' ? allProductsList : []);
+  const prod = list.find(x => x.id === prodId) || { id: prodId, name: '', sku: '' };
   const parent = img.parentElement;
   if (parent) {
     parent.innerHTML = getProductIllustrationSvg(prod);
+  }
+};
+
+window.handleProductImgElementFallback = function(img, prodId) {
+  if (!img) return;
+  img.onerror = null;
+  const list = (typeof allProductsList !== 'undefined' && allProductsList.length > 0)
+    ? allProductsList 
+    : (typeof allProductsCache !== 'undefined' ? allProductsCache : []);
+  const prod = list.find(x => x.id === prodId) || { id: prodId, name: '', sku: '' };
+  const svgMarkup = getProductIllustrationSvg(prod);
+  const wrapper = document.createElement('div');
+  wrapper.style.width = img.style.width || '100px';
+  wrapper.style.height = img.style.height || '100px';
+  wrapper.style.borderRadius = img.style.borderRadius || '8px';
+  wrapper.style.overflow = 'hidden';
+  wrapper.style.display = 'flex';
+  wrapper.style.alignItems = 'center';
+  wrapper.style.justifyContent = 'center';
+  wrapper.style.background = 'var(--bg-surface-alt, #f8fafc)';
+  wrapper.style.border = '1px solid var(--border-color)';
+  wrapper.style.flexShrink = '0';
+  wrapper.innerHTML = svgMarkup;
+  if (img.parentNode) {
+    img.parentNode.replaceChild(wrapper, img);
   }
 };
 
@@ -5575,6 +5665,49 @@ function getProductIllustrationSvg(p) {
   const cat = (p.category || '').toLowerCase();
   const name = (p.name || '').toLowerCase();
 
+  // Heaters & Climate Heating Hardware
+  if (sku.includes('HEAT') || cat.includes('heater') || name.includes('heater') || name.includes('heating')) {
+    return `
+      <svg viewBox="0 0 200 160" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" style="max-height: 160px;">
+        <defs>
+          <linearGradient id="heatBodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f5f5f4" />
+            <stop offset="100%" stop-color="#d6d3d1" />
+          </linearGradient>
+          <radialGradient id="heatGlowGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#fb923c" stop-opacity="0.9" />
+            <stop offset="65%" stop-color="#ea580c" stop-opacity="0.5" />
+            <stop offset="100%" stop-color="#1c1917" stop-opacity="0.1" />
+          </radialGradient>
+        </defs>
+        <!-- Stand -->
+        <path d="M 60,140 L 140,140 L 132,132 L 68,132 Z" fill="#44403c" />
+        <!-- Chassis -->
+        <rect x="52" y="24" width="96" height="110" rx="14" fill="url(#heatBodyGrad)" stroke="#a8a29e" stroke-width="2" />
+        <!-- Handle -->
+        <rect x="78" y="28" width="44" height="6" rx="3" fill="#d6d3d1" />
+        <!-- Circular Heating Core -->
+        <circle cx="100" cy="74" r="38" fill="#1c1917" stroke="#78716c" stroke-width="2" />
+        <circle cx="100" cy="74" r="34" fill="url(#heatGlowGrad)" />
+        <circle cx="100" cy="74" r="30" fill="none" stroke="#ea580c" stroke-width="1.5" opacity="0.8" />
+        <circle cx="100" cy="74" r="22" fill="none" stroke="#f97316" stroke-width="1.5" opacity="0.9" />
+        <circle cx="100" cy="74" r="14" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.85" />
+        <line x1="68" y1="64" x2="132" y2="64" stroke="#57534e" stroke-width="1.5" />
+        <line x1="64" y1="74" x2="136" y2="74" stroke="#57534e" stroke-width="1.5" />
+        <line x1="68" y1="84" x2="132" y2="84" stroke="#57534e" stroke-width="1.5" />
+        <circle cx="100" cy="74" r="6" fill="#292524" stroke="#f97316" stroke-width="1.5" />
+        <!-- Knobs & Controls -->
+        <circle cx="80" cy="120" r="7" fill="#44403c" stroke="#78716c" stroke-width="1" />
+        <circle cx="100" cy="120" r="3" fill="#ef4444" />
+        <circle cx="120" cy="120" r="7" fill="#44403c" stroke="#78716c" stroke-width="1" />
+        <!-- Heat Waves -->
+        <path d="M 75,18 Q 80,10 75,4" fill="none" stroke="#ea580c" stroke-width="1.8" stroke-linecap="round" />
+        <path d="M 100,16 Q 106,8 100,2" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+        <path d="M 125,18 Q 130,10 125,4" fill="none" stroke="#ea580c" stroke-width="1.8" stroke-linecap="round" />
+      </svg>
+    `;
+  }
+
   // 1. Gateways & Controllers
   if (sku.includes('GW') || cat.includes('gateway') || name.includes('gateway')) {
     return `
@@ -6039,9 +6172,10 @@ function renderStoreProductGrid() {
     const isArchived = !p.is_active || p.publication_status === 'ARCHIVED';
     const rating = getDeterministicRating(p.id);
 
-    const hasCustomImage = (p.images && p.images.length > 0 && p.images[0]);
-    const imageHtml = hasCustomImage
-      ? `<img src="${escapeHtml(p.images[0])}" alt="${escapeHtml(p.name)}" class="amazon-product-img" onerror="handleProductCardImgFallback(this, '${escapeHtml(p.id)}')">`
+    const rawCustomImg = (p.images && p.images.length > 0 && p.images[0]) ? p.images[0] : null;
+    const resolvedCustomImg = rawCustomImg ? resolveProductImageUrl(rawCustomImg) : null;
+    const imageHtml = resolvedCustomImg
+      ? `<img src="${escapeHtml(resolvedCustomImg)}" alt="${escapeHtml(p.name)}" class="amazon-product-img" onerror="handleProductCardImgFallback(this, '${escapeHtml(p.id)}')">`
       : `<div class="amazon-hardware-illustration">${getProductIllustrationSvg(p)}</div>`;
 
     // Badges
@@ -6233,7 +6367,8 @@ function renderProductsTable(filtered) {
       : (p.publication_status === 'DRAFT'
           ? '<span class="badge badge-secondary">DRAFT</span>'
           : '<span class="badge badge-success">ACTIVE</span>');
-    const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+    const rawImgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+    const imgUrl = resolveProductImageUrl(rawImgUrl);
 
     return `
       <tr data-id="${p.id}">
@@ -6243,7 +6378,7 @@ function renderProductsTable(filtered) {
         <td style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600;">${escapeHtml(p.sku)}</td>
         <td>
           <div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="openProductSpecsModal('${p.id}')" title="Click to view full specifications">
-            ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 38px; height: 38px; border-radius: 6px; background: rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 18px; height: 18px;"></i></div>`}
+            ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" onerror="handleProductImgElementFallback(this, '${escapeHtml(p.id)}')" style="width: 38px; height: 38px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 38px; height: 38px; border-radius: 6px; background: rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 18px; height: 18px;"></i></div>`}
             <div>
               <div style="font-weight: 700; color: var(--text-main); font-size: 0.88rem;">${escapeHtml(p.name)}</div>
               ${p.short_description ? `<div style="font-size: 0.74rem; color: var(--text-muted); line-height: 1.2;">${escapeHtml(p.short_description.substring(0, 55))}...</div>` : ''}
@@ -6268,6 +6403,9 @@ function renderProductsTable(filtered) {
                   <i data-lucide="more-vertical"></i>
                 </button>
                 <div class="row-action-menu hidden" id="row-action-menu-prod-${p.id}">
+                  <button type="button" class="row-action-item" onclick="openUpdateProductPhotoModal('${p.id}'); closeAllRowActionMenus();">
+                    <i data-lucide="image"></i> <span>Update Photo</span>
+                  </button>
                   <button type="button" class="row-action-item" onclick="toggleProductPublication('${p.id}', '${p.publication_status}'); closeAllRowActionMenus();">
                     <i data-lucide="globe"></i> <span>${p.publication_status === 'PUBLISHED' ? 'Unpublish to Draft' : 'Publish to Store'}</span>
                   </button>
@@ -6348,7 +6486,8 @@ function openFarmerOrderModal(productId) {
   const gst = subtotal * 0.18;
   const total = subtotal + gst;
 
-  const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+  const rawImgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+  const imgUrl = resolveProductImageUrl(rawImgUrl);
   const farmerUser = currentUser || {};
   const defaultAddress = farmerUser.farm_name 
     ? `${farmerUser.farm_name}, ${farmerUser.region || 'Karnataka'}`
@@ -6358,7 +6497,7 @@ function openFarmerOrderModal(productId) {
     <div style="display: flex; flex-direction: column; gap: 14px;">
       <!-- Product Card -->
       <div style="display: flex; gap: 14px; background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; align-items: center;">
-        ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 58px; height: 58px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 58px; height: 58px; border-radius: 8px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 28px; height: 28px;"></i></div>`}
+        ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" onerror="handleProductImgElementFallback(this, '${escapeHtml(p.id)}')" style="width: 58px; height: 58px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 58px; height: 58px; border-radius: 8px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 28px; height: 28px;"></i></div>`}
         <div style="flex: 1; min-width: 0;">
           <div style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted); font-weight: 600;">${escapeHtml(p.sku)} · ${escapeHtml(p.category)}</div>
           <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-main); margin-top: 1px;">${escapeHtml(p.name)}</div>
@@ -6541,9 +6680,10 @@ async function submitFarmerHardwareOrder(productId) {
 }
 
 function openProductSpecsModal(productId) {
-  const p = allProductsList.find(x => x.id === productId);
+  const p = (typeof allProductsList !== 'undefined' ? allProductsList : []).find(x => x.id === productId) || (typeof allProductsCache !== 'undefined' ? allProductsCache : []).find(x => x.id === productId);
   if (!p) return;
-  const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+  const rawImgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
+  const imgUrl = resolveProductImageUrl(rawImgUrl);
   const priceFormatted = (p.price_minor_units / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
   
   let specsHtml = '';
@@ -6561,7 +6701,7 @@ function openProductSpecsModal(productId) {
   const content = `
     <div style="display: flex; flex-direction: column; gap: 14px;">
       <div style="display: flex; gap: 16px; align-items: center;">
-        ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 100px; height: 100px; border-radius: 8px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 40px; height: 40px;"></i></div>`}
+        ${imgUrl ? `<img src="${imgUrl}" alt="${escapeHtml(p.name)}" onerror="handleProductImgElementFallback(this, '${escapeHtml(p.id)}')" style="width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); flex-shrink: 0;">` : `<div style="width: 100px; height: 100px; border-radius: 8px; background: rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0;"><i data-lucide="package" style="width: 40px; height: 40px;"></i></div>`}
         <div style="flex: 1;">
           <span class="badge badge-info" style="font-size: 0.72rem; margin-bottom: 4px;">${escapeHtml(p.category)}</span>
           <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-main); margin: 2px 0 4px 0;">${escapeHtml(p.name)}</h3>
@@ -6604,6 +6744,88 @@ function openProductSpecsModal(productId) {
 
   openAppModal('Product Specifications & Field Guide', content, 'lg');
 }
+
+
+window.previewEditProductImage = async function(input) {
+  if (input && input.files && input.files[0]) {
+    try {
+      const dataUrl = await readImageAsDataUrl(input.files[0]);
+      const container = document.getElementById('photoPreviewContainer');
+      if (container && dataUrl) {
+        container.innerHTML = `<img src="${dataUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+      }
+    } catch (e) {
+      console.warn('Preview error:', e);
+    }
+  }
+};
+
+window.openUpdateProductPhotoModal = function(productId) {
+  const list = (typeof allProductsList !== 'undefined' && allProductsList.length > 0)
+    ? allProductsList 
+    : (typeof allProductsCache !== 'undefined' ? allProductsCache : []);
+  const p = list.find(x => x.id === productId);
+  if (!p) return;
+  const currentImg = (p.images && p.images.length > 0) ? resolveProductImageUrl(p.images[0]) : '';
+  const modalHtml = `
+    <form id="updateProductPhotoForm" onsubmit="handleUpdateProductPhotoSubmit(event, '${escapeHtml(p.id)}')" style="display: flex; flex-direction: column; gap: 14px;">
+      <div>
+        <label style="font-weight: 700; font-size: 0.85rem; color: var(--text-main);">Product</label>
+        <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-main); margin-top: 2px;">${escapeHtml(p.name)} <span style="font-size: 0.75rem; color: var(--text-muted); font-family: var(--font-mono);">(${escapeHtml(p.sku)})</span></div>
+      </div>
+      <div style="display: flex; gap: 14px; align-items: center;">
+        <div id="photoPreviewContainer" style="width: 90px; height: 90px; border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--bg-surface-alt, #f8fafc); flex-shrink: 0;">
+          ${currentImg ? `<img id="prodPhotoPreview" src="${escapeHtml(currentImg)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="handleProductImgElementFallback(this, '${escapeHtml(p.id)}')">` : `<div id="prodPhotoPreview" style="color: var(--text-muted);"><i data-lucide="image" style="width: 32px; height: 32px;"></i></div>`}
+        </div>
+        <div style="flex: 1;">
+          <label class="form-label" style="font-size: 0.8rem; font-weight: 600;">Upload New Photo (JPG, PNG, WebP, SVG)</label>
+          <input type="file" id="editProdImageFile" accept="image/*" class="form-input" style="font-size: 0.8rem; padding: 6px 8px;" onchange="previewEditProductImage(this)">
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 4px;">Optimized & permanently stored in database.</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm" id="btnSaveProductPhoto"><i data-lucide="check"></i> Save Photo</button>
+      </div>
+    </form>
+  `;
+  openAppModal('Update Product Photo', modalHtml);
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+};
+
+window.handleUpdateProductPhotoSubmit = async function(e, productId) {
+  e.preventDefault();
+  const btn = document.getElementById('btnSaveProductPhoto');
+  if (btn) btn.disabled = true;
+  try {
+    const fileInput = document.getElementById('editProdImageFile');
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+      throw new Error('Please select an image file to upload.');
+    }
+    const file = fileInput.files[0];
+    const dataUrl = await readImageAsDataUrl(file);
+    if (!dataUrl) throw new Error('Failed to process image file.');
+    
+    const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ images: [dataUrl] })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update product photo');
+    }
+    showToast('Product photo updated successfully', 'success');
+    closeAppModal();
+    loadProducts();
+  } catch (err) {
+    showToast(err.message, 'error');
+    if (btn) btn.disabled = false;
+  }
+};
 
 function openCreateProductModal() {
   const formHtml = `
@@ -6658,16 +6880,32 @@ async function handleCreateProductSubmit(e) {
     let imageUrls = [];
     const fileInput = document.getElementById('newProdImageFile');
     if (fileInput && fileInput.files && fileInput.files[0]) {
-      const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
-      const upRes = await fetch(`${API_BASE_URL}/products/upload-image`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${adminToken}` },
-        body: formData
-      });
-      if (upRes.ok) {
-        const upData = await upRes.json();
-        if (upData.image_url) imageUrls.push(upData.image_url);
+      const file = fileInput.files[0];
+      // 1. Read persistent compressed Data URL (immune to container disk wipes)
+      try {
+        const dataUrl = await readImageAsDataUrl(file);
+        if (dataUrl) imageUrls.push(dataUrl);
+      } catch (e) {
+        console.warn('DataURL compression fallback:', e);
+      }
+
+      // 2. Also send to backend upload endpoint for static asset store
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const upRes = await fetch(`${API_BASE_URL}/products/upload-image`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${adminToken}` },
+          body: formData
+        });
+        if (upRes.ok) {
+          const upData = await upRes.json();
+          if (imageUrls.length === 0 && upData.image_url) {
+            imageUrls.push(upData.image_url);
+          }
+        }
+      } catch (uploadErr) {
+        console.warn('Backend image upload fallback:', uploadErr);
       }
     }
 
