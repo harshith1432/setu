@@ -216,6 +216,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
                     // Payment Mode Selector
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: paymentMethod,
                       decoration: InputDecoration(
                         labelText: 'Payment Mode',
@@ -224,10 +225,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'UPI', child: Text('UPI (GPay / PhonePe / Paytm)')),
-                        DropdownMenuItem(value: 'CASH_ON_DELIVERY', child: Text('Cash on Delivery (COD)')),
-                        DropdownMenuItem(value: 'CARD', child: Text('Debit / Credit Card')),
-                        DropdownMenuItem(value: 'SUBSIDY_DIRECT_CREDIT', child: Text('Department Subsidy / DBT Claim')),
+                        DropdownMenuItem(
+                          value: 'UPI',
+                          child: Text('UPI (GPay / PhonePe / Paytm)', overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'CASH_ON_DELIVERY',
+                          child: Text('Cash on Delivery (COD)', overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'CARD',
+                          child: Text('Debit / Credit Card', overflow: TextOverflow.ellipsis),
+                        ),
+                        DropdownMenuItem(
+                          value: 'SUBSIDY_DIRECT_CREDIT',
+                          child: Text('Department Subsidy / DBT Claim', overflow: TextOverflow.ellipsis),
+                        ),
                       ],
                       onChanged: (v) {
                         if (v != null) setSheetState(() => paymentMethod = v);
