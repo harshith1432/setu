@@ -1339,6 +1339,16 @@ def update_product_details(product_id: str, data: Dict[str, Any]) -> Optional[Di
         sku = data.get("sku", prod["sku"])
         category = data.get("category", prod["category"])
         description = data.get("description", prod.get("description", ""))
+        short_description = data.get("short_description", prod.get("short_description", ""))
+        compatibility = data.get("compatibility", prod.get("compatibility", ""))
+        specs = data.get("specifications", prod.get("specifications") or {})
+        if isinstance(specs, str):
+            try:
+                specs = json.loads(specs)
+            except Exception:
+                specs = {}
+        elif not isinstance(specs, dict):
+            specs = {}
         price_minor_units = int(data.get("price_minor_units", prod["price_minor_units"]))
         stock_quantity = int(data.get("stock_quantity", prod["stock_quantity"]))
         unit = data.get("unit", prod["unit"])
@@ -1362,6 +1372,9 @@ def update_product_details(product_id: str, data: Dict[str, Any]) -> Optional[Di
             sku = %s,
             category = %s,
             description = %s,
+            short_description = %s,
+            compatibility = %s,
+            specifications = %s::jsonb,
             price_minor_units = %s,
             stock_quantity = %s,
             unit = %s,
@@ -1371,7 +1384,7 @@ def update_product_details(product_id: str, data: Dict[str, Any]) -> Optional[Di
             updated_at = %s
         WHERE id = %s
         RETURNING *;
-        ''', (name, sku, category, description, price_minor_units, stock_quantity, unit, json.dumps(images), is_active, pub_status, now_dt, product_id))
+        ''', (name, sku, category, description, short_description, compatibility, json.dumps(specs), price_minor_units, stock_quantity, unit, json.dumps(images), is_active, pub_status, now_dt, product_id))
         row = cursor.fetchone()
         return dict(row) if row else None
 

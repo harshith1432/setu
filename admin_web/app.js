@@ -6445,9 +6445,9 @@ function renderStoreProductGrid() {
     const priceWhole = Math.floor(unitPrice).toLocaleString('en-IN');
     const priceFraction = (unitPrice % 1).toFixed(2).substring(1); // e.g. .00
 
-    // Amazon style MRP strikethrough (approx 25-35% higher)
-    const mrpMultiplier = 1.30;
-    const mrpPrice = Math.round((unitPrice * mrpMultiplier) / 50) * 50;
+    // Amazon style MRP strikethrough (custom mrp from specs or approx 25-35% higher)
+    const customMrp = p.specifications && p.specifications.mrp ? parseFloat(p.specifications.mrp) : null;
+    const mrpPrice = (customMrp && customMrp > unitPrice) ? customMrp : Math.round((unitPrice * 1.30) / 50) * 50;
     const mrpFormatted = mrpPrice.toLocaleString('en-IN');
     const discountPct = Math.round(((mrpPrice - unitPrice) / mrpPrice) * 100);
 
@@ -6490,6 +6490,12 @@ function renderStoreProductGrid() {
           <i data-lucide="more-vertical" style="width: 15px; height: 15px;"></i>
         </button>
         <div class="row-action-menu hidden" id="row-action-menu-store-p-${p.id}">
+          <button type="button" class="row-action-item" onclick="openEditProductModal('${p.id}'); closeAllRowActionMenus();">
+            <i data-lucide="edit-3"></i> <span>Edit Product SKU</span>
+          </button>
+          <button type="button" class="row-action-item" onclick="openUpdateProductPhotoModal('${p.id}'); closeAllRowActionMenus();">
+            <i data-lucide="image"></i> <span>Update Photo</span>
+          </button>
           <button type="button" class="row-action-item" onclick="toggleProductPublication('${p.id}', '${p.publication_status}'); closeAllRowActionMenus();">
             <i data-lucide="globe"></i> <span>${p.publication_status === 'PUBLISHED' ? 'Unpublish to Draft' : 'Publish to Store'}</span>
           </button>
@@ -6555,11 +6561,11 @@ function renderStoreProductGrid() {
           <div class="amazon-delivery-info">
             <div class="amazon-stock-status ${inStock ? 'in-stock' : 'out-of-stock'}">
               <i data-lucide="${inStock ? 'check-circle-2' : 'x-circle'}" style="width: 14px; height: 14px;"></i>
-              <span>${inStock ? `In Stock (${p.stock_quantity} units in Bangalore hub)` : 'Currently Out of Stock'}</span>
+              <span>${inStock ? `In Stock (${p.stock_quantity} units in ${escapeHtml((p.specifications && p.specifications.hub_location) || 'Bangalore hub')})` : 'Currently Out of Stock'}</span>
             </div>
             <div class="amazon-delivery-time">
               <i data-lucide="truck" style="width: 14px; height: 14px;"></i>
-              <span>Free Shed Delivery &bull; Technician Calibration Included</span>
+              <span>${escapeHtml((p.specifications && p.specifications.warranty) || 'Free Shed Delivery • Technician Calibration Included')}</span>
             </div>
           </div>
 
@@ -6690,6 +6696,9 @@ function renderProductsTable(filtered) {
                   <i data-lucide="more-vertical"></i>
                 </button>
                 <div class="row-action-menu hidden" id="row-action-menu-prod-${p.id}">
+                  <button type="button" class="row-action-item" onclick="openEditProductModal('${p.id}'); closeAllRowActionMenus();">
+                    <i data-lucide="edit-3"></i> <span>Edit Product SKU</span>
+                  </button>
                   <button type="button" class="row-action-item" onclick="openUpdateProductPhotoModal('${p.id}'); closeAllRowActionMenus();">
                     <i data-lucide="image"></i> <span>Update Photo</span>
                   </button>
@@ -7022,6 +7031,11 @@ function openProductSpecsModal(productId) {
 
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 14px;">
         <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
+        ${!(currentUser && currentUser.role === 'farmer') ? `
+          <button type="button" class="btn btn-outline btn-sm" onclick="closeAppModal(); openEditProductModal('${p.id}');" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+            <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i> Edit Product SKU
+          </button>
+        ` : ''}
         ${(currentUser && currentUser.role === 'farmer') ? `
           <button type="button" class="btn btn-primary btn-sm" onclick="closeAppModal(); openFarmerOrderModal('${p.id}');" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 6px 18px; background: #FFD814; border: 1px solid #FCD200; color: #0F1111;">
             <i data-lucide="shopping-bag"></i> Buy Now
@@ -7116,69 +7130,232 @@ window.handleUpdateProductPhotoSubmit = async function(e, productId) {
   }
 };
 
-function openCreateProductModal() {
-  const formHtml = `
-    <form id="createProductForm" onsubmit="handleCreateProductSubmit(event)" style="display: flex; flex-direction: column; gap: 14px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+
+// ==============================================================================
+// PRODUCT SKU MANAGEMENT (CREATE & FULL EDIT MODALS WITH ALL DETAILS)
+// ==============================================================================
+
+function renderProductModalForm(product = null) {
+  const isEdit = Boolean(product && product.id);
+  const specs = (product && product.specifications && typeof product.specifications === 'object') ? product.specifications : {};
+  
+  const unitPrice = product ? (product.price_minor_units || 0) / 100 : '';
+  const mrpVal = specs.mrp || (unitPrice ? Math.round(unitPrice * 1.30) : '');
+  const brandVal = specs.brand || specs.Brand || '';
+  const modelVal = specs.model || specs.Model || '';
+  const powerVal = specs.power_consumption || specs.Power || specs.voltage || '';
+  const stagesVal = specs.suitable_stages || specs.Stages || 'All Instars 1-5';
+  const warrantyVal = specs.warranty || 'Free Shed Delivery • Technician Calibration Included';
+  const hubVal = specs.hub_location || 'Bangalore hub';
+
+  const rawImgUrl = (product && product.images && product.images.length > 0) ? product.images[0] : '';
+  const resolvedImgUrl = rawImgUrl ? resolveProductImageUrl(rawImgUrl) : '';
+
+  return `
+    <form id="productSkuForm" onsubmit="handleSaveProductSubmit(event, ${isEdit ? `'${escapeHtml(product.id)}'` : 'null'})" style="display: flex; flex-direction: column; gap: 16px;">
+      
+      <!-- Section 1: Identification & Basic Info -->
+      <div style="background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="tag" style="width: 15px; height: 15px; color: var(--brand-primary);"></i> Basic Product Identification
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">SKU Code *</label>
+            <input type="text" id="prodSkuInput" class="form-control" required placeholder="e.g. SKU-HEAT-2000" value="${escapeHtml(product?.sku || '')}" style="font-family: var(--font-mono); width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Product Name *</label>
+            <input type="text" id="prodNameInput" class="form-control" required placeholder="e.g. High power Ceramic Shed Heater" value="${escapeHtml(product?.name || '')}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Category *</label>
+            <input type="text" id="prodCategoryInput" list="prodCategoryList" class="form-control" required placeholder="e.g. Climate Automation" value="${escapeHtml(product?.category || '')}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+            <datalist id="prodCategoryList">
+              <option value="Climate Automation">
+              <option value="Sensors & Probes">
+              <option value="IoT Gateways">
+              <option value="Heaters & Foggers">
+              <option value="Disinfection & Hygiene">
+              <option value="Accessories & Spares">
+              <option value="Services">
+            </datalist>
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Hardware Compatibility / Protocols</label>
+            <input type="text" id="prodCompatInput" class="form-control" placeholder="e.g. RS485 Modbus RTU / Dual WiFi / Standalone" value="${escapeHtml(product?.compatibility || '')}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Pricing, M.R.P. & Inventory -->
+      <div style="background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="indian-rupee" style="width: 15px; height: 15px; color: #10b981;"></i> Commercial Pricing & Inventory Hub
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px;">
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Selling Price (₹) *</label>
+            <input type="number" id="prodPriceInput" class="form-control" step="0.01" required placeholder="1999.00" value="${unitPrice !== '' ? unitPrice : ''}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface); font-weight: 700;">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">M.R.P. / Original Price (₹)</label>
+            <input type="number" id="prodMrpInput" class="form-control" step="0.01" placeholder="2600.00" value="${mrpVal !== '' ? mrpVal : ''}" title="Used for Amazon-style discount % strikethrough" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Stock Units *</label>
+            <input type="number" id="prodStockInput" class="form-control" required value="${product ? (product.stock_quantity ?? 0) : '20'}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Stock Hub Location</label>
+            <input type="text" id="prodHubLocationInput" class="form-control" placeholder="e.g. Bangalore hub" value="${escapeHtml(hubVal)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Visuals, Highlights & Detailed Description -->
+      <div style="background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="image" style="width: 15px; height: 15px; color: #6366f1;"></i> Visual Media & Descriptions
+        </h4>
+        
+        <!-- Photo Upload Row with Preview -->
+        <div style="display: flex; gap: 14px; align-items: center; margin-bottom: 12px;">
+          <div id="prodModalImgPreviewBox" style="width: 72px; height: 72px; border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); flex-shrink: 0;">
+            ${resolvedImgUrl ? `<img src="${escapeHtml(resolvedImgUrl)}" style="width: 100%; height: 100%; object-fit: cover;" onerror="handleProductImgElementFallback(this, '${escapeHtml(product?.id || '')}')">` : `<div style="color: var(--text-muted);"><i data-lucide="package" style="width: 28px; height: 28px;"></i></div>`}
+          </div>
+          <div style="flex: 1;">
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">
+              ${isEdit ? 'Replace Photo (Optional)' : 'Product Photo Upload'}
+            </label>
+            <input type="file" id="prodModalImgFileInput" accept="image/*" class="form-control" style="width: 100%; padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem;" onchange="previewProdModalFile(this)">
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Accepts JPG, PNG, WebP. Compressed and stored directly in database.</div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Short Highlights / Key Features</label>
+          <input type="text" id="prodShortDescInput" class="form-control" placeholder="e.g. Brand Solimo Special Feature Lightweight Colour Beige Portable Indoor/Outdoor Usage" value="${escapeHtml(product?.short_description || '')}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+        </div>
+
         <div>
-          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">SKU Code *</label>
-          <input type="text" id="newProdSku" class="form-control" required placeholder="e.g. SKU-FOG-PRO-01" style="font-family: var(--font-mono); width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Full Description & Field Application Guide</label>
+          <textarea id="prodDescInput" rows="3" class="form-control" placeholder="Detailed technical specifications, voltage requirements, and recommended instar stage operation..." style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.82rem; background: var(--bg-surface);">${escapeHtml(product?.description || '')}</textarea>
+        </div>
+      </div>
+
+      <!-- Section 4: Technical Specifications & Rearing Context -->
+      <div style="background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <h4 style="margin: 0 0 10px 0; font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="sliders" style="width: 15px; height: 15px; color: #f59e0b;"></i> Technical Specifications & Field Warranty
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Brand / Manufacturer</label>
+            <input type="text" id="prodBrandInput" class="form-control" placeholder="e.g. Setu Pro / Solimo" value="${escapeHtml(brandVal)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Model / Revision</label>
+            <input type="text" id="prodModelInput" class="form-control" placeholder="e.g. HC-2000 Rev 2.4" value="${escapeHtml(modelVal)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Power Rating / Voltage</label>
+            <input type="text" id="prodPowerInput" class="form-control" placeholder="e.g. 2000W / 230V AC 50Hz" value="${escapeHtml(powerVal)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
+          <div>
+            <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Suitable Rearing Stages</label>
+            <input type="text" id="prodStagesInput" class="form-control" placeholder="e.g. Stage 1-3 (Chawki) or All Instars" value="${escapeHtml(stagesVal)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+          </div>
         </div>
         <div>
-          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Category *</label>
-          <input type="text" id="newProdCategory" class="form-control" required placeholder="e.g. Climate Control" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Delivery & Warranty Terms</label>
+          <input type="text" id="prodWarrantyInput" class="form-control" placeholder="e.g. Free Shed Delivery • Technician Calibration Included" value="${escapeHtml(warrantyVal)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
         </div>
       </div>
-      <div>
-        <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Product Name *</label>
-        <input type="text" id="newProdName" class="form-control" required placeholder="e.g. Automated Ultrasonic Fogger Unit" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-      </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div>
-          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Price in INR (₹) *</label>
-          <input type="number" id="newProdPrice" class="form-control" step="0.01" required placeholder="4999.00" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-        </div>
-        <div>
-          <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Stock Quantity *</label>
-          <input type="number" id="newProdStock" class="form-control" required value="20" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-        </div>
-      </div>
-      <div>
-        <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Product Image (Upload Photo)</label>
-        <input type="file" id="newProdImageFile" accept="image/*" class="form-control" style="width: 100%; padding: 6px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem;">
-      </div>
-      <div>
-        <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Description</label>
-        <textarea id="newProdDesc" rows="3" class="form-control" placeholder="Specifications, voltage requirements, and recommended instar stage..." style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.82rem;"></textarea>
-      </div>
-      <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
-        <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" id="btnSaveNewProduct"><i data-lucide="plus"></i> Create SKU</button>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+        <button type="button" class="btn btn-skin" onclick="closeAppModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSaveProductModalSubmit" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 20px;">
+          <i data-lucide="${isEdit ? 'save' : 'plus'}"></i> <span>${isEdit ? 'Save Changes' : 'Create Product SKU'}</span>
+        </button>
       </div>
     </form>
   `;
-  openAppModal('Create New Product SKU', formHtml);
 }
 
-async function handleCreateProductSubmit(e) {
+window.previewProdModalFile = async function(input) {
+  if (input && input.files && input.files[0]) {
+    try {
+      const dataUrl = await readImageAsDataUrl(input.files[0]);
+      const box = document.getElementById('prodModalImgPreviewBox');
+      if (box && dataUrl) {
+        box.innerHTML = `<img src="${dataUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+      }
+    } catch (e) {
+      console.warn('File preview error:', e);
+    }
+  }
+};
+
+function openCreateProductModal() {
+  openAppModal('Create New Product SKU', renderProductModalForm(null), 'lg');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function openEditProductModal(productId) {
+  let product = (typeof allProductsList !== 'undefined' ? allProductsList : []).find(p => p.id === productId)
+    || (typeof filteredStoreProducts !== 'undefined' ? filteredStoreProducts : []).find(p => p.id === productId);
+
+  if (!product) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/products/${productId}`, {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      });
+      if (res.ok) {
+        product = await res.json();
+      }
+    } catch (err) {
+      console.warn('Product fetch error:', err);
+    }
+  }
+
+  if (!product) {
+    showToast('Product record not found', 'error');
+    return;
+  }
+
+  openAppModal(`Edit Product SKU: ${product.name || product.sku}`, renderProductModalForm(product), 'lg');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handleSaveProductSubmit(e, productId = null) {
   e.preventDefault();
-  const btn = document.getElementById('btnSaveNewProduct');
-  if (btn) btn.disabled = true;
+  const btn = document.getElementById('btnSaveProductModalSubmit');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Saving...';
+  }
 
   try {
+    const isEdit = Boolean(productId);
     let imageUrls = [];
-    const fileInput = document.getElementById('newProdImageFile');
+
+    // 1. Process newly uploaded image if present
+    const fileInput = document.getElementById('prodModalImgFileInput');
     if (fileInput && fileInput.files && fileInput.files[0]) {
       const file = fileInput.files[0];
-      // 1. Read persistent compressed Data URL (immune to container disk wipes)
       try {
         const dataUrl = await readImageAsDataUrl(file);
         if (dataUrl) imageUrls.push(dataUrl);
-      } catch (e) {
-        console.warn('DataURL compression fallback:', e);
+      } catch (err) {
+        console.warn('DataURL compression error:', err);
       }
 
-      // 2. Also send to backend upload endpoint for static asset store
       try {
         const formData = new FormData();
         formData.append('file', file);
@@ -7194,25 +7371,58 @@ async function handleCreateProductSubmit(e) {
           }
         }
       } catch (uploadErr) {
-        console.warn('Backend image upload fallback:', uploadErr);
+        console.warn('Backend image upload error:', uploadErr);
       }
     }
 
-    const priceRupees = parseFloat(document.getElementById('newProdPrice').value) || 0;
+    // If edit and no new photo uploaded, preserve existing images
+    if (isEdit && imageUrls.length === 0) {
+      const existingProd = (typeof allProductsList !== 'undefined' ? allProductsList : []).find(p => p.id === productId);
+      if (existingProd && existingProd.images && existingProd.images.length > 0) {
+        imageUrls = existingProd.images;
+      }
+    }
+
+    const priceRupees = parseFloat(document.getElementById('prodPriceInput').value) || 0;
+    const mrpRupees = parseFloat(document.getElementById('prodMrpInput').value) || undefined;
+    const brandVal = document.getElementById('prodBrandInput')?.value?.trim() || undefined;
+    const modelVal = document.getElementById('prodModelInput')?.value?.trim() || undefined;
+    const powerVal = document.getElementById('prodPowerInput')?.value?.trim() || undefined;
+    const stagesVal = document.getElementById('prodStagesInput')?.value?.trim() || undefined;
+    const warrantyVal = document.getElementById('prodWarrantyInput')?.value?.trim() || undefined;
+    const hubVal = document.getElementById('prodHubLocationInput')?.value?.trim() || 'Bangalore hub';
+
+    const specifications = {
+      brand: brandVal,
+      model: modelVal,
+      power_consumption: powerVal,
+      suitable_stages: stagesVal,
+      warranty: warrantyVal,
+      hub_location: hubVal,
+      mrp: mrpRupees
+    };
+    Object.keys(specifications).forEach(k => specifications[k] === undefined && delete specifications[k]);
+
     const payload = {
-      sku: document.getElementById('newProdSku').value.trim(),
-      name: document.getElementById('newProdName').value.trim(),
-      category: document.getElementById('newProdCategory').value.trim(),
+      sku: document.getElementById('prodSkuInput').value.trim(),
+      name: document.getElementById('prodNameInput').value.trim(),
+      category: document.getElementById('prodCategoryInput').value.trim(),
       price_minor_units: Math.round(priceRupees * 100),
-      stock_quantity: parseInt(document.getElementById('newProdStock').value, 10) || 0,
-      description: document.getElementById('newProdDesc').value.trim(),
+      stock_quantity: parseInt(document.getElementById('prodStockInput').value, 10) || 0,
+      short_description: document.getElementById('prodShortDescInput').value.trim(),
+      description: document.getElementById('prodDescInput').value.trim(),
+      compatibility: document.getElementById('prodCompatInput').value.trim(),
+      specifications: specifications,
       images: imageUrls,
       unit: 'unit',
       currency: 'INR'
     };
 
-    const res = await fetch(`${API_BASE_URL}/products`, {
-      method: 'POST',
+    const endpoint = isEdit ? `${API_BASE_URL}/products/${productId}` : `${API_BASE_URL}/products`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const res = await fetch(endpoint, {
+      method: method,
       headers: {
         'Authorization': `Bearer ${adminToken}`,
         'Content-Type': 'application/json'
@@ -7222,17 +7432,26 @@ async function handleCreateProductSubmit(e) {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to create product');
+      throw new Error(err.detail || `Failed to ${isEdit ? 'update' : 'create'} product`);
     }
 
-    showToast('Product SKU created successfully', 'success');
+    showToast(`Product SKU ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
     closeAppModal();
     loadProducts();
   } catch (err) {
     showToast(err.message, 'error');
-    if (btn) btn.disabled = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<i data-lucide="${productId ? 'save' : 'plus'}"></i> <span>${productId ? 'Save Changes' : 'Create Product SKU'}</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
   }
 }
+
+window.openCreateProductModal = openCreateProductModal;
+window.openEditProductModal = openEditProductModal;
+window.handleSaveProductSubmit = handleSaveProductSubmit;
+
 
 async function toggleProductArchive(productId) {
   try {
