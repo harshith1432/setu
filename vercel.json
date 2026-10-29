@@ -56,11 +56,19 @@
       "destination": "/admin.html"
     },
     {
+      "source": "/uploads/(.*)",
+      "destination": "https://setu-8vh9.onrender.com/uploads/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/$1"
     }
   ],
   "headers": [
+    {
+      "source": "/uploads/(.*)",
+      "destination": "https://setu-8vh9.onrender.com/uploads/$1"
+    },
     {
       "source": "/(.*)",
       "headers": [

@@ -119,7 +119,7 @@ class FirestoreService {
   /// Real-time stream of hardware store catalogue.
   Stream<List<Map<String, dynamic>>> streamProducts({String? category}) {
     if (!isAvailable) {
-      return Stream.value(ApiService.defaultCatalogProducts);
+      return Stream.value([]);
     }
 
     try {
@@ -129,9 +129,6 @@ class FirestoreService {
       }
 
       return q.snapshots().map((snapshot) {
-        if (snapshot.docs.isEmpty) {
-          return ApiService.defaultCatalogProducts;
-        }
         return snapshot.docs.map((doc) {
           final data = doc.data();
           data['id'] = doc.id;
@@ -139,34 +136,31 @@ class FirestoreService {
         }).toList();
       }).handleError((err) {
         debugPrint('streamProducts error: $err');
-        return ApiService.defaultCatalogProducts;
+        return <Map<String, dynamic>>[];
       });
     } catch (e) {
       debugPrint('streamProducts init error: $e');
-      return Stream.value(ApiService.defaultCatalogProducts);
+      return Stream.value([]);
     }
   }
 
   /// Synchronous/async list fetch with automatic offline cache.
   Future<List<Map<String, dynamic>>> getProducts({String? category}) async {
-    if (!isAvailable) return ApiService.defaultCatalogProducts;
+    if (!isAvailable) return [];
     try {
       Query<Map<String, dynamic>> q = firestore.collection('products');
       if (category != null && category.isNotEmpty && category != 'All') {
         q = q.where('category', isEqualTo: category);
       }
       final snapshot = await q.get(const GetOptions(source: Source.serverAndCache));
-      if (snapshot.docs.isEmpty) {
-        return ApiService.defaultCatalogProducts;
-      }
       return snapshot.docs.map((d) {
         final m = d.data();
         m['id'] = d.id;
         return m;
       }).toList();
     } catch (e) {
-      debugPrint('getProducts error, returning default catalog: $e');
-      return ApiService.defaultCatalogProducts;
+      debugPrint('getProducts error: $e');
+      return [];
     }
   }
 

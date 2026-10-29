@@ -317,6 +317,24 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
         existing = get_user_by_username_or_phone(clean_phone)
     if not existing and google_id:
         existing = get_user_by_username_or_phone(f"google_{google_id}")
+    if not existing and req.full_name and req.full_name.strip():
+        from app.services.db_service import get_db_cursor
+        with get_db_cursor(dict_cursor=True) as cursor:
+            try:
+                cursor.execute(
+                    """
+                    SELECT * FROM users 
+                    WHERE LOWER(TRIM(full_name)) = LOWER(TRIM(%s))
+                       OR LOWER(TRIM(username)) = LOWER(TRIM(%s))
+                    LIMIT 1
+                    """,
+                    (req.full_name.strip(), req.full_name.strip())
+                )
+                row = cursor.fetchone()
+                if row:
+                    existing = dict(row)
+            except Exception:
+                pass
 
     user_agent = request.headers.get("user-agent") if request else None
     ip_address = request.client.host if request and request.client else None
@@ -326,10 +344,16 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
     from app.services.db_service import create_user_session
 
     if existing:
+        # Normalize regular user role to farmer for smart sericulture access
+        existing_role = (existing.get("role") or "").lower()
+        if existing_role in ("user", "", "none"):
+            existing["role"] = "farmer"
+            update_user_profile(existing["id"], {"role": "farmer"})
+
         # SEC-03: Prevent Account Takeover (ATO).
         # Google Sign-In is exclusively reserved for farmers.
         # Staff and administrative accounts require direct password authentication.
-        if existing.get("role") != "farmer":
+        if existing.get("role") not in ("farmer", "user"):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Staff and administrative accounts require password authentication. Google Sign-In is strictly for farmers."

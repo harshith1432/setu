@@ -143,3 +143,6 @@ credentials/
 *client_secret*.json
 
 
+
+# Scratch temporary scripts
+scratch/

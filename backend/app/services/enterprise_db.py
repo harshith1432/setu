@@ -457,7 +457,11 @@ def _seed_enterprise_users(cursor, now_dt):
 
 
 def _seed_products_catalogue(cursor, now_dt):
-    """Seeds authentic sericulture IoT and climate control equipment with enterprise specifications."""
+    """Seeds authentic sericulture IoT and climate control equipment with enterprise specifications if table is empty."""
+    cursor.execute("SELECT COUNT(*) FROM products")
+    count_row = cursor.fetchone()
+    if count_row and count_row[0] > 0:
+        return
     import json
     products = [
         {

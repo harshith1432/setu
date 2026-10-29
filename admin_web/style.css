@@ -2668,7 +2668,8 @@ a {
   display: none;
 }
 
-.drawer-backdrop.active {
+.drawer-backdrop.active,
+.drawer-backdrop.open {
   display: block;
 }
 
@@ -3035,6 +3036,26 @@ a {
 /* ==========================================================================
    10b. THIRD-PARTY SERVICE & CLOUD INTEGRATIONS CARDS (Clean Minimalist)
    ========================================================================== */
+/* Integrations KPI Grid */
+.integrations-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 768px) {
+  .integrations-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .integrations-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .integrations-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

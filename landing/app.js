@@ -373,7 +373,7 @@ function filterAndRenderProducts() {
     // Support uploaded product photo if available
     const hasImage = p.images && Array.isArray(p.images) && p.images.length > 0 && p.images[0];
     const visualContent = hasImage
-      ? `<img src="${escapeHtml(p.images[0])}" alt="${escapeHtml(p.name)}" class="product-card-img" onerror="this.onerror=null;this.parentElement.classList.remove('has-image');this.parentElement.innerHTML='<i data-lucide=\'${iconName}\'></i>';if(window.lucide)lucide.createIcons();">`
+      ? `<img src="${escapeHtml(p.images[0])}" alt="${escapeHtml(p.name)}" class="product-card-img" onerror="handleLandingProductImgError(this, '${escapeHtml(iconName)}')">`
       : `<i data-lucide="${iconName}"></i>`;
 
     return `
@@ -561,12 +561,56 @@ async function fetchFaqs() {
 
 function sanitizeFaqHtml(raw) {
   if (!raw) return '';
-  // Whitelist safe semantic tags for formatted answers
-  return raw
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/javascript:[^"']*/gi, '');
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(raw, 'text/html');
+    const allowedTags = new Set(['P', 'UL', 'OL', 'LI', 'STRONG', 'EM', 'SPAN', 'DIV', 'BR', 'B', 'I']);
+
+    function cleanNode(node) {
+      const children = Array.from(node.childNodes);
+      for (const child of children) {
+        if (child.nodeType === Node.ELEMENT_NODE) {
+          const tag = child.tagName.toUpperCase();
+          if (!allowedTags.has(tag)) {
+            if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'INPUT', 'SVG', 'MATH'].includes(tag)) {
+              child.remove();
+              continue;
+            }
+            const textNode = document.createTextNode(child.textContent || '');
+            node.replaceChild(textNode, child);
+            continue;
+          }
+          for (const attr of Array.from(child.attributes)) {
+            if (attr.name.toLowerCase() === 'class') {
+              if (!/^[a-zA-Z0-9_\-\s]+$/.test(attr.value)) {
+                child.removeAttribute(attr.name);
+              }
+            } else {
+              child.removeAttribute(attr.name);
+            }
+          }
+          cleanNode(child);
+        }
+      }
+    }
+
+    cleanNode(doc.body);
+    return doc.body.innerHTML;
+  } catch (_) {
+    return escapeHtml(raw);
+  }
 }
+
+window.handleLandingProductImgError = function(img, iconName) {
+  if (!img) return;
+  img.onerror = null;
+  const parent = img.parentElement;
+  if (parent) {
+    parent.classList.remove('has-image');
+    parent.innerHTML = `<i data-lucide="${escapeHtml(iconName || 'box')}"></i>`;
+    if (window.lucide) lucide.createIcons();
+  }
+};
 
 function formatFaqAnswer(rawAnswer) {
   if (!rawAnswer) return '';

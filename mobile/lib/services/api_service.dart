@@ -7,10 +7,10 @@ class ApiService {
   // Candidate hosts tried in order for local development.
   // Use the settings modal to enter your computer's LAN IP when testing on a physical phone.
   static const List<String> defaultCandidates = [
-    'http://127.0.0.1:8000/api/v1',
-    'http://localhost:8000/api/v1',
     'https://setu-8vh9.onrender.com/api/v1',
     'http://10.0.2.2:8000/api/v1',
+    'http://127.0.0.1:8000/api/v1',
+    'http://localhost:8000/api/v1',
   ];
 
   String? _customHost;
@@ -490,13 +490,17 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getProducts({String? category}) async {
     for (final base in candidateUrls) {
+      final categoryParam = (category != null && category.isNotEmpty && category != 'All')
+          ? '?category=${Uri.encodeComponent(category)}'
+          : '';
+
       // 1. Try public products endpoint first
       try {
-        final pubUri = Uri.parse('$base/public/products');
-        final res = await http.get(pubUri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 4));
+        final pubUri = Uri.parse('$base/public/products$categoryParam');
+        final res = await http.get(pubUri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 5));
         if (res.statusCode == 200) {
           final decoded = jsonDecode(res.body);
-          if (decoded is List && decoded.isNotEmpty) {
+          if (decoded is List) {
             _workingBaseUrl = base;
             return List<Map<String, dynamic>>.from(decoded);
           }
@@ -505,11 +509,11 @@ class ApiService {
 
       // 2. Try authenticated /products
       try {
-        final uri = Uri.parse('$base/products');
-        final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+        final uri = Uri.parse('$base/products$categoryParam');
+        final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 5));
         if (res.statusCode == 200) {
           final decoded = jsonDecode(res.body);
-          if (decoded is List && decoded.isNotEmpty) {
+          if (decoded is List) {
             _workingBaseUrl = base;
             return List<Map<String, dynamic>>.from(decoded);
           }

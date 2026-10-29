@@ -408,12 +408,25 @@ async def upload_product_photo(
                 raise HTTPException(status_code=400, detail="Image file exceeds maximum 10MB limit.")
             buffer.write(chunk)
 
+    import base64
+    import mimetypes
+    mime_type, _ = mimetypes.guess_type(target_path)
+    if not mime_type:
+        mime_type = "image/jpeg"
+    try:
+        with open(target_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("ascii")
+        data_url = f"data:{mime_type};base64,{encoded}"
+    except Exception:
+        data_url = None
+
     public_url = f"/uploads/products/{unique_filename}"
     actor = user.get("sub", "admin")
     log_audit(actor, "PRODUCT_IMAGE_UPLOAD", f"Uploaded product photo: {unique_filename} ({bytes_read} bytes)")
     return {
         "success": True,
         "image_url": public_url,
+        "data_url": data_url,
         "filename": unique_filename,
         "size_bytes": bytes_read
     }
