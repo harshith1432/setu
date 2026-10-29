@@ -55,6 +55,8 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
+    official_email: Optional[str] = None
     preferred_language: Optional[str] = None
     farm_name: Optional[str] = None
     region: Optional[str] = None
@@ -91,6 +93,7 @@ class UserOut(BaseModel):
     created_at: Optional[datetime] = None
     current_stage: Optional[int] = 3
     official_email: Optional[str] = None
+    email: Optional[str] = None
     access_scope: Optional[str] = "GLOBAL"
 
     class Config:

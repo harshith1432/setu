@@ -3869,8 +3869,8 @@ async function openOnboardEmployeeModal() {
           </select>
         </div>
         <div class="form-group">
-          <label style="font-size: 0.8rem; font-weight: 700;">Authorized Shed IDs</label>
-          <input type="text" id="onboardSheds" placeholder="shed_01, shed_02" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <label style="font-size: 0.8rem; font-weight: 700;">Assigned Operating Area / City *</label>
+          <input type="text" id="onboardArea" required value="Bengaluru" placeholder="e.g. Bengaluru, Mysuru, Mandya" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
         </div>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -3916,8 +3916,7 @@ async function submitOnboardEmployee(e) {
   const reporting_manager_id = document.getElementById('onboardManager').value || null;
   const role_code = document.getElementById('onboardRole').value;
   const access_scope = document.getElementById('onboardScope').value;
-  const shedsRaw = document.getElementById('onboardSheds').value.trim();
-  const sheds = shedsRaw ? shedsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const assigned_area = document.getElementById('onboardArea')?.value.trim() || 'Bengaluru';
   const password = document.getElementById('onboardPassword')?.value.trim() || 'Welcome@123';
 
   try {
@@ -3937,7 +3936,8 @@ async function submitOnboardEmployee(e) {
         reporting_manager_id,
         role_code,
         access_scope,
-        assigned_resources: { sheds, devices: [] },
+        assigned_area,
+        assigned_resources: { devices: [] },
         password: password,
         initial_password: password
       })
@@ -4015,7 +4015,7 @@ async function openEditEmployeeModal(empId) {
   const deptOptions = depts.map(d => `<option value="${d.id}" ${emp.department_id === d.id ? 'selected' : ''}>${d.name} (${d.code})</option>`).join('');
   const mgrOptions = `<option value="">None (Top-Level Report)</option>` + potentialManagers.map(m => `<option value="${m.id}" ${emp.reporting_manager_id === m.id ? 'selected' : ''}>${m.full_name} (${m.designation})</option>`).join('');
 
-  const assignedSheds = emp.assigned_resources?.sheds ? emp.assigned_resources.sheds.join(', ') : '';
+  const assignedArea = emp.assigned_area || emp.region || 'Bengaluru';
 
   const body = `
     <form id="editEmpForm" onsubmit="submitEditEmployee(event, '${emp.id}')" style="display: flex; flex-direction: column; gap: 12px;">
@@ -4073,8 +4073,8 @@ async function openEditEmployeeModal(empId) {
           </select>
         </div>
         <div class="form-group">
-          <label style="font-size: 0.8rem; font-weight: 700;">Assigned Sheds (comma-separated)</label>
-          <input type="text" id="editSheds" value="${assignedSheds}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <label style="font-size: 0.8rem; font-weight: 700;">Assigned Operating Area / City *</label>
+          <input type="text" id="editArea" value="${escapeHtml(assignedArea)}" required placeholder="e.g. Bengaluru" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
         </div>
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
@@ -4095,8 +4095,7 @@ async function submitEditEmployee(e, empId) {
   const reporting_manager_id = document.getElementById('editManager').value || null;
   const role_code = document.getElementById('editRole').value;
   const access_scope = document.getElementById('editScope').value;
-  const shedsRaw = document.getElementById('editSheds').value.trim();
-  const sheds = shedsRaw ? shedsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const assigned_area = document.getElementById('editArea')?.value.trim() || 'Bengaluru';
 
   try {
     const res = await fetch(`${API_BASE_URL}/employees/${empId}`, {
@@ -4107,7 +4106,8 @@ async function submitEditEmployee(e, empId) {
       },
       body: JSON.stringify({
         full_name, phone, department_id, designation, reporting_manager_id, role_code, access_scope,
-        assigned_resources: { sheds, devices: [] }
+        assigned_area,
+        assigned_resources: { devices: [] }
       })
     });
     const data = await res.json();
@@ -6282,9 +6282,11 @@ function renderStoreProductGrid() {
 
           <!-- Action Buttons -->
           <div class="amazon-card-actions">
-            <button type="button" class="amazon-btn-buy" onclick="openFarmerOrderModal('${p.id}')" ${!inStock ? 'disabled' : ''} title="${inStock ? 'Order equipment for rearing shed' : 'Out of stock'}">
-              <i data-lucide="shopping-bag" style="width: 15px; height: 15px;"></i> Buy Now
-            </button>
+            ${isFarmer ? `
+              <button type="button" class="amazon-btn-buy" onclick="openFarmerOrderModal('${p.id}')" ${!inStock ? 'disabled' : ''} title="${inStock ? 'Order equipment for rearing shed' : 'Out of stock'}">
+                <i data-lucide="shopping-bag" style="width: 15px; height: 15px;"></i> Buy Now
+              </button>
+            ` : ''}
             <button type="button" class="amazon-btn-specs" onclick="openProductSpecsModal('${p.id}')" title="Technical Specifications">
               <i data-lucide="info" style="width: 14px; height: 14px;"></i> Specs
             </button>
@@ -6394,9 +6396,11 @@ function renderProductsTable(filtered) {
             <button type="button" class="btn btn-outline btn-sm" onclick="openProductSpecsModal('${p.id}')" title="Technical Specifications" style="padding: 4px 8px; font-size: 0.75rem; font-weight: 600; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
               <i data-lucide="info" style="width: 13px; height: 13px;"></i> Specs
             </button>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openFarmerOrderModal('${p.id}')" title="Order equipment for rearing shed" style="padding: 4px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #FFD814; border: 1px solid #FCD200; color: #0F1111; white-space: nowrap;">
-              <i data-lucide="shopping-bag" style="width: 13px; height: 13px;"></i> Buy Now
-            </button>
+            ${isFarmer ? `
+              <button type="button" class="btn btn-primary btn-sm" onclick="openFarmerOrderModal('${p.id}')" title="Order equipment for rearing shed" style="padding: 4px 12px; font-size: 0.78rem; font-weight: 700; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; background: #FFD814; border: 1px solid #FCD200; color: #0F1111; white-space: nowrap;">
+                <i data-lucide="shopping-bag" style="width: 13px; height: 13px;"></i> Buy Now
+              </button>
+            ` : ''}
             ${!isFarmer ? `
               <div class="row-action-dropdown">
                 <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'prod-${p.id}')" title="Admin Actions" aria-label="Product Actions">
@@ -6735,9 +6739,11 @@ function openProductSpecsModal(productId) {
 
       <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 14px;">
         <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="closeAppModal(); openFarmerOrderModal('${p.id}');" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 6px 18px;">
-          <i data-lucide="shopping-bag"></i> Buy Now
-        </button>
+        ${(currentUser && currentUser.role === 'farmer') ? `
+          <button type="button" class="btn btn-primary btn-sm" onclick="closeAppModal(); openFarmerOrderModal('${p.id}');" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 6px 18px; background: #FFD814; border: 1px solid #FCD200; color: #0F1111;">
+            <i data-lucide="shopping-bag"></i> Buy Now
+          </button>
+        ` : ''}
       </div>
     </div>
   `;
@@ -7472,6 +7478,20 @@ async function openInstallationJobDetails(jobId) {
 
   const modalHtml = `
     <div style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Smart Dispatch Route & Workload Information -->
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--brand-tint); display: flex; align-items: center; justify-content: center; color: var(--brand-primary); flex-shrink: 0;">
+            <i data-lucide="navigation" style="width: 16px; height: 16px;"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--text-main);">Territory Dispatch &amp; Workload Balancing</div>
+            <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(job.assigned_reason || ('Dispatched based on area proximity (' + (job.area || 'Bengaluru') + ') and technician workload'))}</div>
+          </div>
+        </div>
+        <span class="badge badge-success" style="font-size: 0.72rem;"><i data-lucide="map-pin" style="width: 12px; height: 12px; margin-right: 3px;"></i>${escapeHtml(job.area || 'Bengaluru')} Territory</span>
+      </div>
+
       <!-- Top Overview Banner -->
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 18px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
         <div>
@@ -7571,6 +7591,25 @@ async function openInstallationJobDetails(jobId) {
         </div>
       </div>
 
+      ${job.completion_photo_url ? `
+      <!-- Certified Work Proof Photo Card -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="camera" style="width: 16px; height: 16px; color: var(--status-success);"></i>
+            <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; color: var(--text-main);">Certified Installation Photo Proof</h4>
+          </div>
+          <span class="badge badge-success"><i data-lucide="shield-check" style="width: 12px; height: 12px; margin-right: 3px;"></i>Verified Physical Work</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--bg-hover); padding: 12px; border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">
+          <img src="${escapeHtml(job.completion_photo_url)}" alt="Work Completion Proof" style="max-height: 240px; max-width: 100%; border-radius: var(--radius-sm); object-fit: contain; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.15);" onclick="window.open('${escapeHtml(job.completion_photo_url)}', '_blank')">
+          <span style="font-size: 0.74rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="zoom-in" style="width: 12px; height: 12px;"></i> Click photo to open high-resolution verified proof in new tab
+          </span>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- Installation & Commissioning Checklist -->
       <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
@@ -7614,7 +7653,154 @@ async function openInstallationJobDetails(jobId) {
   if (window.lucide) lucide.createIcons();
 }
 
+let currentSelectedJobPhotoDataUrl = null;
+
+function openCompleteJobModal(jobId) {
+  const job = allInstallationsCache.find(j => j.id === jobId || j.job_number === jobId);
+  const jobNumber = job ? job.job_number : jobId;
+  const techName = job ? (job.technician_name || 'Field Technician') : 'Technician';
+  const shedId = job ? job.shed_id : 'Shed';
+  const areaName = job ? (job.area || 'Bengaluru') : 'Bengaluru';
+  currentSelectedJobPhotoDataUrl = null;
+
+  const modalHtml = `
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="padding: 12px 16px; background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: var(--font-mono); font-weight: 800; font-size: 1.05rem; color: var(--brand-primary);">${escapeHtml(jobNumber)}</span>
+          <span class="badge badge-info"><i data-lucide="home" style="width: 12px; height: 12px; margin-right: 3px;"></i>${escapeHtml(shedId)}</span>
+        </div>
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; display: flex; justify-content: space-between;">
+          <span>Assigned Lead: <strong>${escapeHtml(techName)}</strong></span>
+          <span>Operating Area: <strong>${escapeHtml(areaName)}</strong></span>
+        </div>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 0.8rem; color: var(--text-main); display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="camera" style="width: 20px; height: 20px; color: var(--status-success); flex-shrink: 0;"></i>
+        <span><strong>Mandatory Work Proof Required:</strong> Upload or capture a clear photo of the completed shed installation before marking this job as completed.</span>
+      </div>
+
+      <form id="completeJobForm" onsubmit="submitCompleteJob(event, '${escapeHtml(jobId)}')" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.82rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            Installation Proof Photo * <span style="font-weight: 700; color: var(--rose);">(Mandatory)</span>
+          </label>
+          <div style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 22px; text-align: center; background: var(--bg-surface); cursor: pointer; position: relative;" onclick="document.getElementById('jobProofPhotoInput').click()">
+            <input type="file" id="jobProofPhotoInput" accept="image/*" capture="environment" style="display: none;" onchange="handleJobPhotoSelected(event)">
+            <div id="jobPhotoPrompt" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+              <div style="width: 46px; height: 46px; border-radius: 50%; background: var(--brand-tint); display: flex; align-items: center; justify-content: center; color: var(--brand-primary);">
+                <i data-lucide="upload-cloud" style="width: 24px; height: 24px;"></i>
+              </div>
+              <div>
+                <span style="font-size: 0.86rem; font-weight: 700; color: var(--text-main);">Click to capture or upload photo proof</span>
+                <span style="font-size: 0.74rem; color: var(--text-muted); display: block; margin-top: 2px;">Supports camera snap or gallery upload (JPEG, PNG, WebP)</span>
+              </div>
+            </div>
+            <div id="jobPhotoPreviewContainer" style="display: none; flex-direction: column; align-items: center; gap: 8px;">
+              <img id="jobPhotoPreview" src="" alt="Proof Preview" style="max-height: 220px; max-width: 100%; border-radius: var(--radius-sm); object-fit: contain; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+              <span id="jobPhotoMeta" style="font-size: 0.74rem; color: var(--text-muted);"></span>
+              <button type="button" class="btn btn-outline btn-xs" onclick="event.stopPropagation(); document.getElementById('jobProofPhotoInput').click();">
+                <i data-lucide="refresh-cw" style="width: 12px; height: 12px; margin-right: 4px;"></i> Retake / Change Photo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 700;">Technician Completion Remarks</label>
+          <textarea id="jobCompleteRemarks" rows="2" placeholder="e.g. Sensors mounted, gateway synchronized, telemetry stream active and verified with farmer." style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-size: 0.82rem;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px;">
+          <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
+          <button type="submit" id="btnSubmitCompleteJob" class="btn btn-primary btn-sm" disabled>
+            <i data-lucide="check-circle-2"></i> Verify &amp; Complete Job
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  openAppModal('Certify & Complete Installation Job', modalHtml);
+  if (window.lucide) lucide.createIcons();
+}
+
+function handleJobPhotoSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    currentSelectedJobPhotoDataUrl = e.target.result;
+    const preview = document.getElementById('jobPhotoPreview');
+    const container = document.getElementById('jobPhotoPreviewContainer');
+    const prompt = document.getElementById('jobPhotoPrompt');
+    const meta = document.getElementById('jobPhotoMeta');
+    const btnSubmit = document.getElementById('btnSubmitCompleteJob');
+
+    if (preview && container && prompt) {
+      preview.src = currentSelectedJobPhotoDataUrl;
+      prompt.style.display = 'none';
+      container.style.display = 'flex';
+      if (meta) meta.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      if (btnSubmit) btnSubmit.removeAttribute('disabled');
+      if (window.lucide) lucide.createIcons();
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function submitCompleteJob(event, jobId) {
+  event.preventDefault();
+  if (!currentSelectedJobPhotoDataUrl) {
+    showToast('Mandatory photo proof of completed work is required.', 'error');
+    return;
+  }
+
+  const remarks = document.getElementById('jobCompleteRemarks')?.value.trim() || 'Hardware installation completed and verified with photographic proof';
+  const btnSubmit = document.getElementById('btnSubmitCompleteJob');
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<span>Verifying & Submitting...</span>';
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/installations/${jobId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        status: 'COMPLETED',
+        remarks: remarks,
+        completion_photo_url: currentSelectedJobPhotoDataUrl
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Failed to certify installation job');
+
+    showToast('Installation job certified and completed with photo proof!', 'success');
+    currentSelectedJobPhotoDataUrl = null;
+    closeAppModal();
+    loadInstallations();
+  } catch (err) {
+    showToast(err.message, 'error');
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i data-lucide="check-circle-2"></i> Verify & Complete Job';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
 async function advanceJobStatus(jobId, newStatus) {
+  if (newStatus === 'COMPLETED') {
+    openCompleteJobModal(jobId);
+    return;
+  }
+
   try {
     const res = await fetch(`${API_BASE_URL}/installations/${jobId}`, {
       method: 'PATCH',
@@ -7628,7 +7814,7 @@ async function advanceJobStatus(jobId, newStatus) {
       })
     });
     if (!res.ok) throw new Error('Failed to update installation job status');
-    showToast(`Installation job ${newStatus === 'COMPLETED' ? 'completed and verified!' : 'marked in progress.'}`, 'success');
+    showToast(`Installation job marked ${newStatus.toLowerCase()}.`, 'success');
     closeAppModal();
     loadInstallations();
   } catch (err) {
@@ -7717,6 +7903,9 @@ function openTicketDetailsModal(ticketId) {
 window.openInstallationJobDetails = openInstallationJobDetails;
 window.openInstallationWorkflowDrawer = openInstallationJobDetails;
 window.advanceJobStatus = advanceJobStatus;
+window.openCompleteJobModal = openCompleteJobModal;
+window.handleJobPhotoSelected = handleJobPhotoSelected;
+window.submitCompleteJob = submitCompleteJob;
 window.updateJobChecklist = updateJobChecklist;
 window.openTicketDetailsModal = openTicketDetailsModal;
 
@@ -7738,8 +7927,8 @@ async function loadInstallTeam() {
         <td style="font-weight: 700;">${escapeHtml(m.full_name)}</td>
         <td style="font-family: var(--font-mono);">${escapeHtml(m.username)}</td>
         <td>${escapeHtml(m.phone || '--')}</td>
-        <td>${escapeHtml(m.region || 'Karnataka Hub')}</td>
-        <td><span class="badge badge-info">${m.active_jobs || 1} Jobs</span></td>
+        <td><span class="badge" style="background: var(--bg-subtle);"><i data-lucide="map-pin" style="width: 12px; height: 12px; margin-right: 3px;"></i>${escapeHtml(m.assigned_area || m.region || 'Bengaluru')}</span></td>
+        <td><span class="badge ${(m.active_jobs_count !== undefined ? m.active_jobs_count : (m.active_jobs || 0)) === 0 ? 'badge-success' : 'badge-warning'}">${m.active_jobs_count !== undefined ? m.active_jobs_count : (m.active_jobs || 0)} Active Workload</span></td>
       </tr>
     `).join('');
 
