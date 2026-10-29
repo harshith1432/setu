@@ -295,10 +295,10 @@ def google_oauth_login(request: Request, redirect_url: str = None):
     return RedirectResponse(url=oauth_url)
 
 @router.post("/google-sync", response_model=Token)
-def google_sync(req: GoogleAuthRequest):
+def google_sync(req: GoogleAuthRequest, request: Request = None):
     """
     Seamless Google OAuth Synchronization:
-    - Existing Users: Automatically matches by email, phone, or Google ID.
+    - Existing Users: Automatically matches by email, username, phone, or Google ID.
       Preserves all existing profiles, sheds, batches, orders, and roles.
     - New Users: Automatically and strictly enrolled as a 'farmer' (smart sericulture grower).
     """
@@ -309,10 +309,19 @@ def google_sync(req: GoogleAuthRequest):
     existing = None
     if clean_email:
         existing = get_user_by_username_or_phone(clean_email)
+        if not existing and "@" in clean_email:
+            existing = get_user_by_username_or_phone(clean_email.split("@")[0])
     if not existing and clean_phone:
         existing = get_user_by_username_or_phone(clean_phone)
     if not existing and google_id:
         existing = get_user_by_username_or_phone(f"google_{google_id}")
+
+    user_agent = request.headers.get("user-agent") if request else None
+    ip_address = request.client.host if request and request.client else None
+    expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expires_at = datetime.now(timezone.utc) + expires_delta
+
+    from app.services.db_service import create_user_session
 
     if existing:
         # SEC-03: Prevent Account Takeover (ATO).
@@ -345,21 +354,33 @@ def google_sync(req: GoogleAuthRequest):
             if updated_user:
                 existing = updated_user
 
-        user_role = existing.get("role", "farmer")
-        access_token = create_access_token(
-            data={"sub": existing["username"], "user_id": existing["id"], "role": user_role}
+        session_id = f"sess_{uuid.uuid4().hex}"
+        create_user_session(
+            session_id=session_id,
+            user_id=existing["id"],
+            username=existing["username"],
+            role="farmer",
+            organization_id=existing.get("organization_id", "default_org"),
+            expires_at=expires_at,
+            user_agent=user_agent,
+            ip_address=ip_address
         )
-        log_audit(existing["username"], "GOOGLE_LOGIN", f"Google user logged in: {existing.get('full_name')} ({existing.get('username')})")
+
+        access_token = create_access_token(
+            data={"sub": existing["username"], "user_id": existing["id"], "role": "farmer", "session_id": session_id},
+            expires_delta=expires_delta
+        )
+        log_audit(existing["username"], "GOOGLE_LOGIN", f"Google farmer logged in: {existing.get('full_name')} ({existing.get('username')})")
 
         user_out = UserOut(
             id=existing["id"],
             username=existing["username"],
-            full_name=existing.get("full_name", "Setu User"),
+            full_name=existing.get("full_name", "Setu Farmer"),
             phone=existing.get("phone", "N/A"),
             whatsapp_number=existing.get("whatsapp_number"),
             whatsapp_verified=bool(existing.get("whatsapp_verified", False)),
             preferred_language=existing.get("preferred_language", "en"),
-            role=user_role,
+            role="farmer",
             farm_name=existing.get("farm_name", "My Sericulture Farm"),
             region=existing.get("region", "Local Rearing Shed"),
             shed_id=existing.get("shed_id", "shed_01"),
@@ -371,7 +392,76 @@ def google_sync(req: GoogleAuthRequest):
             official_email=existing.get("official_email") or clean_email,
             is_active=bool(existing.get("is_active", 1))
         )
-        return Token(access_token=access_token, user=user_out)
+        return Token(access_token=access_token, session_id=session_id, user=user_out)
+
+    # Otherwise, brand new user registering with Google: strictly enrolled as a FARMER!
+    from app.services.db_service import get_next_available_shed_id
+    assigned_shed = req.shed_id or get_next_available_shed_id()
+    user_id = f"usr_{uuid.uuid4().hex[:8]}"
+    username = clean_email or clean_phone or f"farmer_{uuid.uuid4().hex[:6]}"
+
+    new_user_data = {
+        "id": user_id,
+        "username": username,
+        "hashed_password": "oauth_google_" + uuid.uuid4().hex,
+        "full_name": req.full_name.strip() if req.full_name else "Google Farmer",
+        "phone": clean_phone or "N/A",
+        "official_email": clean_email,
+        "whatsapp_number": clean_phone,
+        "whatsapp_verified": True if clean_phone else False,
+        "preferred_language": req.preferred_language or "en",
+        "role": "farmer",  # Guaranteed farmer for all new Google registrations!
+        "farm_name": req.farm_name.strip() if req.farm_name else "My Sericulture Farm",
+        "region": req.region.strip() if req.region else "Karnataka Silk Belt",
+        "shed_id": assigned_shed,
+        "latitude": req.latitude,
+        "longitude": req.longitude,
+        "batch_id": req.batch_id.strip() if req.batch_id else "SERI-2026-B01",
+        "dfl_capacity": req.dfl_capacity.strip() if req.dfl_capacity else "200 DFL",
+        "breed": req.breed.strip() if req.breed else "Double Hybrid (FC1 x FC2)",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    create_user(new_user_data)
+
+    session_id = f"sess_{uuid.uuid4().hex}"
+    create_user_session(
+        session_id=session_id,
+        user_id=user_id,
+        username=new_user_data["username"],
+        role="farmer",
+        organization_id="default_org",
+        expires_at=expires_at,
+        user_agent=user_agent,
+        ip_address=ip_address
+    )
+
+    access_token = create_access_token(
+        data={"sub": new_user_data["username"], "user_id": user_id, "role": "farmer", "session_id": session_id},
+        expires_delta=expires_delta
+    )
+    log_audit(new_user_data["username"], "GOOGLE_ENROLL", f"New Google farmer enrolled: {new_user_data['full_name']} ({username})")
+
+    user_out = UserOut(
+        id=user_id,
+        username=new_user_data["username"],
+        full_name=new_user_data["full_name"],
+        phone=new_user_data["phone"],
+        whatsapp_number=new_user_data.get("whatsapp_number"),
+        whatsapp_verified=bool(new_user_data.get("whatsapp_verified", False)),
+        preferred_language=new_user_data["preferred_language"],
+        role="farmer",
+        farm_name=new_user_data["farm_name"],
+        region=new_user_data["region"],
+        shed_id=assigned_shed,
+        latitude=new_user_data.get("latitude"),
+        longitude=new_user_data.get("longitude"),
+        batch_id=new_user_data["batch_id"],
+        dfl_capacity=new_user_data["dfl_capacity"],
+        breed=new_user_data["breed"],
+        official_email=clean_email,
+        is_active=True
+    )
+    return Token(access_token=access_token, session_id=session_id, user=user_out)
 
     # Otherwise, brand new user registering with Google: strictly enrolled as a FARMER!
     from app.services.db_service import get_next_available_shed_id

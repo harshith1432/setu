@@ -227,6 +227,15 @@ function updateTopBarControlsVisibility() {
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.lucide) lucide.createIcons();
+
+  // SEC-AUTH: If returning from Google OAuth redirect, capture and complete authentication immediately
+  const oauthHash = window.location.hash;
+  if (oauthHash && (oauthHash.includes('access_token=') || oauthHash.includes('id_token='))) {
+    const gateway = document.getElementById('loadingGateway');
+    if (gateway) gateway.classList.remove('hidden');
+    checkGoogleOAuthCallback();
+    return;
+  }
   if (typeof setupFirebaseAuthListeners === 'function') { setupFirebaseAuthListeners(); }
 
   // Check for onboarding invitation token in URL hash or search params
@@ -550,12 +559,15 @@ async function completeGoogleLogin(googleUserData) {
     currentSessionId = data.session_id || null;
     currentUser = data.user;
 
-    // Persist strictly to this tab's sessionStorage
+    // Persist to tab sessionStorage AND localStorage fallback
     TAB_STORAGE.setItem('setu_tab_token', adminToken);
     if (currentSessionId) TAB_STORAGE.setItem('setu_tab_session_id', currentSessionId);
     TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+    localStorage.setItem('setu_token', adminToken);
+    localStorage.setItem('setu_user', JSON.stringify(currentUser));
+    if (currentSessionId) localStorage.setItem('setu_session_id', currentSessionId);
 
-    const defTab = (ROLE_DEFAULT_TABS && ROLE_DEFAULT_TABS[currentUser.role]) || 'overview';
+    const defTab = (ROLE_DEFAULT_TABS && ROLE_DEFAULT_TABS[currentUser.role]) || 'live-monitoring';
     currentTab = defTab;
     TAB_STORAGE.setItem('setu_tab_nav', currentTab);
     if (currentUser.shed_id) {
@@ -566,8 +578,11 @@ async function completeGoogleLogin(googleUserData) {
     closeAppModal();
     showToast(`Signed in with Google as ${currentUser.full_name || currentUser.username}!`, 'success');
     showDashboardView();
+    if (typeof switchNavTab === 'function') {
+      try { switchNavTab(defTab); } catch (_) {}
+    }
     if (window.location.pathname.startsWith('/login')) {
-      window.location.href = '/admin';
+      window.location.href = '/admin/';
       return;
     }
   } catch (err) {
@@ -657,7 +672,7 @@ function initGoogleAuth() {
 
 function redirectToGoogleOAuth() {
   const currentOrigin = window.location.origin;
-  const redirectUri = `${currentOrigin}${window.location.pathname.startsWith('/login') ? '/login' : '/admin/'}`;
+  const redirectUri = `${currentOrigin}/admin/`;
   const state = encodeURIComponent(JSON.stringify({ returnTo: window.location.pathname }));
   const scope = encodeURIComponent('openid email profile');
   const nonce = Math.random().toString(36).substring(2);
@@ -776,56 +791,7 @@ async function handleGoogleSignIn() {
 
   const safetyTimeout = setTimeout(resetButton, 8000);
 
-  // 1. Firebase Authentication with Google Provider
-  // Try popup first (immune to third-party cookie restrictions, exactly like localhost)
-  if (typeof firebase !== 'undefined' && firebase.auth) {
-    try {
-      const provider = new firebase.auth.GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      provider.setCustomParameters({ prompt: 'select_account' });
-
-      try {
-        const result = await firebase.auth().signInWithPopup(provider);
-        clearTimeout(safetyTimeout);
-        if (result && result.user) {
-          const u = result.user;
-          await completeGoogleLogin({
-            email: u.email || '',
-            full_name: u.displayName || 'Google User',
-            google_id: u.uid
-          });
-          return;
-        }
-      } catch (popupErr) {
-        console.warn('Firebase popup attempt notice:', popupErr);
-        if (popupErr.code === 'auth/unauthorized-domain') {
-          clearTimeout(safetyTimeout);
-          resetButton();
-          if (errorEl) {
-            errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
-            errorEl.classList.remove('hidden');
-            if (window.lucide) lucide.createIcons();
-          }
-          showToast('Please add ' + window.location.hostname + ' to Firebase Authorized Domains', 'error');
-          return;
-        } else if (popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
-          clearTimeout(safetyTimeout);
-          resetButton();
-          return;
-        } else if (popupErr.code === 'auth/popup-blocked') {
-          // If browser popup blocker intervened, fall back to first-party proxy redirect
-          if (googleBtn) googleBtn.innerHTML = '<span>Redirecting to Google...</span>';
-          await firebase.auth().signInWithRedirect(provider);
-          return;
-        }
-      }
-    } catch (fbErr) {
-      console.warn('Firebase Google Sign-In notice:', fbErr);
-    }
-  }
-
-  // 2. Google Identity Services (GIS) Token Client Popup (Desktop fallback)
+  // 1. Google Identity Services (GIS) Token Client (Fastest, native Google flow)
   if (window.google && window.google.accounts && window.google.accounts.oauth2 && GOOGLE_CLIENT_ID) {
     try {
       if (!googleTokenClient) {
@@ -837,8 +803,8 @@ async function handleGoogleSignIn() {
             console.warn('GIS Error Callback:', err);
             clearTimeout(safetyTimeout);
             resetButton();
-            if (err && err.type === 'origin_mismatch') {
-              showToast('Domain origin not authorized in Google Cloud Console', 'error');
+            if (err && (err.type === 'popup_failed_to_open' || err.type === 'popup_closed')) {
+              redirectToGoogleOAuth();
             }
           },
           callback: async (tokenResponse) => {
@@ -871,13 +837,50 @@ async function handleGoogleSignIn() {
       googleTokenClient.requestAccessToken({ prompt: 'select_account' });
       return;
     } catch (e) {
-      console.warn('GIS Token Client notice, redirecting:', e);
+      console.warn('GIS Token Client notice, trying fallback:', e);
+    }
+  }
+
+  // 2. Firebase Authentication with Google Provider (Desktop Popup)
+  if (typeof firebase !== 'undefined' && firebase.auth) {
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      provider.setCustomParameters({ prompt: 'select_account' });
+
+      try {
+        const result = await firebase.auth().signInWithPopup(provider);
+        clearTimeout(safetyTimeout);
+        if (result && result.user) {
+          const u = result.user;
+          await completeGoogleLogin({
+            email: u.email || '',
+            full_name: u.displayName || 'Google User',
+            google_id: u.uid
+          });
+          return;
+        }
+      } catch (popupErr) {
+        console.warn('Firebase popup notice:', popupErr);
+        if (popupErr.code === 'auth/popup-closed-by-user' || popupErr.code === 'auth/cancelled-popup-request') {
+          clearTimeout(safetyTimeout);
+          resetButton();
+          return;
+        }
+        // If popup blocked or failed, fall back to direct Google OAuth redirect
+        redirectToGoogleOAuth();
+        return;
+      }
+    } catch (fbErr) {
+      console.warn('Firebase notice:', fbErr);
     }
   }
 
   // 3. Direct browser redirection fallback
   redirectToGoogleOAuth();
 }
+
 function checkGoogleOAuthCallback() {
   const hash = window.location.hash;
   if (!hash || (!hash.includes('access_token=') && !hash.includes('id_token='))) return;
