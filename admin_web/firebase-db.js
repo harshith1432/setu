@@ -7,10 +7,9 @@
 (function() {
   'use strict';
 
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const firebaseConfig = {
     apiKey: "AIzaSyB4gmvhHcOaPJ3WjpVXi6S26OS0vFm-zDQ",
-    authDomain: isLocal ? "setu-a767c.firebaseapp.com" : window.location.host,
+    authDomain: "setu-a767c.firebaseapp.com",
     projectId: "setu-a767c",
     storageBucket: "setu-a767c.firebasestorage.app",
     messagingSenderId: "97434241991",
