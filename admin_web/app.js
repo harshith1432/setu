@@ -566,8 +566,9 @@ async function completeGoogleLogin(googleUserData) {
     closeAppModal();
     showToast(`Signed in with Google as ${currentUser.full_name || currentUser.username}!`, 'success');
     showDashboardView();
-    if (window.location.pathname.startsWith('/login') && window.history && window.history.replaceState) {
-      window.history.replaceState({}, document.title, '/admin');
+    if (window.location.pathname.startsWith('/login')) {
+      window.location.href = '/admin';
+      return;
     }
   } catch (err) {
     if (errorEl) {
@@ -755,7 +756,7 @@ async function handleGoogleSignIn() {
   const originalHtml = googleBtn ? googleBtn.innerHTML : '';
   if (googleBtn) {
     googleBtn.disabled = true;
-    googleBtn.innerHTML = '<span>Opening Google Sign-In...</span>';
+    googleBtn.innerHTML = '<span>Connecting to Google...</span>';
   }
 
   const resetButton = () => {
@@ -773,12 +774,10 @@ async function handleGoogleSignIn() {
     }
   };
 
-  // Safety timer: always reset button after 8 seconds if nothing completed
   const safetyTimeout = setTimeout(resetButton, 8000);
 
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
-
   // 1. Firebase Authentication with Google Provider
+  // Try popup first (immune to third-party cookie restrictions, exactly like localhost)
   if (typeof firebase !== 'undefined' && firebase.auth) {
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
@@ -786,14 +785,6 @@ async function handleGoogleSignIn() {
       provider.addScope('profile');
       provider.setCustomParameters({ prompt: 'select_account' });
 
-      // On mobile devices, browsers strictly block popups: use signInWithRedirect directly
-      if (isMobile) {
-        if (googleBtn) googleBtn.innerHTML = '<span>Redirecting to Google...</span>';
-        await firebase.auth().signInWithRedirect(provider);
-        return;
-      }
-
-      // On desktop, attempt popup
       try {
         const result = await firebase.auth().signInWithPopup(provider);
         clearTimeout(safetyTimeout);
@@ -807,7 +798,7 @@ async function handleGoogleSignIn() {
           return;
         }
       } catch (popupErr) {
-        console.warn('Firebase popup notice:', popupErr);
+        console.warn('Firebase popup attempt notice:', popupErr);
         if (popupErr.code === 'auth/unauthorized-domain') {
           clearTimeout(safetyTimeout);
           resetButton();
@@ -823,7 +814,7 @@ async function handleGoogleSignIn() {
           resetButton();
           return;
         } else if (popupErr.code === 'auth/popup-blocked') {
-          // If browser popup blocker intervened on desktop, automatically fall back to redirect
+          // If browser popup blocker intervened, fall back to first-party proxy redirect
           if (googleBtn) googleBtn.innerHTML = '<span>Redirecting to Google...</span>';
           await firebase.auth().signInWithRedirect(provider);
           return;
@@ -831,22 +822,11 @@ async function handleGoogleSignIn() {
       }
     } catch (fbErr) {
       console.warn('Firebase Google Sign-In notice:', fbErr);
-      if (fbErr.code === 'auth/unauthorized-domain') {
-        clearTimeout(safetyTimeout);
-        resetButton();
-        if (errorEl) {
-          errorEl.innerHTML = '<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>Domain <strong>' + escapeHtml(window.location.hostname) + '</strong> is not authorized in Firebase Console.<br/>Add it under: <em>Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</em></span>';
-          errorEl.classList.remove('hidden');
-          if (window.lucide) lucide.createIcons();
-        }
-        showToast('Please add ' + window.location.hostname + ' to Firebase Authorized Domains', 'error');
-        return;
-      }
     }
   }
 
   // 2. Google Identity Services (GIS) Token Client Popup (Desktop fallback)
-  if (!isMobile && window.google && window.google.accounts && window.google.accounts.oauth2 && GOOGLE_CLIENT_ID) {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2 && GOOGLE_CLIENT_ID) {
     try {
       if (!googleTokenClient) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
