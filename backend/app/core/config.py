@@ -44,13 +44,23 @@ class Settings(BaseModel):
         ).split(",")
         if origin.strip()
     ]
-    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "")
+    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "setu-a767c")
     FIREBASE_CLIENT_EMAIL: str = os.getenv("FIREBASE_CLIENT_EMAIL", "")
     FIREBASE_CLIENT_ID: str = os.getenv("FIREBASE_CLIENT_ID", "")
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
     FIREBASE_SERVICE_ACCOUNT_JSON: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID") or "756971197809-hfqm5rqdk06j19oijgn38d1qtdo2mtb6.apps.googleusercontent.com"
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
+    # SMTP / Email Service Configuration (Forgot Password & System Alerts)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER") or os.getenv("EMAIL_HOST_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD") or os.getenv("EMAIL_HOST_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL") or os.getenv("EMAIL_FROM") or os.getenv("SMTP_USER", "noreply@setu.ag")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "Setu Platform")
+    SMTP_TLS: bool = os.getenv("SMTP_TLS", "true").lower() in ("true", "1", "yes")
+    SMTP_SSL: bool = os.getenv("SMTP_SSL", "false").lower() in ("true", "1", "yes")
 
     # Twilio / WhatsApp notifications
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID") or os.getenv("TWILIO_ACCOUNT_SSID", "")

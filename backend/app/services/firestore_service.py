@@ -285,6 +285,195 @@ class FirestoreService:
             logger.debug("Failed to record device command in Firestore: %s", e)
             return None
 
+    # =========================================================================
+    # 5. USER & AUTHENTICATION MANAGEMENT
+    # =========================================================================
+
+    def get_user_by_username_or_phone(self, identifier: str) -> Optional[Dict[str, Any]]:
+        """Finds user by username, email, or phone number in Firestore."""
+        if not self.is_available:
+            return None
+        clean_id = (identifier or "").strip()
+        if not clean_id:
+            return None
+        try:
+            users_ref = self._db.collection("users")
+            # 1. By exact username
+            docs = list(users_ref.where("username", "==", clean_id).limit(1).stream())
+            if docs:
+                return {"id": docs[0].id, **docs[0].to_dict()}
+
+            # 2. Lowercase username
+            if clean_id.lower() != clean_id:
+                docs = list(users_ref.where("username", "==", clean_id.lower()).limit(1).stream())
+                if docs:
+                    return {"id": docs[0].id, **docs[0].to_dict()}
+
+            # 3. By official_email
+            docs = list(users_ref.where("official_email", "==", clean_id).limit(1).stream())
+            if docs:
+                return {"id": docs[0].id, **docs[0].to_dict()}
+            if clean_id.lower() != clean_id:
+                docs = list(users_ref.where("official_email", "==", clean_id.lower()).limit(1).stream())
+                if docs:
+                    return {"id": docs[0].id, **docs[0].to_dict()}
+
+            # 4. By phone
+            docs = list(users_ref.where("phone", "==", clean_id).limit(1).stream())
+            if docs:
+                return {"id": docs[0].id, **docs[0].to_dict()}
+
+            # 5. By clean phone digits
+            digits = "".join(ch for ch in clean_id if ch.isdigit())
+            if len(digits) >= 10:
+                for candidate in [digits, f"+91{digits[-10:]}", f"+91 {digits[-10:]}"]:
+                    docs = list(users_ref.where("phone", "==", candidate).limit(1).stream())
+                    if docs:
+                        return {"id": docs[0].id, **docs[0].to_dict()}
+
+            return None
+        except Exception as e:
+            logger.debug("Firestore get_user_by_username_or_phone notice: %s", e)
+            return None
+
+    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves user by ID from Firestore."""
+        if not self.is_available or not user_id:
+            return None
+        try:
+            doc = self._db.collection("users").document(user_id).get()
+            if doc.exists:
+                return {"id": doc.id, **doc.to_dict()}
+            docs = list(self._db.collection("users").where("id", "==", user_id).limit(1).stream())
+            if docs:
+                return {"id": docs[0].id, **docs[0].to_dict()}
+            return None
+        except Exception as e:
+            logger.debug("Firestore get_user_by_id notice: %s", e)
+            return None
+
+    def create_user(self, user_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Creates or updates user document in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            u_id = user_data.get("id") or f"usr_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            clean_data = dict(user_data)
+            clean_data["id"] = u_id
+            self._db.collection("users").document(u_id).set(clean_data, merge=True)
+            return clean_data
+        except Exception as e:
+            logger.warning("Firestore create_user error: %s", e)
+            return None
+
+    def update_user_password(self, user_id: str, hashed_password: str) -> bool:
+        """Updates user password in Firestore."""
+        if not self.is_available or not user_id:
+            return False
+        try:
+            self._db.collection("users").document(user_id).set({
+                "hashed_password": hashed_password,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }, merge=True)
+            return True
+        except Exception as e:
+            logger.warning("Firestore update_user_password error: %s", e)
+            return False
+
+    def create_user_session(self, session_data: Dict[str, Any]) -> bool:
+        """Stores active tab session in Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            s_id = session_data.get("session_id")
+            if s_id:
+                self._db.collection("user_sessions").document(s_id).set(session_data, merge=True)
+                return True
+        except Exception as e:
+            logger.debug("Firestore create_user_session notice: %s", e)
+        return False
+
+    def get_user_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves session from Firestore."""
+        if not self.is_available or not session_id:
+            return None
+        try:
+            doc = self._db.collection("user_sessions").document(session_id).get()
+            if doc.exists:
+                return doc.to_dict()
+        except Exception as e:
+            logger.debug("Firestore get_user_session notice: %s", e)
+        return None
+
+    def list_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
+        """Lists active sessions from Firestore."""
+        if not self.is_available or not user_id:
+            return []
+        try:
+            docs = self._db.collection("user_sessions").where("user_id", "==", user_id).where("is_revoked", "==", False).stream()
+            return [d.to_dict() for d in docs]
+        except Exception as e:
+            logger.debug("Firestore list_user_sessions notice: %s", e)
+            return []
+
+    def revoke_user_session(self, session_id: str, reason: str = "") -> bool:
+        """Revokes a session in Firestore."""
+        if not self.is_available or not session_id:
+            return False
+        try:
+            self._db.collection("user_sessions").document(session_id).set({
+                "is_revoked": True,
+                "revoked_at": datetime.now(timezone.utc).isoformat(),
+                "revocation_reason": reason
+            }, merge=True)
+            return True
+        except Exception as e:
+            logger.debug("Firestore revoke_user_session notice: %s", e)
+            return False
+
+    def create_password_reset(self, reset_data: Dict[str, Any]) -> bool:
+        """Stores password reset record in Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            pr_id = reset_data.get("id") or reset_data.get("reset_code")
+            self._db.collection("password_resets").document(pr_id).set(reset_data, merge=True)
+            return True
+        except Exception as e:
+            logger.debug("Firestore create_password_reset notice: %s", e)
+            return False
+
+    def get_active_password_reset(self, code_or_token: str) -> Optional[Dict[str, Any]]:
+        """Finds active unexpired password reset by code or token."""
+        if not self.is_available or not code_or_token:
+            return None
+        clean_val = code_or_token.strip()
+        try:
+            for field in ["reset_code", "reset_token"]:
+                docs = list(self._db.collection("password_resets").where(field, "==", clean_val).stream())
+                for d in docs:
+                    data = d.to_dict()
+                    if not data.get("used_at"):
+                        return {"id": d.id, **data}
+            return None
+        except Exception as e:
+            logger.debug("Firestore get_active_password_reset notice: %s", e)
+            return None
+
+    def mark_password_reset_used(self, reset_id: str) -> bool:
+        """Marks password reset as consumed."""
+        if not self.is_available or not reset_id:
+            return False
+        try:
+            self._db.collection("password_resets").document(reset_id).set({
+                "used_at": datetime.now(timezone.utc).isoformat()
+            }, merge=True)
+            return True
+        except Exception as e:
+            logger.debug("Firestore mark_password_reset_used notice: %s", e)
+            return False
+
 
 # Global singleton instance
 firestore_service = FirestoreService()
+

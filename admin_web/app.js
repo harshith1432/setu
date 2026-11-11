@@ -415,7 +415,7 @@ function togglePasswordVisibility(inputId = 'password', btn = null) {
 // ==============================================================================
 
 function openForgotPasswordModal(prefillIdentifier = '') {
-  const currentLoginInput = document.getElementById('usernameInput')?.value?.trim() || '';
+  const currentLoginInput = document.getElementById('username')?.value?.trim() || document.getElementById('usernameInput')?.value?.trim() || '';
   const initialValue = prefillIdentifier || currentLoginInput;
 
   const content = `
@@ -690,11 +690,42 @@ async function submitNewPassword(e, fallbackToken) {
       throw new Error(data.detail || 'Failed to reset password.');
     }
 
+    if (data.access_token && data.user) {
+      adminToken = data.access_token;
+      window.adminToken = adminToken;
+      currentSessionId = data.session_id || null;
+      window.currentSessionId = currentSessionId;
+      currentUser = data.user;
+      window.currentUser = currentUser;
+
+      TAB_STORAGE.setItem('setu_tab_token', adminToken);
+      if (currentSessionId) TAB_STORAGE.setItem('setu_tab_session_id', currentSessionId);
+      TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+      localStorage.setItem('setu_token', adminToken);
+      localStorage.setItem('setu_user', JSON.stringify(currentUser));
+
+      const defTab = (ROLE_DEFAULT_TABS && ROLE_DEFAULT_TABS[currentUser.role]) || 'overview';
+      currentTab = defTab;
+      TAB_STORAGE.setItem('setu_tab_nav', currentTab);
+      if (currentUser.shed_id) {
+        selectedShedId = currentUser.shed_id;
+        TAB_STORAGE.setItem('setu_tab_shed', selectedShedId);
+      }
+
+      closeAppModal();
+      showToast(`Password reset successfully! Welcome, ${currentUser.full_name || currentUser.username}!`, 'success');
+      showDashboardView();
+      if (typeof switchNavTab === 'function') {
+        try { switchNavTab(defTab); } catch (_) {}
+      }
+      return;
+    }
+
     showToast('Password reset successfully! Please sign in with your new credentials.', 'success');
     closeAppModal();
 
     // Auto-populate the password on the login form for immediate user convenience
-    const pwInput = document.getElementById('passwordInput');
+    const pwInput = document.getElementById('password') || document.getElementById('passwordInput');
     if (pwInput) {
       pwInput.value = new_password;
       pwInput.focus();

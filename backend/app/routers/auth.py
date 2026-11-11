@@ -737,7 +737,8 @@ def forgot_password_endpoint(req: ForgotPasswordRequest, request: Request = None
 @router.post("/reset-password")
 def reset_password_endpoint(req: ResetPasswordRequest, request: Request = None):
     """
-    Verifies recovery code and sets a new password with session invalidation.
+    Verifies recovery code and sets a new password with session invalidation,
+    then automatically authenticates the user and returns fresh session credentials.
     """
     if req.confirm_password is not None and req.new_password != req.confirm_password:
         raise HTTPException(status_code=400, detail="New passwords do not match.")
@@ -746,10 +747,81 @@ def reset_password_endpoint(req: ResetPasswordRequest, request: Request = None):
         raise HTTPException(status_code=400, detail="New password must be at least 6 characters.")
 
     ip_addr = request.client.host if request and request.client else None
-    success, msg = verify_and_complete_password_reset(req.reset_code, req.new_password, ip_address=ip_addr)
-    if not success:
-        raise HTTPException(status_code=400, detail=msg)
+    res_tuple = verify_and_complete_password_reset(req.reset_code, req.new_password, ip_address=ip_addr)
     
+    # Handle both 2-tuple and 3-tuple return signature defensively
+    if isinstance(res_tuple, tuple) and len(res_tuple) == 3:
+        success, msg, user = res_tuple
+    else:
+        success, msg = res_tuple[0], res_tuple[1]
+        user = None
+
+    if not success:
+        raise HTTPException(status_code=400, detail=msg or "Failed to reset password.")
+
+    if not user:
+        from app.services.db_service import get_user_by_username_or_phone
+        # Fallback to fetch by reset code
+        user = get_user_by_username_or_phone(req.reset_code)
+
+    # Issue session and access token for seamless auto-login
+    if user:
+        session_id = f"sess_{uuid.uuid4().hex}"
+        expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_at = datetime.now(timezone.utc) + expires_delta
+
+        user_agent = request.headers.get("user-agent") if request else None
+        client_ip = request.client.host if request and request.client else None
+
+        from app.services.db_service import create_user_session
+        create_user_session(
+            session_id=session_id,
+            user_id=user["id"],
+            username=user["username"],
+            role=user["role"],
+            organization_id=user.get("organization_id") or "default_org",
+            expires_at=expires_at,
+            user_agent=user_agent,
+            ip_address=client_ip
+        )
+
+        access_token = create_access_token(
+            data={
+                "sub": user["username"],
+                "user_id": user["id"],
+                "role": user["role"],
+                "session_id": session_id,
+            },
+            expires_delta=expires_delta
+        )
+
+        user_out = UserOut(
+            id=user["id"],
+            username=user["username"],
+            full_name=user["full_name"],
+            phone=user["phone"],
+            official_email=user.get("official_email"),
+            access_scope=user.get("access_scope", "GLOBAL"),
+            whatsapp_number=user.get("whatsapp_number"),
+            whatsapp_verified=bool(user.get("whatsapp_verified", False)),
+            preferred_language=user.get("preferred_language", "en"),
+            role=user["role"],
+            farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
+            region=user.get("region", "Local Rearing Shed"),
+            batch_id=user.get("batch_id", "SERI-2026-M04"),
+            dfl_capacity=user.get("dfl_capacity", "200 DFL"),
+            breed=user.get("breed", "Double Hybrid (FC1 x FC2)"),
+            is_active=bool(user.get("is_active", 1))
+        )
+
+        return {
+            "success": True,
+            "message": "Password reset successfully! You are now logged in.",
+            "access_token": access_token,
+            "session_id": session_id,
+            "user": user_out
+        }
+
     return {"success": True, "message": msg}
 
 @router.put("/profile", response_model=UserOut)

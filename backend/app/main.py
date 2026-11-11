@@ -109,6 +109,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    import logging
+    tb = traceback.format_exc()
+    logging.getLogger("main").error("Unhandled server exception on %s %s: %s\n%s", request.method, request.url.path, exc, tb)
+    from fastapi.responses import JSONResponse
+    req_origin = request.headers.get("origin")
+    allowed = req_origin if (req_origin and ("vercel.app" in req_origin or req_origin in settings.ALLOWED_ORIGINS)) else "*"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+        headers={
+            "Access-Control-Allow-Origin": allowed,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
+
 # Register Routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(sheds.router, prefix=settings.API_V1_STR)

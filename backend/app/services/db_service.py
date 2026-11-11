@@ -39,6 +39,15 @@ def _set_cached_latest_reading(shed_id: str, data: Dict[str, Any]) -> None:
         _latest_reading_cache_times[shed_id] = now
 
 
+def _get_connect_dsn() -> str:
+    """Returns PostgreSQL connection DSN with defensive connection timeout."""
+    dsn = DATABASE_URL or "postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
+    if "connect_timeout" not in dsn:
+        sep = "&" if "?" in dsn else "?"
+        dsn = f"{dsn}{sep}connect_timeout=3"
+    return dsn
+
+
 def get_pool() -> Optional[pool.ThreadedConnectionPool]:
     """
     Returns a singleton ThreadedConnectionPool for PostgreSQL connection reuse.
@@ -51,12 +60,12 @@ def get_pool() -> Optional[pool.ThreadedConnectionPool]:
                 try:
                     max_conn = int(os.getenv("DB_POOL_MAX", "50"))
                     _connection_pool = pool.ThreadedConnectionPool(
-                        minconn=2,
+                        minconn=1,
                         maxconn=max_conn,
-                        dsn=DATABASE_URL
+                        dsn=_get_connect_dsn()
                     )
                 except Exception as e:
-                    logger.warning("Failed to initialize ThreadedConnectionPool: %s", e)
+                    logger.warning("PostgreSQL ThreadedConnectionPool unavailable: %s", e)
                     _connection_pool = None
     return _connection_pool
 
@@ -75,10 +84,10 @@ def get_db_cursor(commit: bool = False, dict_cursor: bool = False):
             conn = p.getconn()
             from_pool = True
         except Exception:
-            conn = psycopg2.connect(DATABASE_URL)
+            conn = psycopg2.connect(_get_connect_dsn())
             from_pool = False
     else:
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(_get_connect_dsn())
 
     if commit:
         conn.autocommit = True
@@ -105,7 +114,7 @@ def get_db_cursor(commit: bool = False, dict_cursor: bool = False):
 
 def get_connection():
     """Legacy helper: Returns a direct PostgreSQL connection."""
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(_get_connect_dsn())
 
 
 def _ensure_telemetry_partitions(cursor):
@@ -772,7 +781,9 @@ def save_shed_settings(
         return res
 
 def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
-    clean_id = identifier.strip()
+    clean_id = (identifier or "").strip()
+    if not clean_id:
+        return None
     candidates = [clean_id, clean_id.lower()]
     digits = "".join(ch for ch in clean_id if ch.isdigit())
     if digits:
@@ -783,39 +794,52 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
             candidates.extend([digits[2:], f"+{digits}", f"+91 {digits[2:]}"])
     unique_candidates = list(dict.fromkeys(candidates))
 
-    with get_db_cursor(dict_cursor=True) as cursor:
-        try:
-            cursor.execute(
-                """
-                SELECT * FROM users 
-                WHERE username = ANY(%s) 
-                   OR phone = ANY(%s) 
-                   OR whatsapp_number = ANY(%s) 
-                   OR official_email = ANY(%s)
-                LIMIT 1
-                """,
-                (unique_candidates, unique_candidates, unique_candidates, unique_candidates),
-            )
-        except Exception:
-            cursor.execute(
-                """
-                SELECT * FROM users 
-                WHERE username = ANY(%s) 
-                   OR phone = ANY(%s) 
-                LIMIT 1
-                """,
-                (unique_candidates, unique_candidates),
-            )
-        row = cursor.fetchone()
-        if row:
-            invalidate_user_cache()
-            d = dict(row)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
-            return d
-    return None
+    # 1. Attempt PostgreSQL resolution
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            try:
+                cursor.execute(
+                    """
+                    SELECT * FROM users 
+                    WHERE username = ANY(%s) 
+                       OR phone = ANY(%s) 
+                       OR whatsapp_number = ANY(%s) 
+                       OR LOWER(official_email) = ANY(%s)
+                    LIMIT 1
+                    """,
+                    (unique_candidates, unique_candidates, unique_candidates, [c.lower() for c in unique_candidates]),
+                )
+            except Exception:
+                cursor.execute(
+                    """
+                    SELECT * FROM users 
+                    WHERE username = ANY(%s) 
+                       OR phone = ANY(%s) 
+                    LIMIT 1
+                    """,
+                    (unique_candidates, unique_candidates),
+                )
+            row = cursor.fetchone()
+            if row:
+                invalidate_user_cache()
+                d = dict(row)
+                if isinstance(d.get("created_at"), datetime):
+                    d["created_at"] = d["created_at"].isoformat()
+                return d
+    except Exception as e:
+        logger.warning("Postgres get_user_by_username_or_phone notice (%s); checking Firestore...", e)
+
+    # 2. Automated fallback to Firebase Cloud Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        return firestore_service.get_user_by_username_or_phone(clean_id)
+    except Exception as fe:
+        logger.debug("Firestore get_user fallback notice: %s", fe)
+        return None
 
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
+    if not user_id:
+        return None
     cache_key = f"id:{user_id.strip()}"
     now = time.time()
     with _user_cache_lock:
@@ -824,19 +848,31 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
             if now < exp:
                 return dict(val) if val else None
 
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        row = cursor.fetchone()
-        res = None
-        if row:
-            d = dict(row)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
-            res = d
+    # 1. Attempt PostgreSQL
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+            row = cursor.fetchone()
+            res = None
+            if row:
+                d = dict(row)
+                if isinstance(d.get("created_at"), datetime):
+                    d["created_at"] = d["created_at"].isoformat()
+                res = d
 
-        with _user_cache_lock:
-            _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
-        return dict(res) if res else None
+            with _user_cache_lock:
+                _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
+            if res:
+                return dict(res)
+    except Exception as e:
+        logger.warning("Postgres get_user_by_id notice (%s); checking Firestore...", e)
+
+    # 2. Attempt Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        return firestore_service.get_user_by_id(user_id)
+    except Exception:
+        return None
 
 _shed_settings_cache: Dict[str, tuple[float, Optional[Dict[str, Any]]]] = {}
 
@@ -1012,37 +1048,51 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         assigned_shed = get_next_available_shed_id()
     user_data["shed_id"] = assigned_shed
 
-    with get_db_cursor(commit=True) as cursor:
-        cursor.execute("""
-        INSERT INTO users (
-            id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
-            preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
-            dfl_capacity, breed, official_email, organization_id, is_active, created_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            user_data["id"],
-            user_data["username"],
-            user_data["hashed_password"],
-            user_data["full_name"],
-            user_data["phone"],
-            user_data.get("whatsapp_number") or user_data.get("phone"),
-            bool(user_data.get("whatsapp_verified", False)),
-            user_data.get("preferred_language", "kn"),
-            user_data.get("role", "farmer"),
-            user_data.get("farm_name", "Green Valley Farm"),
-            user_data.get("region", "Local Rearing Shed"),
-            user_data.get("latitude"),
-            user_data.get("longitude"),
-            user_data.get("shed_id", assigned_shed),
-            user_data.get("batch_id", "SERI-2026-M04"),
-            user_data.get("dfl_capacity", "200 DFL"),
-            user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
-            user_data.get("official_email"),
-            user_data.get("organization_id", "default_org"),
-            True,
-            created_at_dt
-        ))
+    # 1. Attempt PostgreSQL persistence
+    try:
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("""
+            INSERT INTO users (
+                id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
+                preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
+                dfl_capacity, breed, official_email, organization_id, is_active, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                user_data["id"],
+                user_data["username"],
+                user_data["hashed_password"],
+                user_data["full_name"],
+                user_data["phone"],
+                user_data.get("whatsapp_number") or user_data.get("phone"),
+                bool(user_data.get("whatsapp_verified", False)),
+                user_data.get("preferred_language", "kn"),
+                user_data.get("role", "farmer"),
+                user_data.get("farm_name", "Green Valley Farm"),
+                user_data.get("region", "Local Rearing Shed"),
+                user_data.get("latitude"),
+                user_data.get("longitude"),
+                user_data.get("shed_id", assigned_shed),
+                user_data.get("batch_id", "SERI-2026-M04"),
+                user_data.get("dfl_capacity", "200 DFL"),
+                user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
+                user_data.get("official_email"),
+                user_data.get("organization_id", "default_org"),
+                True,
+                created_at_dt
+            ))
+    except Exception as pe:
+        logger.warning("Postgres create_user notice (%s); saving to Firestore...", pe)
+
+    # 2. Sync to Firebase Cloud Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        fs_data = dict(user_data)
+        fs_data["created_at"] = created_at_dt.isoformat() if isinstance(created_at_dt, datetime) else created_at_dt
+        firestore_service.create_user(fs_data)
+    except Exception as fe:
+        logger.debug("Firestore create_user notice: %s", fe)
+
     invalidate_user_cache()
     return user_data
 
@@ -2090,20 +2140,14 @@ def revoke_user_session(session_id: str, reason: str = "User logout") -> bool:
 def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Generates a secure 6-digit OTP code and unique reset token for password recovery.
-    Dispatches notifications via SMS/WhatsApp if available.
+    Dispatches notifications via SMTP Email and WhatsApp/SMS.
     """
     clean_id = (identifier or "").strip()
     if not clean_id:
         return None
 
+    # Resolve user across PostgreSQL and Firebase Cloud Firestore
     user = get_user_by_username_or_phone(clean_id)
-    if not user:
-        with get_db_cursor(dict_cursor=True) as cur:
-            cur.execute("SELECT * FROM users WHERE LOWER(TRIM(official_email)) = LOWER(TRIM(%s)) LIMIT 1", (clean_id,))
-            row = cur.fetchone()
-            if row:
-                user = dict(row)
-
     if not user:
         return None
 
@@ -2116,25 +2160,63 @@ def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> 
     reset_token = f"rst_{secrets.token_urlsafe(32)}"
     reset_id = f"pr_{secrets.token_hex(12)}"
 
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
-        )
+    reset_payload = {
+        "id": reset_id,
+        "user_id": user["id"],
+        "identifier": clean_id,
+        "reset_code": reset_code,
+        "reset_token": reset_token,
+        "expires_at": expires_at.isoformat(),
+        "ip_address": ip_address or "127.0.0.1",
+        "created_at": now_dt.isoformat(),
+        "used_at": None
+    }
+
+    # 1. Save to PostgreSQL if available
+    try:
+        with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+            cursor.execute(
+                """
+                INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
+            )
+    except Exception as pe:
+        logger.warning("Postgres insert password_resets notice (%s); saving to Firestore...", pe)
+
+    # 2. Save to Firebase Cloud Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        firestore_service.create_password_reset(reset_payload)
+    except Exception as fe:
+        logger.debug("Firestore insert password_resets notice: %s", fe)
 
     log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
 
+    # 3. Determine recipient email address
+    user_email = user.get("official_email") or ""
+    if not user_email and "@" in clean_id:
+        user_email = clean_id
+    elif not user_email and user.get("username") and "@" in user["username"]:
+        user_email = user["username"]
+
+    email_sent = False
+    if user_email:
+        try:
+            from app.services.email_service import send_password_reset_email
+            email_sent = send_password_reset_email(user_email, user.get("full_name") or user["username"], reset_code)
+        except Exception as ee:
+            logger.warning("Email dispatch error for password reset: %s", ee)
+
     phone = user.get("phone") or ""
     masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
-    email = user.get("official_email") or ""
     masked_email = ""
-    if email and "@" in email:
-        parts = email.split("@")
+    if user_email and "@" in user_email:
+        parts = user_email.split("@")
         masked_email = f"{parts[0][:2]}***@{parts[1]}"
 
+    # Optional WhatsApp dispatch
     try:
         from app.services.whatsapp_alerts import alert_service
         target_whatsapp = user.get("whatsapp_number") or user.get("phone")
@@ -2152,7 +2234,8 @@ def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> 
         "reset_code": reset_code,
         "username": user["username"],
         "masked_phone": masked_phone,
-        "masked_email": masked_email,
+        "masked_email": masked_email or user_email,
+        "email_sent": email_sent,
         "expires_in_minutes": 15
     }
 
@@ -2160,325 +2243,81 @@ def verify_and_complete_password_reset(
     code_or_token: str, 
     new_password: str,
     ip_address: Optional[str] = None
-) -> Tuple[bool, str]:
+) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
     """
     Validates recovery code and updates the user's password with OWASP session revocation.
+    Returns (success, message, user_dict) to enable immediate automated login.
     """
     clean_val = (code_or_token or "").strip()
     if not clean_val:
-        return False, "Verification code or token is required."
+        return False, "Verification code or token is required.", None
     
     if len(new_password) < 6:
-        return False, "New password must be at least 6 characters long."
+        return False, "New password must be at least 6 characters long.", None
 
     now_dt = datetime.now(timezone.utc)
+    from app.core.security import get_password_hash
+    hashed_pw = get_password_hash(new_password)
+    user_record = None
+    reset_record = None
 
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            SELECT * FROM password_resets
-            WHERE (reset_code = %s OR reset_token = %s)
-              AND used_at IS NULL
-              AND expires_at > %s
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (clean_val, clean_val, now_dt)
-        )
-        row = cursor.fetchone()
-        if not row:
-            return False, "Invalid, expired, or already used recovery code."
-
-        reset_record = dict(row)
-        user_id = reset_record["user_id"]
-
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            return False, "Associated user account not found."
-        
-        user = dict(user_row)
-
-        from app.core.security import get_password_hash
-        hashed_pw = get_password_hash(new_password)
-
-        cursor.execute(
-            "UPDATE users SET hashed_password = %s WHERE id = %s",
-            (hashed_pw, user_id)
-        )
-
-        cursor.execute(
-            "UPDATE password_resets SET used_at = %s WHERE id = %s",
-            (now_dt, reset_record["id"])
-        )
-
-        cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
-
-        log_audit(user["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user['username']}")
-
-    return True, "Password has been successfully reset. You may now sign in with your new password."
-
-def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """
-    Generates a secure 6-digit OTP code and unique reset token for password recovery.
-    Dispatches notifications via SMS/WhatsApp if available.
-    """
-    clean_id = (identifier or "").strip()
-    if not clean_id:
-        return None
-
-    user = get_user_by_username_or_phone(clean_id)
-    if not user:
-        with get_db_cursor(dict_cursor=True) as cur:
-            cur.execute("SELECT * FROM users WHERE LOWER(TRIM(official_email)) = LOWER(TRIM(%s)) LIMIT 1", (clean_id,))
-            row = cur.fetchone()
-            if row:
-                user = dict(row)
-
-    if not user:
-        return None
-
-    import secrets
-    import string
-    now_dt = datetime.now(timezone.utc)
-    expires_at = now_dt + timedelta(minutes=15)
-    
-    reset_code = "".join(secrets.choice(string.digits) for _ in range(6))
-    reset_token = f"rst_{secrets.token_urlsafe(32)}"
-    reset_id = f"pr_{secrets.token_hex(12)}"
-
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
-        )
-
-    log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
-
-    phone = user.get("phone") or ""
-    masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
-    email = user.get("official_email") or ""
-    masked_email = ""
-    if email and "@" in email:
-        parts = email.split("@")
-        masked_email = f"{parts[0][:2]}***@{parts[1]}"
-
+    # 1. Check PostgreSQL first
     try:
-        from app.services.whatsapp_alerts import alert_service
-        target_whatsapp = user.get("whatsapp_number") or user.get("phone")
-        if target_whatsapp:
-            alert_service.send_alert(
-                f"Your Setu Platform password recovery code is: {reset_code}. Valid for 15 minutes. Do not share this code.",
-                target_phone=target_whatsapp
+        with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM password_resets
+                WHERE (reset_code = %s OR reset_token = %s)
+                  AND used_at IS NULL
+                  AND expires_at > %s
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (clean_val, clean_val, now_dt)
             )
-    except Exception:
-        pass
-
-    return {
-        "success": True,
-        "reset_token": reset_token,
-        "reset_code": reset_code,
-        "username": user["username"],
-        "masked_phone": masked_phone,
-        "masked_email": masked_email,
-        "expires_in_minutes": 15
-    }
-
-def verify_and_complete_password_reset(
-    code_or_token: str, 
-    new_password: str,
-    ip_address: Optional[str] = None
-) -> Tuple[bool, str]:
-    """
-    Validates recovery code and updates the user's password with OWASP session revocation.
-    """
-    clean_val = (code_or_token or "").strip()
-    if not clean_val:
-        return False, "Verification code or token is required."
-    
-    if len(new_password) < 6:
-        return False, "New password must be at least 6 characters long."
-
-    now_dt = datetime.now(timezone.utc)
-
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            SELECT * FROM password_resets
-            WHERE (reset_code = %s OR reset_token = %s)
-              AND used_at IS NULL
-              AND expires_at > %s
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (clean_val, clean_val, now_dt)
-        )
-        row = cursor.fetchone()
-        if not row:
-            return False, "Invalid, expired, or already used recovery code."
-
-        reset_record = dict(row)
-        user_id = reset_record["user_id"]
-
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            return False, "Associated user account not found."
-        
-        user = dict(user_row)
-
-        from app.core.security import get_password_hash
-        hashed_pw = get_password_hash(new_password)
-
-        cursor.execute(
-            "UPDATE users SET hashed_password = %s WHERE id = %s",
-            (hashed_pw, user_id)
-        )
-
-        cursor.execute(
-            "UPDATE password_resets SET used_at = %s WHERE id = %s",
-            (now_dt, reset_record["id"])
-        )
-
-        cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
-
-        log_audit(user["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user['username']}")
-
-    return True, "Password has been successfully reset. You may now sign in with your new password."
-
-def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """
-    Generates a secure 6-digit OTP code and unique reset token for password recovery.
-    Dispatches notifications via SMS/WhatsApp if available.
-    """
-    clean_id = (identifier or "").strip()
-    if not clean_id:
-        return None
-
-    user = get_user_by_username_or_phone(clean_id)
-    if not user:
-        with get_db_cursor(dict_cursor=True) as cur:
-            cur.execute("SELECT * FROM users WHERE LOWER(TRIM(official_email)) = LOWER(TRIM(%s)) LIMIT 1", (clean_id,))
-            row = cur.fetchone()
+            row = cursor.fetchone()
             if row:
-                user = dict(row)
+                reset_record = dict(row)
+                user_id = reset_record["user_id"]
+                cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                user_row = cursor.fetchone()
+                if user_row:
+                    user_record = dict(user_row)
+                    cursor.execute("UPDATE users SET hashed_password = %s WHERE id = %s", (hashed_pw, user_id))
+                    cursor.execute("UPDATE password_resets SET used_at = %s WHERE id = %s", (now_dt, reset_record["id"]))
+                    cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+    except Exception as pe:
+        logger.warning("Postgres verify_and_complete_password_reset notice: %s", pe)
 
-    if not user:
-        return None
-
-    import secrets
-    import string
-    now_dt = datetime.now(timezone.utc)
-    expires_at = now_dt + timedelta(minutes=15)
-    
-    reset_code = "".join(secrets.choice(string.digits) for _ in range(6))
-    reset_token = f"rst_{secrets.token_urlsafe(32)}"
-    reset_id = f"pr_{secrets.token_hex(12)}"
-
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            INSERT INTO password_resets (id, user_id, identifier, reset_code, reset_token, expires_at, ip_address, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (reset_id, user["id"], clean_id, reset_code, reset_token, expires_at, ip_address, now_dt)
-        )
-
-    log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
-
-    phone = user.get("phone") or ""
-    masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
-    email = user.get("official_email") or ""
-    masked_email = ""
-    if email and "@" in email:
-        parts = email.split("@")
-        masked_email = f"{parts[0][:2]}***@{parts[1]}"
-
+    # 2. Check Firebase Cloud Firestore
     try:
-        from app.services.whatsapp_alerts import alert_service
-        target_whatsapp = user.get("whatsapp_number") or user.get("phone")
-        if target_whatsapp:
-            alert_service.send_alert(
-                f"Your Setu Platform password recovery code is: {reset_code}. Valid for 15 minutes. Do not share this code.",
-                target_phone=target_whatsapp
-            )
-    except Exception:
-        pass
+        from app.services.firestore_service import firestore_service
+        fs_reset = firestore_service.get_active_password_reset(clean_val)
+        if fs_reset:
+            fs_uid = fs_reset["user_id"]
+            firestore_service.update_user_password(fs_uid, hashed_pw)
+            firestore_service.mark_password_reset_used(fs_reset["id"])
+            if not user_record:
+                user_record = firestore_service.get_user_by_id(fs_uid)
+    except Exception as fe:
+        logger.debug("Firestore verify_and_complete_password_reset notice: %s", fe)
 
-    return {
-        "success": True,
-        "reset_token": reset_token,
-        "reset_code": reset_code,
-        "username": user["username"],
-        "masked_phone": masked_phone,
-        "masked_email": masked_email,
-        "expires_in_minutes": 15
-    }
+    if not user_record and not reset_record:
+        return False, "Invalid, expired, or already used recovery code.", None
 
-def verify_and_complete_password_reset(
-    code_or_token: str, 
-    new_password: str,
-    ip_address: Optional[str] = None
-) -> Tuple[bool, str]:
-    """
-    Validates recovery code and updates the user's password with OWASP session revocation.
-    """
-    clean_val = (code_or_token or "").strip()
-    if not clean_val:
-        return False, "Verification code or token is required."
-    
-    if len(new_password) < 6:
-        return False, "New password must be at least 6 characters long."
+    if not user_record and reset_record:
+        user_record = get_user_by_id(reset_record["user_id"])
 
-    now_dt = datetime.now(timezone.utc)
+    if not user_record:
+        return False, "Associated user account not found.", None
 
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(
-            """
-            SELECT * FROM password_resets
-            WHERE (reset_code = %s OR reset_token = %s)
-              AND used_at IS NULL
-              AND expires_at > %s
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            (clean_val, clean_val, now_dt)
-        )
-        row = cursor.fetchone()
-        if not row:
-            return False, "Invalid, expired, or already used recovery code."
+    user_record["hashed_password"] = hashed_pw
+    invalidate_user_cache()
+    log_audit(user_record["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user_record['username']}")
 
-        reset_record = dict(row)
-        user_id = reset_record["user_id"]
+    return True, "Password has been successfully reset. You are now logged in.", user_record
 
-        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        user_row = cursor.fetchone()
-        if not user_row:
-            return False, "Associated user account not found."
-        
-        user = dict(user_row)
 
-        from app.core.security import get_password_hash
-        hashed_pw = get_password_hash(new_password)
-
-        cursor.execute(
-            "UPDATE users SET hashed_password = %s WHERE id = %s",
-            (hashed_pw, user_id)
-        )
-
-        cursor.execute(
-            "UPDATE password_resets SET used_at = %s WHERE id = %s",
-            (now_dt, reset_record["id"])
-        )
-
-        cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
-
-        log_audit(user["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user['username']}")
-
-    return True, "Password has been successfully reset. You may now sign in with your new password."
 
 def revoke_all_user_sessions(user_id: str, reason: str = "Logout all sessions") -> int:
     """Revokes all active sessions for a user across all tabs and devices."""
