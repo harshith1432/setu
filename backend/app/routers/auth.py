@@ -29,7 +29,33 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/login", response_model=Token)
 def login(credentials: UserLogin, request: Request = None):
     user = get_user_by_username_or_phone(credentials.username)
-    if not user or not verify_password(credentials.password, user["hashed_password"]):
+
+    # SEC-ENV: Check if authentication attempt targets the Default .env Super Admin
+    clean_req_user = (credentials.username or "").strip().lower().replace(" ", "").replace("-", "")
+    default_u = (settings.SUPERADMIN_USERNAME or "superadmin").strip().lower().replace(" ", "").replace("-", "")
+    default_e = (settings.SUPERADMIN_EMAIL or "admin@setu.ag").strip().lower().replace(" ", "").replace("-", "")
+    is_default_admin = (
+        bool(user and user.get("is_default"))
+        or clean_req_user in [default_u, "superadmin", "admin", default_e]
+    )
+
+    if is_default_admin:
+        from app.services.enterprise_db import is_default_admin_enabled
+        if not is_default_admin_enabled():
+            log_audit(credentials.username or "superadmin", "LOGIN_BLOCKED", "Default Super Admin login attempt blocked (disabled by policy)")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Default Super Admin login from .env has been disabled by platform policy. Please sign in with your active custom Super Admin credentials."
+            )
+
+    # Credential Verification: Hash verification or direct .env password match for default admin
+    password_valid = False
+    if user and user.get("hashed_password"):
+        password_valid = verify_password(credentials.password, user["hashed_password"])
+    if not password_valid and is_default_admin and credentials.password == settings.SUPERADMIN_PASSWORD:
+        password_valid = True
+
+    if not user or not password_valid:
         log_audit(credentials.username or "anonymous", "LOGIN_FAILED", "Failed authentication attempt (invalid credentials)")
         try:
             from app.services.siem_service import SIEMForwarder

@@ -9929,6 +9929,9 @@ async function saveCmsSettings() {
 async function fetchSuperAdminsTable() {
   const tbody = document.getElementById('tbodySuperAdmins');
   const badge = document.getElementById('superAdminCountBadge');
+  const toggle = document.getElementById('toggleDefaultAdminLogin');
+  const badgeStatus = document.getElementById('badgeDefaultAdminStatus');
+  const labelStatus = document.getElementById('labelDefaultAdminToggle');
   if (!tbody) return;
 
   try {
@@ -9943,6 +9946,20 @@ async function fetchSuperAdminsTable() {
     if (!res.ok) return;
     const data = await res.json();
     const admins = data.admins || [];
+    const defaultEnabled = (data.default_admin_enabled !== false);
+
+    // Update Default .env Admin Banner Status
+    if (toggle) {
+      toggle.checked = defaultEnabled;
+    }
+    if (badgeStatus) {
+      badgeStatus.textContent = defaultEnabled ? 'Active (Enabled)' : 'Disabled (Blocked)';
+      badgeStatus.className = `badge ${defaultEnabled ? 'badge-success' : 'badge-danger'}`;
+    }
+    if (labelStatus) {
+      labelStatus.textContent = defaultEnabled ? 'Active' : 'Disabled';
+      labelStatus.style.color = defaultEnabled ? '#16a34a' : '#ef4444';
+    }
 
     if (badge) {
       badge.textContent = `${admins.length} Accounts`;
@@ -9957,6 +9974,7 @@ async function fetchSuperAdminsTable() {
       const initial = (adm.full_name || adm.username || 'A').charAt(0).toUpperCase();
       const subroleClass = getSubRoleBadgeClass(adm.sub_role);
       const isCurrent = currentUser && (currentUser.username === adm.username);
+      const isDefault = Boolean(adm.is_default);
 
       return `
         <tr>
@@ -9964,8 +9982,11 @@ async function fetchSuperAdminsTable() {
             <div style="display: flex; align-items: center;">
               <span class="avatar-initial-circle">${initial}</span>
               <div>
-                <strong style="color: var(--text-main); font-size: 0.90rem;">${escapeHtml(adm.full_name || adm.username)}</strong>
-                ${isCurrent ? '<span style="font-size: 0.70rem; color: #2563eb; background: #eff6ff; padding: 2px 6px; border-radius: 4px; margin-left: 6px; font-weight: 700;">You</span>' : ''}
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                  <strong style="color: var(--text-main); font-size: 0.90rem;">${escapeHtml(adm.full_name || adm.username)}</strong>
+                  ${isDefault ? '<span style="font-size: 0.68rem; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; padding: 1px 5px; border-radius: 4px; font-weight: 700;">Default (.env)</span>' : ''}
+                  ${isCurrent ? '<span style="font-size: 0.68rem; color: #2563eb; background: #eff6ff; padding: 1px 5px; border-radius: 4px; font-weight: 700;">You</span>' : ''}
+                </div>
                 <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(adm.username)}</div>
               </div>
             </div>
@@ -9985,12 +10006,19 @@ async function fetchSuperAdminsTable() {
             <span style="font-size: 0.82rem; color: var(--text-muted);">${adm.created_at_fmt || '2026-09-11'}</span>
           </td>
           <td style="text-align: right;">
-            ${isCurrent ? '<span style="color: var(--text-muted); font-size: 0.78rem;">Active Session</span>' : `
-              <button type="button" class="btn btn-outline btn-sm" onclick="toggleAdminAccountStatus('${adm.id}', ${adm.is_active})">
-                <i data-lucide="${adm.is_active ? 'user-x' : 'user-check'}"></i>
-                <span>${adm.is_active ? 'Deactivate' : 'Activate'}</span>
-              </button>
-            `}
+            ${isCurrent ? '<span style="color: var(--text-muted); font-size: 0.78rem;">Active Session</span>' : (
+              isDefault ? `
+                <button type="button" class="btn btn-outline btn-sm" onclick="executeToggleDefaultAdmin(${!adm.is_active})">
+                  <i data-lucide="${adm.is_active ? 'shield-off' : 'shield-check'}"></i>
+                  <span>${adm.is_active ? 'Disable .env' : 'Enable .env'}</span>
+                </button>
+              ` : `
+                <button type="button" class="btn btn-outline btn-sm" onclick="toggleAdminAccountStatus('${adm.id}', ${adm.is_active})">
+                  <i data-lucide="${adm.is_active ? 'user-x' : 'user-check'}"></i>
+                  <span>${adm.is_active ? 'Deactivate' : 'Activate'}</span>
+                </button>
+              `
+            )}
           </td>
         </tr>
       `;
@@ -10146,7 +10174,53 @@ async function handleAddSuperAdminSubmit(event) {
   }
 }
 
+async function handleToggleDefaultAdmin(inputEl) {
+  const enable = inputEl ? inputEl.checked : true;
+  await executeToggleDefaultAdmin(enable, inputEl);
+}
+
+async function executeToggleDefaultAdmin(enable, inputEl) {
+  const action = enable ? 'enable' : 'disable';
+  const confirmMsg = enable
+    ? 'Are you sure you want to enable the Default (.env) Super Admin login? The credentials configured in .env will become active.'
+    : 'Are you sure you want to DISABLE the Default (.env) Super Admin login?\n\nOnce disabled, the password stored in the .env file will NOT work. Only newly created custom Super Admin accounts will remain active.';
+
+  if (!confirm(confirmMsg)) {
+    if (inputEl) inputEl.checked = !enable;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/platform/superadmins/toggle-default`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`,
+        'X-Session-ID': currentSessionId || '',
+        'X-Tab-ID': tabId
+      },
+      body: JSON.stringify({ enabled: enable })
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || `Default Super Admin login ${action}d successfully!`, 'success');
+      await fetchSuperAdminsTable();
+    } else {
+      if (inputEl) inputEl.checked = !enable;
+      showToast(data.detail || `Failed to ${action} default super admin`, 'error');
+    }
+  } catch (err) {
+    if (inputEl) inputEl.checked = !enable;
+    showToast('Network error while toggling default superadmin', 'error');
+  }
+}
+
 async function toggleAdminAccountStatus(userId, currentIsActive) {
+  if (userId === 'usr_admin') {
+    return executeToggleDefaultAdmin(!currentIsActive);
+  }
+
   const actionText = currentIsActive ? 'Deactivate' : 'Activate';
   if (!confirm(`Are you sure you want to ${actionText.toLowerCase()} this Super Admin account?`)) {
     return;

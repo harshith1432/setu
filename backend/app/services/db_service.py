@@ -885,22 +885,30 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
 
     # 3. Built-in Authoritative SuperAdmin & System Fallback
     norm_id = clean_id.lower().replace(" ", "").replace("-", "")
-    if norm_id in ["superadmin", "admin", "admin@setu.ag", "admin@sericare.io", "+919845099999", "9845099999", "919845099999"]:
+    default_u = (settings.SUPERADMIN_USERNAME or "superadmin").strip().lower().replace(" ", "").replace("-", "")
+    default_e = (settings.SUPERADMIN_EMAIL or "admin@setu.ag").strip().lower().replace(" ", "").replace("-", "")
+    if norm_id in [default_u, "superadmin", "admin", default_e, "admin@setu.ag", "admin@sericare.io", "+919845099999", "9845099999", "919845099999"]:
+        from app.services.enterprise_db import is_default_admin_enabled, get_default_superadmin_password_hash
         from app.core.security import get_password_hash
+        is_active = is_default_admin_enabled()
+        custom_hash = get_default_superadmin_password_hash()
+        pw_hash = custom_hash or get_password_hash(settings.SUPERADMIN_PASSWORD)
         return {
             "id": "usr_admin",
-            "username": "superadmin",
-            "hashed_password": get_password_hash("admin"),
+            "username": settings.SUPERADMIN_USERNAME or "superadmin",
+            "hashed_password": pw_hash,
             "full_name": "Setu Super Admin",
             "phone": "+91 98450 99999",
-            "official_email": "admin@setu.ag",
+            "official_email": settings.SUPERADMIN_EMAIL or "admin@setu.ag",
             "whatsapp_number": "+91 98450 99999",
             "preferred_language": "en",
             "role": "superadmin",
+            "sub_role": "Owner (Default)",
             "farm_name": "Central Sericulture Command",
             "region": "Mulbagal Regional HQ",
             "shed_id": "shed_01",
-            "is_active": True,
+            "is_default": True,
+            "is_active": is_active,
             "created_at": "2026-01-01T00:00:00Z"
         }
 

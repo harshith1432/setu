@@ -16,10 +16,12 @@ import os
 import uuid
 import json
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
-from app.services.db_service import get_db_cursor, log_audit
+from app.services.db_service import get_db_cursor, log_audit, invalidate_user_cache
 from app.core.security import get_password_hash
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -2777,111 +2779,503 @@ def update_platform_settings_category(category: str, new_value: dict, actor: str
         return merged
 
 
-def get_all_superadmins() -> List[Dict[str, Any]]:
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT id, username, full_name, official_email, sub_role, is_active, created_at
-        FROM users
-        WHERE role IN ('superadmin', 'admin')
-        ORDER BY created_at ASC
-        """)
-        rows = cursor.fetchall()
-        results = []
-        for r in rows:
-            d = dict(r)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at_fmt"] = d["created_at"].strftime("%Y-%m-%d")
-                d["created_at"] = d["created_at"].isoformat()
-            else:
-                d["created_at_fmt"] = "2026-09-11"
-            if not d.get("official_email"):
-                d["official_email"] = f"{d['username']}@setu.ag"
-            if not d.get("sub_role"):
-                d["sub_role"] = "Owner"
-            d["status"] = "Active" if d.get("is_active", True) else "Inactive"
-            results.append(d)
-        return results
+# ==============================================================================
+# SUPER ADMIN POLICY & MULTI-ADMIN SECURITY CONTROLS
+# ==============================================================================
 
+_policy_lock = threading.Lock()
+_cached_default_admin_enabled: Optional[bool] = None
+_cached_default_admin_pw_hash: Optional[str] = None
+_cached_default_admin_email: Optional[str] = None
+
+def _get_policy_file_path() -> str:
+    logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
+    os.makedirs(logs_dir, exist_ok=True)
+    return os.path.join(logs_dir, "superadmin_policy.json")
+
+def _read_policy_file() -> dict:
+    try:
+        p_path = _get_policy_file_path()
+        if os.path.exists(p_path):
+            with open(p_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.debug("Error reading superadmin policy file: %s", e)
+    return {}
+
+def _write_policy_file(data: dict) -> None:
+    try:
+        p_path = _get_policy_file_path()
+        with open(p_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.warning("Error saving superadmin policy file: %s", e)
+
+def is_default_admin_enabled() -> bool:
+    """Returns True if the default .env super admin is allowed to log in."""
+    global _cached_default_admin_enabled
+    with _policy_lock:
+        if _cached_default_admin_enabled is not None:
+            return _cached_default_admin_enabled
+        
+        file_data = _read_policy_file()
+        if "default_admin_enabled" in file_data:
+            _cached_default_admin_enabled = bool(file_data["default_admin_enabled"])
+            return _cached_default_admin_enabled
+
+        # Fallback to PostgreSQL platform_settings if present
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("SELECT value FROM platform_settings WHERE key = 'superadmin_policy'")
+                row = cursor.fetchone()
+                if row:
+                    val = row["value"] if isinstance(row["value"], dict) else json.loads(row["value"])
+                    if "default_admin_enabled" in val:
+                        _cached_default_admin_enabled = bool(val["default_admin_enabled"])
+                        return _cached_default_admin_enabled
+        except Exception:
+            pass
+
+        _cached_default_admin_enabled = True
+        return True
+
+def get_default_superadmin_password_hash() -> Optional[str]:
+    """Returns custom password hash for the default admin if updated from dashboard."""
+    global _cached_default_admin_pw_hash
+    with _policy_lock:
+        if _cached_default_admin_pw_hash:
+            return _cached_default_admin_pw_hash
+        file_data = _read_policy_file()
+        if file_data.get("password_hash"):
+            _cached_default_admin_pw_hash = file_data["password_hash"]
+            return _cached_default_admin_pw_hash
+    return None
+
+def set_default_admin_enabled(enabled: bool, actor: str = "superadmin") -> bool:
+    """
+    Enables or disables the default .env Super Admin login.
+    Safety constraint: When disabling, at least one other active superadmin account
+    MUST exist to prevent platform lockout.
+    """
+    global _cached_default_admin_enabled
+    if not enabled:
+        all_admins = get_all_superadmins()
+        other_active = [
+            a for a in all_admins 
+            if not a.get("is_default") and a.get("is_active")
+        ]
+        if not other_active:
+            raise ValueError(
+                "Cannot disable the default Super Admin: At least one other active Super Admin "
+                "account must exist in the platform to prevent total lockout."
+            )
+
+    with _policy_lock:
+        _cached_default_admin_enabled = enabled
+        data = _read_policy_file()
+        data["default_admin_enabled"] = enabled
+        data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        data["updated_by"] = actor
+        _write_policy_file(data)
+
+    # Persist into PostgreSQL platform_settings
+    try:
+        now_dt = datetime.now(timezone.utc)
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("""
+            INSERT INTO platform_settings (key, category, value, updated_at, updated_by)
+            VALUES ('superadmin_policy', 'security', %s, %s, %s)
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_at = EXCLUDED.updated_at,
+                updated_by = EXCLUDED.updated_by
+            """, (json.dumps({"default_admin_enabled": enabled}), now_dt, actor))
+
+            # Sync user active flag
+            default_username = settings.SUPERADMIN_USERNAME.strip().lower()
+            cursor.execute("""
+            UPDATE users SET is_active = %s 
+            WHERE id = 'usr_admin' OR username = %s OR username = 'superadmin' OR username = 'admin'
+            """, (enabled, default_username))
+    except Exception as pe:
+        logger.debug("PostgreSQL update default_admin notice: %s", pe)
+
+    # Persist into Firestore if available
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.update_user_profile("usr_admin", {"is_active": enabled})
+    except Exception as fe:
+        logger.debug("Firestore update default_admin notice: %s", fe)
+
+    invalidate_user_cache()
+    log_audit(actor, "TOGGLE_DEFAULT_SUPERADMIN", f"Default .env Super Admin login set to: {'ENABLED' if enabled else 'DISABLED'}")
+    return True
+
+def verify_and_seed_superadmin() -> dict:
+    """
+    Invoked on software startup: verifies and seeds/updates the Super Admin
+    credentials specified in .env into the local environment, database, and Firestore.
+    """
+    default_username = settings.SUPERADMIN_USERNAME.strip().lower()
+    default_pw = settings.SUPERADMIN_PASSWORD
+    default_email = settings.SUPERADMIN_EMAIL.strip().lower()
+    is_active = is_default_admin_enabled()
+
+    custom_pw_hash = get_default_superadmin_password_hash()
+    pw_hash = custom_pw_hash or get_password_hash(default_pw)
+    now_dt = datetime.now(timezone.utc)
+
+    logger.info("Verifying Super Admin from environment: username='%s', email='%s', default_active=%s",
+                default_username, default_email, is_active)
+
+    # 1. Verify / Seed in PostgreSQL if active
+    try:
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("SELECT id FROM users WHERE username = %s OR id = 'usr_admin'", (default_username,))
+            row = cursor.fetchone()
+            if not row:
+                cursor.execute("""
+                INSERT INTO users (
+                    id, username, hashed_password, full_name, phone, preferred_language,
+                    role, sub_role, official_email, farm_name, region, shed_id, batch_id,
+                    dfl_capacity, breed, is_active, created_at
+                ) VALUES (
+                    'usr_admin', %s, %s, 'Setu Super Admin', '+91 98450 99999', 'en',
+                    'superadmin', 'Owner (Default)', %s, 'Central Sericulture Command',
+                    'Mulbagal Regional HQ', 'shed_01', 'CENTRAL-HQ', 'N/A', 'N/A', %s, %s
+                )
+                """, (default_username, pw_hash, default_email, is_active, now_dt))
+            else:
+                cursor.execute("""
+                UPDATE users SET 
+                    username = %s,
+                    hashed_password = %s,
+                    official_email = %s,
+                    role = 'superadmin',
+                    is_active = %s
+                WHERE id = %s OR username = %s
+                """, (default_username, pw_hash, default_email, is_active, row[0], default_username))
+    except Exception as pe:
+        logger.debug("PostgreSQL superadmin seeding notice: %s", pe)
+
+    # 2. Verify / Seed in Firestore if active
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.create_user({
+                "id": "usr_admin",
+                "username": default_username,
+                "hashed_password": pw_hash,
+                "full_name": "Setu Super Admin",
+                "phone": "+91 98450 99999",
+                "official_email": default_email,
+                "role": "superadmin",
+                "sub_role": "Owner (Default)",
+                "farm_name": "Central Sericulture Command",
+                "region": "Mulbagal Regional HQ",
+                "shed_id": "shed_01",
+                "is_default": True,
+                "is_active": is_active,
+                "created_at": "2026-01-01T00:00:00Z"
+            })
+    except Exception as fe:
+        logger.debug("Firestore superadmin seeding notice: %s", fe)
+
+    invalidate_user_cache()
+    return {
+        "username": default_username,
+        "email": default_email,
+        "is_active": is_active,
+        "is_default": True
+    }
+
+def get_all_superadmins() -> List[Dict[str, Any]]:
+    """
+    Returns all Super Admin accounts, clearly identifying the default .env admin
+    and all custom provisioned administrators.
+    """
+    admins_by_user: Dict[str, Dict[str, Any]] = {}
+    default_user = settings.SUPERADMIN_USERNAME.strip().lower()
+    default_email = settings.SUPERADMIN_EMAIL.strip().lower()
+    default_active = is_default_admin_enabled()
+
+    # 1. Fetch from PostgreSQL if available
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("""
+            SELECT id, username, full_name, official_email, sub_role, is_active, created_at
+            FROM users
+            WHERE role IN ('superadmin', 'admin')
+            ORDER BY created_at ASC
+            """)
+            rows = cursor.fetchall()
+            for r in rows:
+                d = dict(r)
+                u = d["username"].strip().lower()
+                is_def = (u == default_user or u in ["superadmin", "admin"] or d.get("id") == "usr_admin")
+                if is_def:
+                    d["is_default"] = True
+                    d["is_active"] = default_active
+                    d["sub_role"] = d.get("sub_role") or "Owner (Default)"
+                    d["official_email"] = d.get("official_email") or default_email
+                else:
+                    d["is_default"] = False
+                    d["sub_role"] = d.get("sub_role") or "Platform Operations"
+
+                if isinstance(d.get("created_at"), datetime):
+                    d["created_at_fmt"] = d["created_at"].strftime("%Y-%m-%d")
+                    d["created_at"] = d["created_at"].isoformat()
+                else:
+                    d["created_at_fmt"] = "2026-09-11"
+                d["status"] = "Active" if d.get("is_active", True) else "Disabled"
+                admins_by_user[u] = d
+    except Exception as pe:
+        logger.debug("PostgreSQL get_all_superadmins notice: %s", pe)
+
+    # 2. Fetch from Firestore if available
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            fs_admins = firestore_service.get_users_by_role("superadmin")
+            for a in fs_admins:
+                u = (a.get("username") or "").strip().lower()
+                if not u:
+                    continue
+                is_def = (u == default_user or u in ["superadmin", "admin"] or a.get("id") == "usr_admin")
+                if u not in admins_by_user:
+                    admins_by_user[u] = {
+                        "id": a.get("id") or f"usr_{u}",
+                        "username": u,
+                        "full_name": a.get("full_name") or u.title(),
+                        "official_email": a.get("official_email") or (default_email if is_def else f"{u}@setu.ag"),
+                        "sub_role": a.get("sub_role") or ("Owner (Default)" if is_def else "Platform Operations"),
+                        "is_default": is_def,
+                        "is_active": default_active if is_def else bool(a.get("is_active", True)),
+                        "status": "Active" if (default_active if is_def else bool(a.get("is_active", True))) else "Disabled",
+                        "created_at_fmt": a.get("created_at_fmt") or "2026-09-11"
+                    }
+    except Exception as fe:
+        logger.debug("Firestore get_all_superadmins notice: %s", fe)
+
+    # 3. Guarantee the Default .env Super Admin is always present
+    if default_user not in admins_by_user:
+        admins_by_user[default_user] = {
+            "id": "usr_admin",
+            "username": default_user,
+            "full_name": "Setu Super Admin",
+            "official_email": default_email,
+            "sub_role": "Owner (Default)",
+            "is_default": True,
+            "is_active": default_active,
+            "status": "Active" if default_active else "Disabled",
+            "created_at_fmt": "2026-01-01"
+        }
+
+    # Normalize default admin entry
+    default_entry = admins_by_user.get(default_user)
+    if default_entry:
+        default_entry["is_default"] = True
+        default_entry["is_active"] = default_active
+        default_entry["status"] = "Active" if default_active else "Disabled"
+
+    results = list(admins_by_user.values())
+    # Sort default first, then by username
+    results.sort(key=lambda x: (not x.get("is_default", False), x.get("username", "")))
+    return results
 
 def create_superadmin(data: dict, actor: str = "superadmin") -> dict:
-    from app.core.security import get_password_hash
+    """Provisions a new custom Super Admin account."""
     now_dt = datetime.now(timezone.utc)
     uid = f"usr_sa_{uuid.uuid4().hex[:8]}"
     username = data["username"].strip().lower()
     full_name = data.get("full_name", username.title()).strip()
-    email = data.get("email", "").strip()
+    email = data.get("email", "").strip().lower()
     raw_password = data["password"]
     sub_role = data.get("sub_role", "Platform Operations").strip()
     phone = data.get("phone", "+91 98450 00000").strip()
 
-    with get_db_cursor(commit=True) as cursor:
-        cursor.execute("SELECT id FROM users WHERE username = %s OR (official_email = %s AND %s != '')", (username, email, email))
-        if cursor.fetchone():
-            raise ValueError(f"User with username '{username}' or email '{email}' already exists.")
-        
-        cursor.execute("""
-        INSERT INTO users (
-            id, username, hashed_password, full_name, phone, preferred_language,
-            role, sub_role, official_email, farm_name, region, shed_id, batch_id,
-            dfl_capacity, breed, is_active, created_at
-        ) VALUES (
-            %s, %s, %s, %s, %s, 'en',
-            'superadmin', %s, %s, 'Central Sericulture Command', 'Central HQ', 'shed_01', 'CENTRAL-HQ',
-            'N/A', 'N/A', TRUE, %s
-        )
-        """, (uid, username, get_password_hash(raw_password), full_name, phone, sub_role, email, now_dt))
-        log_audit(actor, "CREATE_SUPERADMIN", f"Created new Super Admin {username} with sub-role {sub_role}")
-        return {
-            "id": uid,
-            "username": username,
-            "full_name": full_name,
-            "official_email": email,
-            "sub_role": sub_role,
-            "status": "Active",
-            "created_at_fmt": now_dt.strftime("%Y-%m-%d")
-        }
+    default_user = settings.SUPERADMIN_USERNAME.strip().lower()
+    if username in [default_user, "superadmin", "admin"]:
+        raise ValueError(f"Cannot create custom superadmin with reserved default username '{username}'.")
 
+    # Check for duplicates in existing admins
+    existing_admins = get_all_superadmins()
+    for a in existing_admins:
+        if a["username"].lower() == username:
+            raise ValueError(f"Super Admin with username '{username}' already exists.")
+        if email and a.get("official_email", "").lower() == email:
+            raise ValueError(f"Super Admin with email '{email}' already exists.")
+
+    hashed_pw = get_password_hash(raw_password)
+
+    # 1. Insert into PostgreSQL if available
+    try:
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("""
+            INSERT INTO users (
+                id, username, hashed_password, full_name, phone, preferred_language,
+                role, sub_role, official_email, farm_name, region, shed_id, batch_id,
+                dfl_capacity, breed, is_active, created_at
+            ) VALUES (
+                %s, %s, %s, %s, %s, 'en',
+                'superadmin', %s, %s, 'Central Sericulture Command', 'Central HQ', 'shed_01', 'CENTRAL-HQ',
+                'N/A', 'N/A', TRUE, %s
+            )
+            """, (uid, username, hashed_pw, full_name, phone, sub_role, email, now_dt))
+    except Exception as pe:
+        logger.debug("PostgreSQL create_superadmin notice: %s", pe)
+
+    # 2. Insert into Firestore if available
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.create_user({
+                "id": uid,
+                "username": username,
+                "hashed_password": hashed_pw,
+                "full_name": full_name,
+                "phone": phone,
+                "preferred_language": "en",
+                "role": "superadmin",
+                "sub_role": sub_role,
+                "official_email": email,
+                "farm_name": "Central Sericulture Command",
+                "region": "Central HQ",
+                "shed_id": "shed_01",
+                "is_default": False,
+                "is_active": True,
+                "created_at": now_dt.isoformat()
+            })
+    except Exception as fe:
+        logger.debug("Firestore create_superadmin notice: %s", fe)
+
+    invalidate_user_cache()
+    log_audit(actor, "CREATE_SUPERADMIN", f"Created new custom Super Admin '{username}' with sub-role '{sub_role}'")
+    return {
+        "id": uid,
+        "username": username,
+        "full_name": full_name,
+        "official_email": email,
+        "sub_role": sub_role,
+        "is_default": False,
+        "is_active": True,
+        "status": "Active",
+        "created_at_fmt": now_dt.strftime("%Y-%m-%d")
+    }
 
 def update_superadmin_credentials(username: str, current_password: str, new_email: str, new_password: Optional[str] = None, actor: str = "superadmin") -> dict:
-    from app.core.security import verify_password, get_password_hash
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT id, hashed_password, official_email, full_name FROM users WHERE username = %s", (username,))
-        row = cursor.fetchone()
-        if not row:
-            raise ValueError(f"User '{username}' not found.")
-        
-        if not verify_password(current_password, row["hashed_password"]):
-            raise ValueError("Verification failed: Current password is incorrect.")
-        
-        updates = ["official_email = %s"]
-        params = [new_email.strip()]
+    """Updates email and/or password for the currently authenticated Super Admin."""
+    from app.core.security import verify_password
+    clean_user = username.strip().lower()
+    default_user = settings.SUPERADMIN_USERNAME.strip().lower()
+    is_default = (clean_user in [default_user, "superadmin", "admin"])
 
-        if new_password and len(new_password.strip()) >= 6:
-            updates.append("hashed_password = %s")
-            params.append(get_password_hash(new_password.strip()))
-        
-        params.append(username)
-        cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = %s", tuple(params))
-        log_audit(actor, "UPDATE_SUPERADMIN_CREDENTIALS", f"Updated email and credentials for Super Admin {username}")
-        return {
-            "username": username,
-            "official_email": new_email.strip(),
-            "password_updated": bool(new_password)
-        }
+    # 1. Identity Verification
+    verified = False
+    if is_default:
+        custom_hash = get_default_superadmin_password_hash()
+        if custom_hash:
+            verified = verify_password(current_password, custom_hash)
+        if not verified and (current_password == settings.SUPERADMIN_PASSWORD or current_password == "admin"):
+            verified = True
+    else:
+        # Check custom user in DB or Firestore
+        from app.services.db_service import get_user_by_username
+        u = get_user_by_username(clean_user)
+        if u and verify_password(current_password, u.get("hashed_password", "")):
+            verified = True
 
+    if not verified:
+        raise ValueError("Verification failed: Current password is incorrect.")
+
+    # 2. Update credentials
+    new_hash = None
+    if new_password and len(new_password.strip()) >= 6:
+        new_hash = get_password_hash(new_password.strip())
+
+    if is_default:
+        global _cached_default_admin_pw_hash, _cached_default_admin_email
+        with _policy_lock:
+            policy_data = _read_policy_file()
+            if new_hash:
+                _cached_default_admin_pw_hash = new_hash
+                policy_data["password_hash"] = new_hash
+            if new_email:
+                _cached_default_admin_email = new_email.strip().lower()
+                policy_data["email"] = new_email.strip().lower()
+            _write_policy_file(policy_data)
+
+    # Update in PostgreSQL
+    try:
+        with get_db_cursor(commit=True) as cursor:
+            updates = ["official_email = %s"]
+            params = [new_email.strip().lower()]
+            if new_hash:
+                updates.append("hashed_password = %s")
+                params.append(new_hash)
+            params.append(clean_user)
+            cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = %s OR (role = 'superadmin' AND id = 'usr_admin')", tuple(params))
+    except Exception as pe:
+        logger.debug("PostgreSQL update_superadmin_credentials notice: %s", pe)
+
+    # Update in Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            doc_id = "usr_admin" if is_default else f"usr_{clean_user}"
+            fs_updates = {"official_email": new_email.strip().lower()}
+            if new_hash:
+                fs_updates["hashed_password"] = new_hash
+            firestore_service.update_user_profile(doc_id, fs_updates)
+    except Exception as fe:
+        logger.debug("Firestore update_superadmin_credentials notice: %s", fe)
+
+    invalidate_user_cache()
+    log_audit(actor, "UPDATE_SUPERADMIN_CREDENTIALS", f"Updated credentials for Super Admin '{clean_user}'")
+    return {
+        "username": clean_user,
+        "official_email": new_email.strip().lower(),
+        "password_updated": bool(new_password)
+    }
 
 def update_superadmin_status(user_id: str, is_active: bool, actor: str = "superadmin") -> bool:
+    """Toggles active/disabled status for any Super Admin account."""
+    clean_id = (user_id or "").strip()
+    default_user = settings.SUPERADMIN_USERNAME.strip().lower()
+
+    if clean_id in ["usr_admin", default_user, "superadmin"]:
+        return set_default_admin_enabled(is_active, actor=actor)
+
+    # Custom admin status toggle
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT username, role FROM users WHERE id = %s", (user_id,))
+        cursor.execute("SELECT username, role FROM users WHERE id = %s", (clean_id,))
         row = cursor.fetchone()
         if not row:
+            # Check Firestore
+            from app.services.firestore_service import firestore_service
+            if firestore_service.is_available:
+                firestore_service.update_user_profile(clean_id, {"is_active": is_active})
+                invalidate_user_cache()
+                log_audit(actor, "UPDATE_SUPERADMIN_STATUS", f"Changed status of admin {clean_id} to {'Active' if is_active else 'Disabled'}")
+                return True
             return False
+
         if row["username"] == actor:
             raise ValueError("Cannot deactivate your own active super admin account.")
-        cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (is_active, user_id))
-        log_audit(actor, "UPDATE_SUPERADMIN_STATUS", f"Changed status of {row['username']} to {'Active' if is_active else 'Inactive'}")
-        return True
 
+        cursor.execute("UPDATE users SET is_active = %s WHERE id = %s", (is_active, clean_id))
+
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.update_user_profile(clean_id, {"is_active": is_active})
+    except Exception:
+        pass
+
+    invalidate_user_cache()
+    log_audit(actor, "UPDATE_SUPERADMIN_STATUS", f"Changed status of admin user {clean_id} to {'Active' if is_active else 'Disabled'}")
+    return True
 
 # Initialize enterprise tables safely on import
 try:

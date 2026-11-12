@@ -152,3 +152,91 @@ async def test_rbac_farmer_cannot_access_platform_settings(async_client, farmer_
         headers=farmer_headers
     )
     assert res3.status_code == 403
+
+
+@pytest.mark.anyio
+async def test_env_superadmin_verification_and_toggle_flow(async_client, admin_token):
+    from app.core.config import settings
+    from app.services.enterprise_db import set_default_admin_enabled
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Reset state to enabled initially
+    set_default_admin_enabled(True, "test_setup")
+
+    # 1. Fetch superadmins and verify default_admin_enabled is True
+    res = await async_client.get("/api/v1/platform/superadmins", headers=headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["default_admin_enabled"] is True
+
+    # 2. Verify default admin can authenticate via /auth/login with .env password
+    default_pw = settings.SUPERADMIN_PASSWORD
+    login_default = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
+    )
+    assert login_default.status_code == 200
+    assert "access_token" in login_default.json()
+
+    # 3. Create a secondary active super admin
+    new_admin_user = f"custom_sa_{settings.SUPERADMIN_USERNAME}"
+    new_admin_pw = "CustomSecurePassword123!"
+    add_res = await async_client.post(
+        "/api/v1/platform/superadmins",
+        json={
+            "username": new_admin_user,
+            "full_name": "Custom Platform Admin",
+            "email": f"{new_admin_user}@setu.ag",
+            "password": new_admin_pw,
+            "sub_role": "Platform Operations"
+        },
+        headers=headers
+    )
+    assert add_res.status_code in [200, 400]
+
+    # Verify custom admin can authenticate
+    login_custom = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": new_admin_user, "password": new_admin_pw}
+    )
+    assert login_custom.status_code == 200
+
+    # 4. Disable the default .env super admin
+    toggle_off = await async_client.post(
+        "/api/v1/platform/superadmins/toggle-default",
+        json={"enabled": False},
+        headers=headers
+    )
+    assert toggle_off.status_code == 200
+    assert toggle_off.json()["default_admin_enabled"] is False
+
+    # 5. Verify default admin from .env is now BLOCKED (403 Forbidden)
+    blocked_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
+    )
+    assert blocked_login.status_code == 403
+    assert "disabled" in blocked_login.json()["detail"].lower()
+
+    # 6. Verify custom super admin can STILL authenticate while default admin is disabled
+    login_custom_while_disabled = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": new_admin_user, "password": new_admin_pw}
+    )
+    assert login_custom_while_disabled.status_code == 200
+
+    # 7. Re-enable the default super admin
+    toggle_on = await async_client.post(
+        "/api/v1/platform/superadmins/toggle-default",
+        json={"enabled": True},
+        headers=headers
+    )
+    assert toggle_on.status_code == 200
+    assert toggle_on.json()["default_admin_enabled"] is True
+
+    # 8. Verify default admin can log in again
+    re_login = await async_client.post(
+        "/api/v1/auth/login",
+        json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
+    )
+    assert re_login.status_code == 200

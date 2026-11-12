@@ -33,6 +33,9 @@ class Settings(BaseModel):
     FIREBASE_SERVICE_ACCOUNT_B64: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64", "")
 
     # Security & Access Control
+    SUPERADMIN_USERNAME: str = os.getenv("SUPERADMIN_USERNAME", "superadmin")
+    SUPERADMIN_PASSWORD: str = os.getenv("SUPERADMIN_PASSWORD", os.getenv("INITIAL_ADMIN_PASSWORD", "admin"))
+    SUPERADMIN_EMAIL: str = os.getenv("SUPERADMIN_EMAIL", "admin@setu.ag")
     INITIAL_ADMIN_PASSWORD: str = os.getenv("INITIAL_ADMIN_PASSWORD", "admin")
     DEVICE_API_KEY: str = os.getenv("DEVICE_API_KEY", "setu-iot-device-key-2026")
     ALLOWED_ORIGINS: list[str] = [

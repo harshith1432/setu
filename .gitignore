@@ -124,6 +124,7 @@ Desktop.ini
 *.db
 tmp/
 temp/
+backend/logs/
 
 /home/nihal-ubuntu/Desktop/Development/Seva First Innovation/setu/setu-96d33-firebase-adminsdk-fbsvc-c71914b018.json
 setu-96d33-firebase-adminsdk-fbsvc-c71914b018.json

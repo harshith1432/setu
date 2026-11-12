@@ -153,6 +153,15 @@ def startup_db_init():
     else:
         log.info("Firebase Cloud Firestore operating in fallback mode.")
 
+    # SEC-01 & ENV-AUTH: Verify Super Admin from environment file on software startup
+    try:
+        from app.services.enterprise_db import verify_and_seed_superadmin
+        admin_meta = verify_and_seed_superadmin()
+        log.info("Super Admin verified from environment (.env): username='%s', active=%s", 
+                 admin_meta.get("username"), admin_meta.get("is_active"))
+    except Exception as se:
+        log.warning("Super Admin environment verification notice: %s", se)
+
     from app.services.db_service import _postgres_available, get_pool
     # If postgres is disabled or unavailable, skip without blocking
     p = get_pool()

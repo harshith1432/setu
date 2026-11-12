@@ -526,6 +526,17 @@ class FirestoreService:
             logger.debug("Firestore get_all_users error: %s", e)
             return []
 
+    def get_users_by_role(self, role: str) -> List[Dict[str, Any]]:
+        """Queries users matching a specific role in Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("users").where("role", "==", role).stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_users_by_role notice: %s", e)
+            return []
+
     # =========================================================================
     # 6. SHEDS & FARM REARING MANAGEMENT
     # =========================================================================

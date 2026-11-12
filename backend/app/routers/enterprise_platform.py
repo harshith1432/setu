@@ -1339,6 +1339,10 @@ class UpdateAdminCredentialsIn(BaseModel):
     confirm_new_password: Optional[str] = None
 
 
+class ToggleDefaultAdminIn(BaseModel):
+    enabled: bool
+
+
 @router.get("/platform/settings")
 def get_platform_settings_route(
     user: dict = Depends(require_roles(["superadmin", "admin", "ceo"]))
@@ -1365,9 +1369,35 @@ def update_platform_settings_route(
 def get_superadmins_route(
     user: dict = Depends(require_roles(["superadmin", "admin"]))
 ):
-    from app.services.enterprise_db import get_all_superadmins
+    from app.services.enterprise_db import get_all_superadmins, is_default_admin_enabled
+    from app.core.config import settings
     admins = get_all_superadmins()
-    return {"status": "success", "total": len(admins), "admins": admins}
+    default_enabled = is_default_admin_enabled()
+    return {
+        "status": "success",
+        "total": len(admins),
+        "admins": admins,
+        "default_admin_enabled": default_enabled,
+        "default_admin_username": settings.SUPERADMIN_USERNAME
+    }
+
+
+@router.post("/platform/superadmins/toggle-default")
+def toggle_default_admin_route(
+    payload: ToggleDefaultAdminIn,
+    user: dict = Depends(require_roles(["superadmin", "admin"]))
+):
+    from app.services.enterprise_db import set_default_admin_enabled
+    actor = user.get("sub", user.get("username", "admin"))
+    try:
+        set_default_admin_enabled(payload.enabled, actor=actor)
+        return {
+            "status": "success",
+            "default_admin_enabled": payload.enabled,
+            "message": f"Default Super Admin login {'enabled' if payload.enabled else 'disabled'} successfully."
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/platform/superadmins")
