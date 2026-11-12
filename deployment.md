@@ -40,9 +40,19 @@ Install backend dependencies:
 pip install -r backend/requirements.txt
 ```
 
-### 2.4 Run Development Server
+### 2.4 Automated Database Schema Verification & Table Creation
+The software automatically checks the database every time it boots:
+- If all tables already exist, it verifies the schema and proceeds immediately.
+- If tables are missing (e.g. fresh database or new deployment), it automatically creates all 36+ required tables, indexes, and baseline seeds before starting the web server.
+
+You can also run the verification manually at any time or as a deployment release command:
 ```bash
-# Start backend on port 8000
+python backend/init_db.py
+```
+
+### 2.5 Run Development Server
+```bash
+# Start backend on port 8000 (automated DB check runs on startup)
 python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
 ```
 

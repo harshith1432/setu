@@ -41,6 +41,17 @@ def _set_cached_latest_reading(shed_id: str, data: Dict[str, Any]) -> None:
 
 _postgres_available: Optional[bool] = None
 
+class _DummyRow(dict):
+    """Safe row object supporting both integer index and string key access in fallback mode."""
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return 0
+        return super().get(item, 0)
+
+    def get(self, key, default=0):
+        return super().get(key, default)
+
+
 class _DummyCursor:
     """Safe no-op cursor for legacy SQL callers when running in pure Firebase mode."""
     def __init__(self):
@@ -51,7 +62,7 @@ class _DummyCursor:
     def executemany(self, query, params=None):
         return self
     def fetchone(self):
-        return None
+        return _DummyRow()
     def fetchall(self):
         return []
     def fetchmany(self, size=None):
@@ -520,7 +531,8 @@ def init_db():
 
         # Pre-seed Stage Thresholds if empty
         cursor.execute("SELECT COUNT(*) FROM stage_thresholds")
-        if cursor.fetchone()[0] == 0:
+        count_row = cursor.fetchone()
+        if count_row and count_row[0] == 0:
             for stage in [
                 (1, "1st Instar (Chawki)", "Days 1–3", 27.0, 28.0, 80.0, 85.0, 0.5, 3.0, 1.5, "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation.", now_dt),
                 (2, "2nd Instar", "Days 4–5", 26.5, 27.5, 75.0, 80.0, 0.5, 3.0, 1.5, "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements.", now_dt),

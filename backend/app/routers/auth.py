@@ -26,6 +26,35 @@ from app.services.whatsapp_alerts import alert_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
+def _build_user_out(user_data: Optional[Dict[str, Any]]) -> UserOut:
+    """Safe constructor for UserOut model that guarantees default fallbacks and avoids KeyError."""
+    if not isinstance(user_data, dict):
+        user_data = {}
+    return UserOut(
+        id=str(user_data.get("id") or ""),
+        username=str(user_data.get("username") or "user"),
+        full_name=str(user_data.get("full_name") or user_data.get("username") or "User"),
+        phone=str(user_data.get("phone") or ""),
+        official_email=user_data.get("official_email") or user_data.get("email"),
+        email=user_data.get("official_email") or user_data.get("email"),
+        access_scope=str(user_data.get("access_scope") or "GLOBAL"),
+        whatsapp_number=user_data.get("whatsapp_number"),
+        whatsapp_verified=bool(user_data.get("whatsapp_verified", False)),
+        preferred_language=str(user_data.get("preferred_language") or "en"),
+        role=str(user_data.get("role") or "farmer"),
+        farm_name=str(user_data.get("farm_name") or "Green Valley Sericulture Farm"),
+        region=str(user_data.get("region") or "Local Rearing Shed"),
+        latitude=user_data.get("latitude"),
+        longitude=user_data.get("longitude"),
+        shed_id=str(user_data.get("shed_id") or "shed_01"),
+        batch_id=str(user_data.get("batch_id") or "SERI-2026-M04"),
+        dfl_capacity=str(user_data.get("dfl_capacity") or "200 DFL"),
+        breed=str(user_data.get("breed") or "Double Hybrid (FC1 x FC2)"),
+        is_active=bool(user_data.get("is_active", True)),
+        created_at=user_data.get("created_at"),
+        current_stage=user_data.get("current_stage", 3)
+    )
+
 @router.post("/login", response_model=Token)
 def login(credentials: UserLogin, request: Request = None):
     user = get_user_by_username_or_phone(credentials.username)
@@ -131,16 +160,16 @@ def login(credentials: UserLogin, request: Request = None):
     log_audit(user["username"], "LOGIN", f"User logged in from client (role: {user['role']})")
 
     user_out = UserOut(
-        id=user["id"],
-        username=user["username"],
-        full_name=user["full_name"],
-        phone=user["phone"],
+        id=user.get("id", "usr_unknown"),
+        username=user.get("username", "user"),
+        full_name=user.get("full_name", user.get("username", "User")),
+        phone=user.get("phone", "+91 98450 00000"),
         official_email=user.get("official_email"),
                 access_scope=user.get("access_scope", "GLOBAL"),
         whatsapp_number=user.get("whatsapp_number"),
         whatsapp_verified=bool(user.get("whatsapp_verified", False)),
-        preferred_language=user["preferred_language"],
-        role=user["role"],
+        preferred_language=user.get("preferred_language", "en"),
+        role=user.get("role", "farmer"),
         farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
         region=user.get("region", "Local Rearing Shed"),
         batch_id=user.get("batch_id", "SERI-2026-M04"),

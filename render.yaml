@@ -7,7 +7,7 @@ services:
     branch: main
     autoDeploy: true
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    startCommand: python backend/init_db.py && uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
@@ -20,8 +20,10 @@ services:
         value: backend
       - key: SETU_SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
       - key: USE_FIREBASE_ONLY
-        value: "true"
+        value: "false"
       - key: FIREBASE_PROJECT_ID
         value: setu-a767c
       - key: FIREBASE_SERVICE_ACCOUNT_B64

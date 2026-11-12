@@ -147,37 +147,15 @@ app.include_router(employees.router, prefix=settings.API_V1_STR)
 def startup_db_init():
     import logging
     log = logging.getLogger("main")
-    from app.services.firestore_service import firestore_service
-    if firestore_service.is_available:
-        log.info("Firebase Cloud Firestore initialized and active as primary cloud database.")
-    else:
-        log.info("Firebase Cloud Firestore operating in fallback mode.")
-
-    # SEC-01 & ENV-AUTH: Verify Super Admin from environment file on software startup
+    
+    # Run comprehensive automated database check and schema initialization
     try:
-        from app.services.enterprise_db import verify_and_seed_superadmin
-        admin_meta = verify_and_seed_superadmin()
-        log.info("Super Admin verified from environment (.env): username='%s', active=%s", 
-                 admin_meta.get("username"), admin_meta.get("is_active"))
-    except Exception as se:
-        log.warning("Super Admin environment verification notice: %s", se)
-
-    from app.services.db_service import _postgres_available, get_pool
-    # If postgres is disabled or unavailable, skip without blocking
-    p = get_pool()
-    if not p:
-        log.info("Operating in pure Firebase Cloud Firestore mode. PostgreSQL startup skipped.")
-        return
-
-    try:
-        from app.services.db_service import init_db
-        init_db()
-        from app.services.enterprise_db import init_enterprise_tables
-        init_enterprise_tables()
-        from app.services.org_employee_db import init_org_employee_tables
-        init_org_employee_tables()
+        from app.services.db_initializer import verify_and_ensure_database_ready
+        db_status = verify_and_ensure_database_ready()
+        pg_status = db_status.get("postgres", {}).get("status", "ready")
+        log.info("Startup automated database check completed successfully (engine status: %s).", pg_status)
     except Exception as e:
-        log.info("Startup DB init deferred: %s", e)
+        log.error("Startup database check encountered an exception: %s", e)
 
 # Mount Super Admin Web Application
 admin_web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "admin_web"))
@@ -193,6 +171,17 @@ def admin_portal_page():
 
 if os.path.exists(admin_web_dir):
     app.mount("/admin", StaticFiles(directory=admin_web_dir, html=False), name="admin_web")
+
+@app.get("/firebase-db.js")
+def serve_firebase_db_script():
+    fb_path = os.path.join(admin_web_dir, "firebase-db.js")
+    if os.path.exists(fb_path):
+        return FileResponse(fb_path, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="firebase-db.js not found")
+
+admin_assets_dir = os.path.join(admin_web_dir, "assets")
+if os.path.exists(admin_assets_dir):
+    app.mount("/assets", StaticFiles(directory=admin_assets_dir), name="admin_assets")
 
 # Mount Public Landing Page
 landing_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "landing"))
