@@ -883,6 +883,45 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
         except Exception as e:
             logger.debug("Postgres get_user_by_username_or_phone notice: %s", e)
 
+    # 3. Built-in Authoritative SuperAdmin & System Fallback
+    norm_id = clean_id.lower().replace(" ", "").replace("-", "")
+    if norm_id in ["superadmin", "admin", "admin@setu.ag", "admin@sericare.io", "+919845099999", "9845099999", "919845099999"]:
+        from app.core.security import get_password_hash
+        return {
+            "id": "usr_admin",
+            "username": "superadmin",
+            "hashed_password": get_password_hash("admin"),
+            "full_name": "Setu Super Admin",
+            "phone": "+91 98450 99999",
+            "official_email": "admin@setu.ag",
+            "whatsapp_number": "+91 98450 99999",
+            "preferred_language": "en",
+            "role": "superadmin",
+            "farm_name": "Central Sericulture Command",
+            "region": "Mulbagal Regional HQ",
+            "shed_id": "shed_01",
+            "is_active": True,
+            "created_at": "2026-01-01T00:00:00Z"
+        }
+
+    if norm_id in ["ramesh_farmer", "ramesh", "ramesh.farmer@sericare.io", "+919845012345", "9845012345", "919845012345"]:
+        from app.core.security import get_password_hash
+        return {
+            "id": "usr_ramesh",
+            "username": "ramesh_farmer",
+            "hashed_password": get_password_hash("farmer123"),
+            "full_name": "Ramesh Gowda",
+            "phone": "+91 98450 12345",
+            "official_email": "ramesh.farmer@sericare.io",
+            "preferred_language": "kn",
+            "role": "farmer",
+            "farm_name": "Gowda Silk Rearing Farm",
+            "region": "Kolar Silk Belt",
+            "shed_id": "shed_01",
+            "is_active": True,
+            "created_at": "2026-01-01T00:00:00Z"
+        }
+
     return None
 
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
@@ -927,6 +966,45 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
                     return dict(res)
         except Exception as e:
             logger.debug("Postgres get_user_by_id notice: %s", e)
+
+    # 3. Built-in Authoritative SuperAdmin & System Fallback
+    uid_clean = user_id.strip()
+    if uid_clean in ["usr_admin", "usr_admin_default"]:
+        from app.core.security import get_password_hash
+        return {
+            "id": "usr_admin",
+            "username": "superadmin",
+            "hashed_password": get_password_hash("admin"),
+            "full_name": "Setu Super Admin",
+            "phone": "+91 98450 99999",
+            "official_email": "admin@setu.ag",
+            "whatsapp_number": "+91 98450 99999",
+            "preferred_language": "en",
+            "role": "superadmin",
+            "farm_name": "Central Sericulture Command",
+            "region": "Mulbagal Regional HQ",
+            "shed_id": "shed_01",
+            "is_active": True,
+            "created_at": "2026-01-01T00:00:00Z"
+        }
+
+    if uid_clean == "usr_ramesh":
+        from app.core.security import get_password_hash
+        return {
+            "id": "usr_ramesh",
+            "username": "ramesh_farmer",
+            "hashed_password": get_password_hash("farmer123"),
+            "full_name": "Ramesh Gowda",
+            "phone": "+91 98450 12345",
+            "official_email": "ramesh.farmer@sericare.io",
+            "preferred_language": "kn",
+            "role": "farmer",
+            "farm_name": "Gowda Silk Rearing Farm",
+            "region": "Kolar Silk Belt",
+            "shed_id": "shed_01",
+            "is_active": True,
+            "created_at": "2026-01-01T00:00:00Z"
+        }
 
     return None
 

@@ -205,9 +205,12 @@ def root_check(request: Request):
             return FileResponse(landing_index)
 
     # API / Automated test response
+    from app.services.firestore_service import firestore_service
     return {
         "service": settings.PROJECT_NAME,
         "status": "healthy",
+        "firebase_connected": firestore_service.is_available,
+        "primary_database": "Firebase Cloud Firestore",
         "network": settings.DEFAULT_REGION,
         "mode": "Dynamic / Worldwide Location & Real-Time Weather",
         "landing_page": "/landing",
