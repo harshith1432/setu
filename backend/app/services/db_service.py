@@ -282,6 +282,7 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org'")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_official_email ON users (official_email);")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;")
 
         # 2. IoT Device Registry
         cursor.execute("""
@@ -891,6 +892,8 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
                     d = dict(row)
                     if isinstance(d.get("created_at"), datetime):
                         d["created_at"] = d["created_at"].isoformat()
+                    d.setdefault("preferred_language", "en")
+                    d.setdefault("role", "farmer")
                     return d
         except Exception as e:
             logger.debug("Postgres get_user_by_username_or_phone notice: %s", e)
@@ -1202,6 +1205,15 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         assigned_shed = get_next_available_shed_id()
     user_data["shed_id"] = assigned_shed
 
+    role = user_data.get("role", "farmer")
+    if role != "superadmin":
+        if "must_change_password" not in user_data:
+            user_data["must_change_password"] = True
+        if not user_data.get("hashed_password"):
+            user_data["hashed_password"] = get_password_hash(settings.DEFAULT_NEW_USER_PASSWORD)
+    else:
+        user_data.setdefault("must_change_password", False)
+
     # 1. Primary write to Firebase Cloud Firestore
     try:
         from app.services.firestore_service import firestore_service
@@ -1220,9 +1232,9 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
                 INSERT INTO users (
                     id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
                     preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
-                    dfl_capacity, breed, official_email, organization_id, is_active, created_at
+                    dfl_capacity, breed, official_email, organization_id, is_active, must_change_password, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
                     user_data["id"],
                     user_data["username"],
@@ -1244,6 +1256,7 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
                     user_data.get("official_email"),
                     user_data.get("organization_id", "default_org"),
                     True,
+                    bool(user_data.get("must_change_password", False)),
                     created_at_dt
                 ))
         except Exception as pe:
@@ -1251,6 +1264,31 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
 
     invalidate_user_cache()
     return user_data
+
+def update_user_password(user_id: str, new_hashed_password: str, must_change_password: bool = False) -> bool:
+    """Updates user password hash and clears/sets must_change_password flag across PostgreSQL and Firestore."""
+    # 1. Update in Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.update_user_password(user_id, new_hashed_password, must_change_password=must_change_password)
+    except Exception as fe:
+        logger.debug("Firestore update_user_password notice: %s", fe)
+
+    # 2. Update in PostgreSQL
+    if _postgres_available is not False:
+        try:
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute("""
+                UPDATE users 
+                SET hashed_password = %s, must_change_password = %s 
+                WHERE id = %s
+                """, (new_hashed_password, must_change_password, user_id))
+        except Exception as pe:
+            logger.debug("Postgres update_user_password notice: %s", pe)
+
+    invalidate_user_cache()
+    return True
 
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     # 1. Update in Firebase Cloud Firestore

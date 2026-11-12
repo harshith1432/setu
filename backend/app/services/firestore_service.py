@@ -8,8 +8,11 @@ Project ID: setu-a767c
 import os
 import json
 import logging
+import warnings
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
+
+warnings.filterwarnings("ignore", category=UserWarning, module=".*firestore.*")
 
 logger = logging.getLogger("firestore_service")
 
@@ -314,6 +317,29 @@ class FirestoreService:
     # 5. USER & AUTHENTICATION MANAGEMENT
     # =========================================================================
 
+    @staticmethod
+    def _normalize_user_doc(data: Dict[str, Any], doc_id: str = "") -> Dict[str, Any]:
+        """Ensures all standard user keys are present with safe fallbacks."""
+        if not isinstance(data, dict):
+            return {}
+        res = dict(data)
+        if not res.get("id"):
+            res["id"] = doc_id or res.get("user_id") or ""
+        res.setdefault("username", doc_id or "user")
+        res.setdefault("full_name", res.get("username", "User"))
+        res.setdefault("phone", "")
+        res.setdefault("preferred_language", "en")
+        res.setdefault("role", "farmer")
+        res.setdefault("farm_name", "Green Valley Sericulture Farm")
+        res.setdefault("region", "Local Rearing Shed")
+        res.setdefault("batch_id", "SERI-2026-M04")
+        res.setdefault("dfl_capacity", "200 DFL")
+        res.setdefault("breed", "Double Hybrid (FC1 x FC2)")
+        res.setdefault("is_active", True)
+        res.setdefault("access_scope", "GLOBAL")
+        res.setdefault("whatsapp_verified", False)
+        return res
+
     def get_user_by_username_or_phone(self, identifier: str) -> Optional[Dict[str, Any]]:
         """Finds user by username, email, or phone number in Firestore."""
         if not self.is_available:
@@ -326,27 +352,27 @@ class FirestoreService:
             # 1. By exact username
             docs = list(users_ref.where("username", "==", clean_id).limit(1).stream())
             if docs:
-                return {"id": docs[0].id, **docs[0].to_dict()}
+                return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 
             # 2. Lowercase username
             if clean_id.lower() != clean_id:
                 docs = list(users_ref.where("username", "==", clean_id.lower()).limit(1).stream())
                 if docs:
-                    return {"id": docs[0].id, **docs[0].to_dict()}
+                    return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 
             # 3. By official_email
             docs = list(users_ref.where("official_email", "==", clean_id).limit(1).stream())
             if docs:
-                return {"id": docs[0].id, **docs[0].to_dict()}
+                return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
             if clean_id.lower() != clean_id:
                 docs = list(users_ref.where("official_email", "==", clean_id.lower()).limit(1).stream())
                 if docs:
-                    return {"id": docs[0].id, **docs[0].to_dict()}
+                    return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 
             # 4. By phone
             docs = list(users_ref.where("phone", "==", clean_id).limit(1).stream())
             if docs:
-                return {"id": docs[0].id, **docs[0].to_dict()}
+                return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 
             # 5. By clean phone digits
             digits = "".join(ch for ch in clean_id if ch.isdigit())
@@ -354,7 +380,7 @@ class FirestoreService:
                 for candidate in [digits, f"+91{digits[-10:]}", f"+91 {digits[-10:]}"]:
                     docs = list(users_ref.where("phone", "==", candidate).limit(1).stream())
                     if docs:
-                        return {"id": docs[0].id, **docs[0].to_dict()}
+                        return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 
             return None
         except Exception as e:
@@ -368,10 +394,10 @@ class FirestoreService:
         try:
             doc = self._db.collection("users").document(user_id).get()
             if doc.exists:
-                return {"id": doc.id, **doc.to_dict()}
+                return self._normalize_user_doc(doc.to_dict(), doc.id)
             docs = list(self._db.collection("users").where("id", "==", user_id).limit(1).stream())
             if docs:
-                return {"id": docs[0].id, **docs[0].to_dict()}
+                return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
             return None
         except Exception as e:
             logger.debug("Firestore get_user_by_id notice: %s", e)
@@ -391,13 +417,14 @@ class FirestoreService:
             logger.warning("Firestore create_user error: %s", e)
             return None
 
-    def update_user_password(self, user_id: str, hashed_password: str) -> bool:
-        """Updates user password in Firestore."""
+    def update_user_password(self, user_id: str, hashed_password: str, must_change_password: bool = False) -> bool:
+        """Updates user password and must_change_password flag in Firestore."""
         if not self.is_available or not user_id:
             return False
         try:
             self._db.collection("users").document(user_id).set({
                 "hashed_password": hashed_password,
+                "must_change_password": bool(must_change_password),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }, merge=True)
             return True

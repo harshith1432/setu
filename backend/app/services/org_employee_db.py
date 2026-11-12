@@ -633,13 +633,23 @@ def get_user_access_context(user_id: str) -> Dict[str, Any]:
         """, (user_id,))
         row = cursor.fetchone()
         if not row:
+            from app.services.db_service import get_user_by_id
+            u = get_user_by_id(user_id) if user_id else None
+            if u:
+                u_role = u.get("role", "farmer")
+                return {
+                    "role": u_role,
+                    "access_scope": u.get("access_scope", "GLOBAL"),
+                    "assigned_resources": {"sheds": [], "devices": []},
+                    "permissions": get_user_effective_permissions(user_id, u_role),
+                    "is_active": bool(u.get("is_active", True))
+                }
             return {
-                
                 "role": "farmer",
                 "access_scope": "GLOBAL",
                 "assigned_resources": {"sheds": [], "devices": []},
                 "permissions": [],
-                "is_active": False
+                "is_active": True
             }
 
         role = row["role"]
@@ -1513,10 +1523,11 @@ def create_employee_with_invitation(
         cursor.execute("SELECT id FROM users WHERE username = %s", (base_username,))
         uname = base_username if not cursor.fetchone() else f"{base_username}_{secrets.token_hex(2)}"
 
-        # Initial account password: uses configured password or defaults to "Welcome@123"
-        raw_password = (data.get("initial_password") or data.get("password") or "Welcome@123").strip()
+        # Initial account password: uses configured password or defaults to settings.DEFAULT_NEW_USER_PASSWORD
+        default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "Welcome@123")
+        raw_password = (data.get("initial_password") or data.get("password") or default_pwd).strip()
         if len(raw_password) < 6:
-            raw_password = "Welcome@123"
+            raw_password = default_pwd
         initial_password_hash = get_password_hash(raw_password)
         user_id = f"usr_{secrets.token_hex(6)}"
 
@@ -1524,9 +1535,9 @@ def create_employee_with_invitation(
         INSERT INTO users (
             id, username, hashed_password, full_name, phone, official_email,
             preferred_language, role, farm_name, region, shed_id,
-            batch_id, dfl_capacity, breed, is_active, mfa_enabled, created_at
+            batch_id, dfl_capacity, breed, is_active, mfa_enabled, must_change_password, created_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, 'en', %s, 'SeriCare Operations', 'Regional Hub', 'shed_01', 'SERI-2026', 'N/A', 'N/A', TRUE, FALSE, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, 'en', %s, 'SeriCare Operations', 'Regional Hub', 'shed_01', 'SERI-2026', 'N/A', 'N/A', TRUE, FALSE, TRUE, %s)
         RETURNING *
         """, (
             user_id, uname, initial_password_hash, full_name,

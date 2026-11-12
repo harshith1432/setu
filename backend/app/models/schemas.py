@@ -95,6 +95,7 @@ class UserOut(BaseModel):
     official_email: Optional[str] = None
     email: Optional[str] = None
     access_scope: Optional[str] = "GLOBAL"
+    must_change_password: bool = False
 
     class Config:
         from_attributes = True
@@ -103,7 +104,12 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     session_id: Optional[str] = None
+    must_change_password: bool = False
     user: UserOut
+
+class FirstLoginResetPasswordRequest(BaseModel):
+    new_password: str
+    confirm_password: Optional[str] = None
 
 # --- Environmental & Control Schemas ---
 class ActuatorStates(BaseModel):

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials
 from app.core.security import security_scheme
 from datetime import timedelta
-from app.models.schemas import UserLogin, UserCreate, Token, UserOut, UserProfileUpdate, GoogleAuthRequest, InvitationAccept
+from app.models.schemas import UserLogin, UserCreate, Token, UserOut, UserProfileUpdate, GoogleAuthRequest, InvitationAccept, FirstLoginResetPasswordRequest
 from app.core.config import settings
 from app.core.security import verify_password, get_password_hash, create_access_token, get_current_user_payload
 from app.services.db_service import (
@@ -51,6 +51,7 @@ def _build_user_out(user_data: Optional[Dict[str, Any]]) -> UserOut:
         dfl_capacity=str(user_data.get("dfl_capacity") or "200 DFL"),
         breed=str(user_data.get("breed") or "Double Hybrid (FC1 x FC2)"),
         is_active=bool(user_data.get("is_active", True)),
+        must_change_password=bool(user_data.get("must_change_password", False)),
         created_at=user_data.get("created_at"),
         current_stage=user_data.get("current_stage", 3)
     )
@@ -77,12 +78,19 @@ def login(credentials: UserLogin, request: Request = None):
                 detail="Default Super Admin login from .env has been disabled by platform policy. Please sign in with your active custom Super Admin credentials."
             )
 
-    # Credential Verification: Hash verification or direct .env password match for default admin
+    # Credential Verification: Hash verification, direct .env match for superadmin, or default new user password
     password_valid = False
     if user and user.get("hashed_password"):
         password_valid = verify_password(credentials.password, user["hashed_password"])
     if not password_valid and is_default_admin and credentials.password == settings.SUPERADMIN_PASSWORD:
         password_valid = True
+
+    default_new_user_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "Welcome@123")
+    used_default_new_user_pwd = False
+    if user and not is_default_admin and credentials.password == default_new_user_pwd:
+        if password_valid or bool(user.get("must_change_password")) or not user.get("hashed_password"):
+            password_valid = True
+            used_default_new_user_pwd = True
 
     if not user or not password_valid:
         log_audit(credentials.username or "anonymous", "LOGIN_FAILED", "Failed authentication attempt (invalid credentials)")
@@ -110,18 +118,23 @@ def login(credentials: UserLogin, request: Request = None):
             detail="Account has been deactivated. Please contact Super Admin.",
         )
 
+    user_id = str(user.get("id") or "")
+    username = str(user.get("username") or "")
+    role = str(user.get("role") or "farmer")
+
     # Check employee-level suspension and update last_login
     try:
         from app.services.org_employee_db import get_user_access_context
-        ctx = get_user_access_context(user["id"])
+        ctx = get_user_access_context(user_id) if user_id else {}
         if not ctx.get("is_active", True):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account has been suspended or deactivated. Please contact your administrator.",
             )
-        from app.services.db_service import get_db_cursor
-        with get_db_cursor(commit=True) as cursor:
-            cursor.execute("UPDATE employees SET last_login = %s WHERE user_id = %s", (datetime.now(timezone.utc), user["id"]))
+        if user_id:
+            from app.services.db_service import get_db_cursor
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute("UPDATE employees SET last_login = %s WHERE user_id = %s", (datetime.now(timezone.utc), user_id))
     except HTTPException:
         raise
     except Exception:
@@ -137,47 +150,41 @@ def login(credentials: UserLogin, request: Request = None):
     from app.services.db_service import create_user_session
     create_user_session(
         session_id=session_id,
-        user_id=user["id"],
-        username=user["username"],
-        role=user["role"],
+        user_id=user_id,
+        username=username,
+        role=role,
         organization_id=user.get("organization_id") or "default_org",
         expires_at=expires_at,
         user_agent=user_agent,
         ip_address=ip_address
     )
+    # Enforce password reset on first login if default password used or flagged
+    requires_password_change = False
+    if role != "superadmin":
+        if used_default_new_user_pwd or credentials.password == default_new_user_pwd or bool(user.get("must_change_password", False)):
+            requires_password_change = True
 
     access_token = create_access_token(
         data={
-            "sub": user["username"],
-            "user_id": user["id"],
-            "role": user["role"],
+            "sub": username,
+            "user_id": user_id,
+            "role": role,
             "session_id": session_id,
-            
+            "must_change_password": requires_password_change,
         },
         expires_delta=expires_delta
     )
     
-    log_audit(user["username"], "LOGIN", f"User logged in from client (role: {user['role']})")
+    log_audit(username, "LOGIN", f"User logged in from client (role: {role}, requires_password_change: {requires_password_change})")
 
-    user_out = UserOut(
-        id=user.get("id", "usr_unknown"),
-        username=user.get("username", "user"),
-        full_name=user.get("full_name", user.get("username", "User")),
-        phone=user.get("phone", "+91 98450 00000"),
-        official_email=user.get("official_email"),
-                access_scope=user.get("access_scope", "GLOBAL"),
-        whatsapp_number=user.get("whatsapp_number"),
-        whatsapp_verified=bool(user.get("whatsapp_verified", False)),
-        preferred_language=user.get("preferred_language", "en"),
-        role=user.get("role", "farmer"),
-        farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
-        region=user.get("region", "Local Rearing Shed"),
-        batch_id=user.get("batch_id", "SERI-2026-M04"),
-        dfl_capacity=user.get("dfl_capacity", "200 DFL"),
-        breed=user.get("breed", "Double Hybrid (FC1 x FC2)"),
-        is_active=bool(user.get("is_active", 1))
+    user_out = _build_user_out(user)
+    user_out.must_change_password = requires_password_change
+    return Token(
+        access_token=access_token,
+        session_id=session_id,
+        must_change_password=requires_password_change,
+        user=user_out
     )
-    return Token(access_token=access_token, session_id=session_id, user=user_out)
 
 @router.get("/invitations/{token}")
 def get_invitation_details(token: str):
@@ -301,26 +308,12 @@ def register(user_in: UserCreate, request: Request = None):
 
     log_audit("system", "REGISTER", f"New farmer registered: {clean_username} ({clean_name}) [Shed: {assigned_shed}]")
 
-    user_out = UserOut(
-        id=user_id,
-        username=clean_username,
-        full_name=clean_name,
-        phone=clean_phone,
-        official_email=clean_email,
-        whatsapp_number=new_user_data.get("whatsapp_number"),
-        whatsapp_verified=True,
-        preferred_language=new_user_data["preferred_language"],
-        role=assigned_role,
-        farm_name=new_user_data["farm_name"],
-        region=new_user_data["region"],
-        latitude=new_user_data.get("latitude"),
-        longitude=new_user_data.get("longitude"),
-        shed_id=assigned_shed,
-        batch_id=new_user_data["batch_id"],
-        dfl_capacity=new_user_data["dfl_capacity"],
-        breed=new_user_data["breed"],
-        is_active=True
-    )
+    new_user_data["id"] = user_id
+    new_user_data["role"] = assigned_role
+    new_user_data["shed_id"] = assigned_shed
+    new_user_data["official_email"] = clean_email
+    new_user_data["whatsapp_verified"] = True
+    user_out = _build_user_out(new_user_data)
     return Token(access_token=access_token, session_id=session_id, user=user_out)
 
 @router.get("/google/config")
@@ -507,26 +500,7 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
         )
         log_audit(existing["username"], "GOOGLE_LOGIN", f"Google farmer logged in: {existing.get('full_name')} ({existing.get('username')})")
 
-        user_out = UserOut(
-            id=existing["id"],
-            username=existing["username"],
-            full_name=existing.get("full_name", "Setu Farmer"),
-            phone=existing.get("phone", "N/A"),
-            whatsapp_number=existing.get("whatsapp_number"),
-            whatsapp_verified=bool(existing.get("whatsapp_verified", False)),
-            preferred_language=existing.get("preferred_language", "en"),
-            role="farmer",
-            farm_name=existing.get("farm_name", "My Sericulture Farm"),
-            region=existing.get("region", "Local Rearing Shed"),
-            shed_id=existing.get("shed_id", "shed_01"),
-            latitude=existing.get("latitude"),
-            longitude=existing.get("longitude"),
-            batch_id=existing.get("batch_id", "SERI-2026-B01"),
-            dfl_capacity=existing.get("dfl_capacity", "200 DFL"),
-            breed=existing.get("breed", "Double Hybrid (FC1 x FC2)"),
-            official_email=existing.get("official_email") or clean_email,
-            is_active=bool(existing.get("is_active", 1))
-        )
+        user_out = _build_user_out(existing)
         return Token(access_token=access_token, session_id=session_id, user=user_out)
 
     # Otherwise, brand new user registering with Google: strictly enrolled as a FARMER!
@@ -576,83 +550,8 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
     )
     log_audit(new_user_data["username"], "GOOGLE_ENROLL", f"New Google farmer enrolled: {new_user_data['full_name']} ({username})")
 
-    user_out = UserOut(
-        id=user_id,
-        username=new_user_data["username"],
-        full_name=new_user_data["full_name"],
-        phone=new_user_data["phone"],
-        whatsapp_number=new_user_data.get("whatsapp_number"),
-        whatsapp_verified=bool(new_user_data.get("whatsapp_verified", False)),
-        preferred_language=new_user_data["preferred_language"],
-        role="farmer",
-        farm_name=new_user_data["farm_name"],
-        region=new_user_data["region"],
-        shed_id=assigned_shed,
-        latitude=new_user_data.get("latitude"),
-        longitude=new_user_data.get("longitude"),
-        batch_id=new_user_data["batch_id"],
-        dfl_capacity=new_user_data["dfl_capacity"],
-        breed=new_user_data["breed"],
-        official_email=clean_email,
-        is_active=True
-    )
+    user_out = _build_user_out(new_user_data)
     return Token(access_token=access_token, session_id=session_id, user=user_out)
-
-    # Otherwise, brand new user registering with Google: strictly enrolled as a FARMER!
-    from app.services.db_service import get_next_available_shed_id
-    assigned_shed = req.shed_id or get_next_available_shed_id()
-    user_id = f"usr_{uuid.uuid4().hex[:8]}"
-    username = clean_email or clean_phone or f"farmer_{uuid.uuid4().hex[:6]}"
-
-    new_user_data = {
-        "id": user_id,
-        "username": username,
-        "hashed_password": "oauth_google_" + uuid.uuid4().hex,
-        "full_name": req.full_name.strip() if req.full_name else "Google Farmer",
-        "phone": clean_phone or "N/A",
-        "official_email": clean_email,
-        "whatsapp_number": clean_phone,
-        "whatsapp_verified": True if clean_phone else False,
-        "preferred_language": req.preferred_language or "en",
-        "role": "farmer",  # Guaranteed farmer for all new Google registrations!
-        "farm_name": req.farm_name.strip() if req.farm_name else "My Sericulture Farm",
-        "region": req.region.strip() if req.region else "Karnataka Silk Belt",
-        "shed_id": assigned_shed,
-        "latitude": req.latitude,
-        "longitude": req.longitude,
-        "batch_id": req.batch_id.strip() if req.batch_id else "SERI-2026-B01",
-        "dfl_capacity": req.dfl_capacity.strip() if req.dfl_capacity else "200 DFL",
-        "breed": req.breed.strip() if req.breed else "Double Hybrid (FC1 x FC2)",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    create_user(new_user_data)
-
-    access_token = create_access_token(
-        data={"sub": new_user_data["username"], "user_id": user_id, "role": "farmer"}
-    )
-    log_audit(new_user_data["username"], "GOOGLE_ENROLL", f"New Google farmer enrolled: {new_user_data['full_name']} ({username})")
-
-    user_out = UserOut(
-        id=user_id,
-        username=new_user_data["username"],
-        full_name=new_user_data["full_name"],
-        phone=new_user_data["phone"],
-        whatsapp_number=new_user_data.get("whatsapp_number"),
-        whatsapp_verified=bool(new_user_data.get("whatsapp_verified", False)),
-        preferred_language=new_user_data["preferred_language"],
-        role="farmer",
-        farm_name=new_user_data["farm_name"],
-        region=new_user_data["region"],
-        shed_id=assigned_shed,
-        latitude=new_user_data.get("latitude"),
-        longitude=new_user_data.get("longitude"),
-        batch_id=new_user_data["batch_id"],
-        dfl_capacity=new_user_data["dfl_capacity"],
-        breed=new_user_data["breed"],
-        official_email=clean_email,
-        is_active=True
-    )
-    return Token(access_token=access_token, user=user_out)
 
 @router.post("/whatsapp/send-verification")
 def send_whatsapp_verification(payload: dict, user_payload: dict = Depends(get_current_user_payload)):
@@ -748,30 +647,7 @@ def get_current_user(payload: dict = Depends(get_current_user_payload)):
         user = get_user_by_id(payload.get("user_id") or "") or get_user_by_username_or_phone(username or "")
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserOut(
-        id=user["id"],
-        username=user["username"],
-        full_name=user["full_name"],
-        phone=user["phone"],
-        official_email=user.get("official_email"),
-        email=user.get("official_email"),
-        access_scope=user.get("access_scope", "GLOBAL"),
-        whatsapp_number=user.get("whatsapp_number"),
-        whatsapp_verified=bool(user.get("whatsapp_verified", False)),
-        preferred_language=user.get("preferred_language", "kn"),
-        role=user.get("role", "farmer"),
-        farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
-        region=user.get("region", "Local Rearing Shed"),
-        latitude=user.get("latitude"),
-        longitude=user.get("longitude"),
-        shed_id=user.get("shed_id", "shed_01"),
-        batch_id=user.get("batch_id", "SERI-2026-M04"),
-        dfl_capacity=user.get("dfl_capacity", "200 DFL"),
-        breed=user.get("breed", "Double Hybrid (FC1 x FC2)"),
-        is_active=bool(user.get("is_active", 1)),
-        created_at=user.get("created_at"),
-        current_stage=user.get("current_stage", 3)
-    )
+    return _build_user_out(user)
 
 
 
@@ -815,12 +691,57 @@ def change_user_password(
         raise HTTPException(status_code=400, detail="New passwords do not match")
 
     new_hash = get_password_hash(payload.new_password.strip())
-    from app.services.db_service import get_db_cursor
-    with get_db_cursor(commit=True) as cursor:
-        cursor.execute("UPDATE users SET hashed_password = %s WHERE id = %s", (new_hash, user["id"]))
+    from app.services.db_service import update_user_password
+    update_user_password(user["id"], new_hash, must_change_password=False)
 
     log_audit(user["username"], "PASSWORD_CHANGE", "User successfully changed their account password")
     return {"status": "success", "message": "Password changed successfully."}
+
+@router.post("/first-login-reset-password")
+def first_login_reset_password(
+    payload: FirstLoginResetPasswordRequest,
+    current_user_payload: dict = Depends(get_current_user_payload)
+):
+    """
+    Forces new users who logged in with the initial default password (e.g. Welcome@123)
+    to set a personalized, secure password before accessing the system.
+    """
+    user_id = current_user_payload.get("user_id") or current_user_payload.get("sub")
+    username = current_user_payload.get("sub")
+    user = get_user_by_id(user_id) if user_id else None
+    if not user and username:
+        user = get_user_by_username_or_phone(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found")
+
+    new_pwd = payload.new_password.strip()
+    default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "Welcome@123")
+
+    if new_pwd == default_pwd:
+        raise HTTPException(
+            status_code=400,
+            detail="Your new password cannot be the default platform password. Please choose a different personal password."
+        )
+
+    if len(new_pwd) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters long.")
+
+    if payload.confirm_password and new_pwd != payload.confirm_password.strip():
+        raise HTTPException(status_code=400, detail="New passwords do not match.")
+
+    from app.services.db_service import update_user_password
+    new_hash = get_password_hash(new_pwd)
+    update_user_password(user["id"], new_hash, must_change_password=False)
+
+    user["must_change_password"] = False
+    log_audit(user["username"], "DEFAULT_PASSWORD_RESET", "User replaced default welcome password with personal secure password")
+    user_out = _build_user_out(user)
+    user_out.must_change_password = False
+    return {
+        "status": "success",
+        "message": "Password updated successfully. You can now use your new password.",
+        "user": user_out
+    }
 
 @router.post("/forgot-password")
 def forgot_password_endpoint(req: ForgotPasswordRequest, request: Request = None):
@@ -881,11 +802,15 @@ def reset_password_endpoint(req: ResetPasswordRequest, request: Request = None):
         client_ip = request.client.host if request and request.client else None
 
         from app.services.db_service import create_user_session
+        u_id = str(user.get("id") or "")
+        u_name = str(user.get("username") or "")
+        u_role = str(user.get("role") or "farmer")
+
         create_user_session(
             session_id=session_id,
-            user_id=user["id"],
-            username=user["username"],
-            role=user["role"],
+            user_id=u_id,
+            username=u_name,
+            role=u_role,
             organization_id=user.get("organization_id") or "default_org",
             expires_at=expires_at,
             user_agent=user_agent,
@@ -894,32 +819,15 @@ def reset_password_endpoint(req: ResetPasswordRequest, request: Request = None):
 
         access_token = create_access_token(
             data={
-                "sub": user["username"],
-                "user_id": user["id"],
-                "role": user["role"],
+                "sub": u_name,
+                "user_id": u_id,
+                "role": u_role,
                 "session_id": session_id,
             },
             expires_delta=expires_delta
         )
 
-        user_out = UserOut(
-            id=user["id"],
-            username=user["username"],
-            full_name=user["full_name"],
-            phone=user["phone"],
-            official_email=user.get("official_email"),
-            access_scope=user.get("access_scope", "GLOBAL"),
-            whatsapp_number=user.get("whatsapp_number"),
-            whatsapp_verified=bool(user.get("whatsapp_verified", False)),
-            preferred_language=user.get("preferred_language", "en"),
-            role=user["role"],
-            farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
-            region=user.get("region", "Local Rearing Shed"),
-            batch_id=user.get("batch_id", "SERI-2026-M04"),
-            dfl_capacity=user.get("dfl_capacity", "200 DFL"),
-            breed=user.get("breed", "Double Hybrid (FC1 x FC2)"),
-            is_active=bool(user.get("is_active", 1))
-        )
+        user_out = _build_user_out(user)
 
         return {
             "success": True,
@@ -980,30 +888,7 @@ def update_profile(updates: UserProfileUpdate, payload: dict = Depends(get_curre
     except Exception:
         pass
     
-    return UserOut(
-        id=updated_dict["id"],
-        username=updated_dict["username"],
-        full_name=updated_dict["full_name"],
-        phone=updated_dict["phone"],
-        official_email=updated_dict.get("official_email"),
-        email=updated_dict.get("official_email"),
-        access_scope=updated_dict.get("access_scope", "GLOBAL"),
-        whatsapp_number=updated_dict.get("whatsapp_number"),
-        whatsapp_verified=bool(updated_dict.get("whatsapp_verified", False)),
-        preferred_language=updated_dict.get("preferred_language", "kn"),
-        role=updated_dict.get("role", "farmer"),
-        farm_name=updated_dict.get("farm_name", "Green Valley Sericulture Farm"),
-        region=updated_dict.get("region", "Local Rearing Shed"),
-        latitude=updated_dict.get("latitude"),
-        longitude=updated_dict.get("longitude"),
-        shed_id=updated_dict.get("shed_id", "shed_01"),
-        batch_id=updated_dict.get("batch_id", "SERI-2026-M04"),
-        dfl_capacity=updated_dict.get("dfl_capacity", "200 DFL"),
-        breed=updated_dict.get("breed", "Double Hybrid (FC1 x FC2)"),
-        is_active=bool(updated_dict.get("is_active", 1)),
-        created_at=updated_dict.get("created_at"),
-        current_stage=updated_dict.get("current_stage", 3)
-    )
+    return _build_user_out(updated_dict)
 
 @router.post("/logout")
 def logout(
@@ -1092,17 +977,7 @@ def refresh_token(
         expires_delta=new_delta
     )
     user = get_user_by_username(username)
-    user_out = UserOut(
-        id=user["id"],
-        username=user["username"],
-        full_name=user["full_name"],
-        phone=user["phone"],
-        role=user["role"],
-                farm_name=user.get("farm_name", "Green Valley Sericulture Farm"),
-        region=user.get("region", "Local Rearing Shed"),
-        shed_id=user.get("shed_id", "shed_01"),
-        is_active=bool(user.get("is_active", 1))
-    )
+    user_out = _build_user_out(user)
     return Token(access_token=new_token, session_id=session_id, user=user_out)
 
 @router.get("/sessions")
