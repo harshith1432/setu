@@ -2282,7 +2282,8 @@ def test_integration_connection(provider_key: str, credentials: Optional[Dict[st
                     return {"success": True, "detail": "Weather API endpoint reached and returned 200 OK with live telemetry data.", "timestamp": now_dt}
                 return {"success": False, "detail": f"Weather API returned status code {resp.status}.", "timestamp": now_dt}
         except Exception as e:
-            return {"success": False, "detail": f"Failed to contact Weather API: {str(e)}", "timestamp": now_dt}
+            logger.error("Failed to contact Weather API: %s", e)
+            return {"success": False, "detail": "Failed to contact Weather API: remote endpoint timed out or connection failed.", "timestamp": now_dt}
 
     elif provider_key == "razorpay":
         key_id = str(credentials.get("key_id", "")).strip() or os.getenv("RAZORPAY_KEY_ID", "")
@@ -2311,7 +2312,8 @@ def test_integration_connection(provider_key: str, credentials: Optional[Dict[st
             with socket.create_connection((host, port), timeout=3.0):
                 return {"success": True, "detail": f"Successfully connected to MQTT Broker TCP socket at {host}:{port}.", "timestamp": now_dt}
         except Exception as e:
-            return {"success": False, "detail": f"TCP Socket connection to {host}:{port} timed out or failed: {str(e)}", "timestamp": now_dt}
+            logger.error("TCP Socket connection to %s:%s timed out or failed: %s", host, port, e)
+            return {"success": False, "detail": f"TCP Socket connection to {host}:{port} timed out or failed.", "timestamp": now_dt}
 
     elif provider_key == "s3_storage":
         bucket = str(credentials.get("bucket_name", "")).strip() or os.getenv("AWS_S3_BUCKET_NAME", "")

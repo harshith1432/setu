@@ -14,10 +14,13 @@ Provides versioned REST endpoints with server-side RBAC enforcement for:
 """
 
 import os
+import logging
 from fastapi import APIRouter, HTTPException, Depends, Query, status, Request, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 from app.core.security import get_current_user_payload
 from app.services.db_service import get_user_by_id, get_user_by_username, log_audit, get_audit_logs
@@ -364,7 +367,8 @@ def create_new_product(
         log_audit(actor, "PRODUCT_CREATE", f"Created product {payload.sku} - {payload.name}")
         return prod
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error("Failed to create product: %s", e)
+        raise HTTPException(status_code=400, detail="Failed to create product. Please verify parameters.")
 
 
 ALLOWED_PRODUCT_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
@@ -981,8 +985,16 @@ def test_integration_route(
     payload: Optional[IntegrationConfigIn] = None,
     user: dict = Depends(require_roles(["superadmin", "admin"]))
 ):
-    creds = payload.credentials if payload else None
-    return test_integration_connection(provider_key, creds)
+    try:
+        creds = payload.credentials if payload else None
+        return test_integration_connection(provider_key, creds)
+    except Exception as e:
+        logger.error("Failed to test integration %s: %s", provider_key, e)
+        return {
+            "success": False,
+            "detail": "Failed to test integration connection. Please verify configuration.",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
 
 @router.get("/platform/audit-logs")
