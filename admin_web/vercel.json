@@ -35,6 +35,10 @@
       "destination": "/app.js"
     },
     {
+      "source": "/admin/purify.min.js",
+      "destination": "/purify.min.js"
+    },
+    {
       "source": "/admin/table-manager.js",
       "destination": "/table-manager.js"
     },

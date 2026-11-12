@@ -278,19 +278,57 @@ def get_google_config():
         "scope": "openid email profile"
     }
 
+def _get_safe_redirect_uri(redirect_url: Optional[str], request: Request) -> str:
+    base_url = str(request.base_url).rstrip("/")
+    default_redirect = f"{base_url}/admin/"
+    if not redirect_url:
+        return default_redirect
+
+    try:
+        parsed = urllib.parse.urlsplit(redirect_url)
+    except Exception:
+        return default_redirect
+
+    # Block dangerous schemes (e.g. javascript:, data:)
+    if parsed.scheme and parsed.scheme not in ("http", "https"):
+        return default_redirect
+
+    # Handle safe relative path on same host (must start with single '/')
+    if not parsed.netloc:
+        if redirect_url.startswith("/") and not redirect_url.startswith("//"):
+            return f"{base_url}{redirect_url}"
+        return default_redirect
+
+    # Whitelist check against configured allowed origins and request host
+    allowed_hosts = {
+        urllib.parse.urlsplit(origin).netloc.lower()
+        for origin in settings.ALLOWED_ORIGINS
+        if origin
+    }
+    if request.url.netloc:
+        allowed_hosts.add(request.url.netloc.lower())
+
+    if parsed.netloc.lower() in allowed_hosts:
+        clean_path = parsed.path or "/"
+        clean_query = f"?{parsed.query}" if parsed.query else ""
+        return f"{parsed.scheme}://{parsed.netloc}{clean_path}{clean_query}"
+
+    return default_redirect
+
+
 @router.get("/google/login")
 def google_oauth_login(request: Request, redirect_url: str = None):
     """
     Direct server-side Google OAuth 2.0 redirection to Google Consent Screen.
+    Validates redirect_url against allowed origins to prevent open redirects.
     """
-    base_url = str(request.base_url).rstrip("/")
-    target_redirect = redirect_url or f"{base_url}/admin/"
+    target_redirect = _get_safe_redirect_uri(redirect_url, request)
     client_id = settings.GOOGLE_CLIENT_ID
     
     oauth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={urllib.parse.quote(client_id)}&"
-        f"redirect_uri={urllib.parse.quote(target_redirect)}&"
+        f"redirect_uri={urllib.parse.quote(target_redirect, safe='')}&"
         f"response_type=token%20id_token&"
         f"scope={urllib.parse.quote('openid email profile')}&"
         f"prompt=select_account&"
@@ -320,23 +358,37 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
     if not existing and google_id:
         existing = get_user_by_username_or_phone(f"google_{google_id}")
     if not existing and req.full_name and req.full_name.strip():
-        from app.services.db_service import get_db_cursor
-        with get_db_cursor(dict_cursor=True) as cursor:
-            try:
-                cursor.execute(
-                    """
-                    SELECT * FROM users 
-                    WHERE LOWER(TRIM(full_name)) = LOWER(TRIM(%s))
-                       OR LOWER(TRIM(username)) = LOWER(TRIM(%s))
-                    LIMIT 1
-                    """,
-                    (req.full_name.strip(), req.full_name.strip())
-                )
-                row = cursor.fetchone()
-                if row:
-                    existing = dict(row)
-            except Exception:
-                pass
+        try:
+            from app.services.firestore_service import firestore_service
+            if firestore_service.is_available:
+                name_clean = req.full_name.strip().lower()
+                docs = firestore_service.client.collection("users").stream()
+                for d in docs:
+                    udata = d.to_dict()
+                    if (udata.get("full_name") or "").strip().lower() == name_clean or (udata.get("username") or "").strip().lower() == name_clean:
+                        existing = {"id": d.id, **udata}
+                        break
+        except Exception:
+            pass
+
+        if not existing:
+            from app.services.db_service import get_db_cursor
+            with get_db_cursor(dict_cursor=True) as cursor:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT * FROM users 
+                        WHERE LOWER(TRIM(full_name)) = LOWER(TRIM(%s))
+                           OR LOWER(TRIM(username)) = LOWER(TRIM(%s))
+                        LIMIT 1
+                        """,
+                        (req.full_name.strip(), req.full_name.strip())
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        existing = dict(row)
+                except Exception:
+                    pass
 
     user_agent = request.headers.get("user-agent") if request else None
     ip_address = request.client.host if request and request.client else None

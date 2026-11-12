@@ -39,55 +39,96 @@ def _set_cached_latest_reading(shed_id: str, data: Dict[str, Any]) -> None:
         _latest_reading_cache_times[shed_id] = now
 
 
+_postgres_available: Optional[bool] = None
+
+class _DummyCursor:
+    """Safe no-op cursor for legacy SQL callers when running in pure Firebase mode."""
+    def __init__(self):
+        self.rowcount = 0
+        self.description = []
+    def execute(self, query, params=None):
+        return self
+    def executemany(self, query, params=None):
+        return self
+    def fetchone(self):
+        return None
+    def fetchall(self):
+        return []
+    def fetchmany(self, size=None):
+        return []
+    def close(self):
+        pass
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+
 def _get_connect_dsn() -> str:
     """Returns PostgreSQL connection DSN with defensive connection timeout."""
-    dsn = DATABASE_URL or "postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
-    if "connect_timeout" not in dsn:
-        sep = "&" if "?" in dsn else "?"
-        dsn = f"{dsn}{sep}connect_timeout=3"
-    return dsn
+    return DATABASE_URL or ""
 
 
 def get_pool() -> Optional[pool.ThreadedConnectionPool]:
     """
     Returns a singleton ThreadedConnectionPool for PostgreSQL connection reuse.
-    Configurable connection limits to prevent Postgres server connection exhaustion.
+    If PostgreSQL is disabled, unreachable, or broken, returns None cleanly.
     """
-    global _connection_pool
+    global _connection_pool, _postgres_available
+    if _postgres_available is False:
+        return None
+
+    dsn = _get_connect_dsn()
+    # If no DSN, or dead Render Postgres host, or USE_FIREBASE_ONLY is set: disable Postgres
+    if not dsn or "dpg-db5luo4s728c73897it0-a" in dsn or os.getenv("USE_FIREBASE_ONLY", "false").lower() in ("true", "1"):
+        _postgres_available = False
+        logger.info("Operating in pure Firebase Cloud Firestore mode (PostgreSQL disabled).")
+        return None
+
     if _connection_pool is None:
         with _pool_lock:
-            if _connection_pool is None:
+            if _connection_pool is None and _postgres_available is not False:
                 try:
-                    max_conn = int(os.getenv("DB_POOL_MAX", "50"))
+                    sep = "&" if "?" in dsn else "?"
+                    if "connect_timeout" not in dsn:
+                        dsn = f"{dsn}{sep}connect_timeout=2"
+                    max_conn = int(os.getenv("DB_POOL_MAX", "20"))
                     _connection_pool = pool.ThreadedConnectionPool(
                         minconn=1,
                         maxconn=max_conn,
-                        dsn=_get_connect_dsn()
+                        dsn=dsn
                     )
+                    _postgres_available = True
                 except Exception as e:
-                    logger.warning("PostgreSQL ThreadedConnectionPool unavailable: %s", e)
+                    logger.info("PostgreSQL unavailable (%s). Switching cleanly to Firebase Cloud Firestore mode.", e)
                     _connection_pool = None
+                    _postgres_available = False
     return _connection_pool
 
 
 @contextmanager
 def get_db_cursor(commit: bool = False, dict_cursor: bool = False):
     """
-    Context manager that yields a cursor from the connection pool or a direct connection.
-    Guarantees connection cleanup, release back to pool, and enforces statement timeouts.
+    Context manager that yields a cursor from the connection pool or a safe dummy cursor.
+    Never crashes or delays application execution if PostgreSQL is offline.
     """
     p = get_pool()
+    if not p or _postgres_available is False:
+        yield _DummyCursor()
+        return
+
     conn = None
     from_pool = False
-    if p:
+    try:
+        conn = p.getconn()
+        from_pool = True
+    except Exception:
         try:
-            conn = p.getconn()
-            from_pool = True
-        except Exception:
             conn = psycopg2.connect(_get_connect_dsn())
             from_pool = False
-    else:
-        conn = psycopg2.connect(_get_connect_dsn())
+        except Exception:
+            yield _DummyCursor()
+            return
 
     if commit:
         conn.autocommit = True
@@ -95,9 +136,8 @@ def get_db_cursor(commit: bool = False, dict_cursor: bool = False):
     cursor_kwargs = {"cursor_factory": RealDictCursor} if dict_cursor else {}
     cursor = conn.cursor(**cursor_kwargs)
     try:
-        # Enforce defensive timeouts to prevent runaway queries from locking worker pools
         try:
-            cursor.execute("SET statement_timeout = '8000ms'; SET lock_timeout = '3000ms';")
+            cursor.execute("SET statement_timeout = '4000ms'; SET lock_timeout = '2000ms';")
         except Exception:
             pass
         yield cursor
@@ -113,6 +153,9 @@ def get_db_cursor(commit: bool = False, dict_cursor: bool = False):
 
 
 def get_connection():
+    if _postgres_available is False:
+        return None
+    return psycopg2.connect(_get_connect_dsn())
     """Legacy helper: Returns a direct PostgreSQL connection."""
     return psycopg2.connect(_get_connect_dsn())
 
@@ -794,48 +837,53 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
             candidates.extend([digits[2:], f"+{digits}", f"+91 {digits[2:]}"])
     unique_candidates = list(dict.fromkeys(candidates))
 
-    # 1. Attempt PostgreSQL resolution
-    try:
-        with get_db_cursor(dict_cursor=True) as cursor:
-            try:
-                cursor.execute(
-                    """
-                    SELECT * FROM users 
-                    WHERE username = ANY(%s) 
-                       OR phone = ANY(%s) 
-                       OR whatsapp_number = ANY(%s) 
-                       OR LOWER(official_email) = ANY(%s)
-                    LIMIT 1
-                    """,
-                    (unique_candidates, unique_candidates, unique_candidates, [c.lower() for c in unique_candidates]),
-                )
-            except Exception:
-                cursor.execute(
-                    """
-                    SELECT * FROM users 
-                    WHERE username = ANY(%s) 
-                       OR phone = ANY(%s) 
-                    LIMIT 1
-                    """,
-                    (unique_candidates, unique_candidates),
-                )
-            row = cursor.fetchone()
-            if row:
-                invalidate_user_cache()
-                d = dict(row)
-                if isinstance(d.get("created_at"), datetime):
-                    d["created_at"] = d["created_at"].isoformat()
-                return d
-    except Exception as e:
-        logger.warning("Postgres get_user_by_username_or_phone notice (%s); checking Firestore...", e)
-
-    # 2. Automated fallback to Firebase Cloud Firestore
+    # 1. Primary resolution via Firebase Cloud Firestore
     try:
         from app.services.firestore_service import firestore_service
-        return firestore_service.get_user_by_username_or_phone(clean_id)
+        if firestore_service.is_available:
+            u = firestore_service.get_user_by_username_or_phone(clean_id)
+            if u:
+                return u
     except Exception as fe:
-        logger.debug("Firestore get_user fallback notice: %s", fe)
-        return None
+        logger.debug("Firestore get_user notice: %s", fe)
+
+    # 2. Secondary resolution via PostgreSQL (only if online and enabled)
+    if _postgres_available is not False:
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                try:
+                    cursor.execute(
+                        """
+                        SELECT * FROM users 
+                        WHERE username = ANY(%s) 
+                           OR phone = ANY(%s) 
+                           OR whatsapp_number = ANY(%s) 
+                           OR LOWER(official_email) = ANY(%s)
+                        LIMIT 1
+                        """,
+                        (unique_candidates, unique_candidates, unique_candidates, [c.lower() for c in unique_candidates]),
+                    )
+                except Exception:
+                    cursor.execute(
+                        """
+                        SELECT * FROM users 
+                        WHERE username = ANY(%s) 
+                           OR phone = ANY(%s) 
+                        LIMIT 1
+                        """,
+                        (unique_candidates, unique_candidates),
+                    )
+                row = cursor.fetchone()
+                if row:
+                    invalidate_user_cache()
+                    d = dict(row)
+                    if isinstance(d.get("created_at"), datetime):
+                        d["created_at"] = d["created_at"].isoformat()
+                    return d
+        except Exception as e:
+            logger.debug("Postgres get_user_by_username_or_phone notice: %s", e)
+
+    return None
 
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     if not user_id:
@@ -848,31 +896,39 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
             if now < exp:
                 return dict(val) if val else None
 
-    # 1. Attempt PostgreSQL
-    try:
-        with get_db_cursor(dict_cursor=True) as cursor:
-            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-            row = cursor.fetchone()
-            res = None
-            if row:
-                d = dict(row)
-                if isinstance(d.get("created_at"), datetime):
-                    d["created_at"] = d["created_at"].isoformat()
-                res = d
-
-            with _user_cache_lock:
-                _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
-            if res:
-                return dict(res)
-    except Exception as e:
-        logger.warning("Postgres get_user_by_id notice (%s); checking Firestore...", e)
-
-    # 2. Attempt Firestore
+    # 1. Primary resolution via Firebase Cloud Firestore
     try:
         from app.services.firestore_service import firestore_service
-        return firestore_service.get_user_by_id(user_id)
-    except Exception:
-        return None
+        if firestore_service.is_available:
+            u = firestore_service.get_user_by_id(user_id)
+            if u:
+                with _user_cache_lock:
+                    _user_cache[cache_key] = (now + USER_CACHE_TTL, u)
+                return u
+    except Exception as fe:
+        logger.debug("Firestore get_user_by_id notice: %s", fe)
+
+    # 2. Secondary resolution via PostgreSQL (only if online)
+    if _postgres_available is not False:
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                row = cursor.fetchone()
+                res = None
+                if row:
+                    d = dict(row)
+                    if isinstance(d.get("created_at"), datetime):
+                        d["created_at"] = d["created_at"].isoformat()
+                    res = d
+
+                with _user_cache_lock:
+                    _user_cache[cache_key] = (now + USER_CACHE_TTL, res)
+                if res:
+                    return dict(res)
+        except Exception as e:
+            logger.debug("Postgres get_user_by_id notice: %s", e)
+
+    return None
 
 _shed_settings_cache: Dict[str, tuple[float, Optional[Dict[str, Any]]]] = {}
 
@@ -1048,85 +1104,91 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         assigned_shed = get_next_available_shed_id()
     user_data["shed_id"] = assigned_shed
 
-    # 1. Attempt PostgreSQL persistence
-    try:
-        with get_db_cursor(commit=True) as cursor:
-            cursor.execute("""
-            INSERT INTO users (
-                id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
-                preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
-                dfl_capacity, breed, official_email, organization_id, is_active, created_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                user_data["id"],
-                user_data["username"],
-                user_data["hashed_password"],
-                user_data["full_name"],
-                user_data["phone"],
-                user_data.get("whatsapp_number") or user_data.get("phone"),
-                bool(user_data.get("whatsapp_verified", False)),
-                user_data.get("preferred_language", "kn"),
-                user_data.get("role", "farmer"),
-                user_data.get("farm_name", "Green Valley Farm"),
-                user_data.get("region", "Local Rearing Shed"),
-                user_data.get("latitude"),
-                user_data.get("longitude"),
-                user_data.get("shed_id", assigned_shed),
-                user_data.get("batch_id", "SERI-2026-M04"),
-                user_data.get("dfl_capacity", "200 DFL"),
-                user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
-                user_data.get("official_email"),
-                user_data.get("organization_id", "default_org"),
-                True,
-                created_at_dt
-            ))
-    except Exception as pe:
-        logger.warning("Postgres create_user notice (%s); saving to Firestore...", pe)
-
-    # 2. Sync to Firebase Cloud Firestore
+    # 1. Primary write to Firebase Cloud Firestore
     try:
         from app.services.firestore_service import firestore_service
-        fs_data = dict(user_data)
-        fs_data["created_at"] = created_at_dt.isoformat() if isinstance(created_at_dt, datetime) else created_at_dt
-        firestore_service.create_user(fs_data)
+        if firestore_service.is_available:
+            fs_data = dict(user_data)
+            fs_data["created_at"] = created_at_dt.isoformat() if isinstance(created_at_dt, datetime) else created_at_dt
+            firestore_service.create_user(fs_data)
     except Exception as fe:
         logger.debug("Firestore create_user notice: %s", fe)
+
+    # 2. Secondary write to PostgreSQL (only if enabled and online)
+    if _postgres_available is not False:
+        try:
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute("""
+                INSERT INTO users (
+                    id, username, hashed_password, full_name, phone, whatsapp_number, whatsapp_verified,
+                    preferred_language, role, farm_name, region, latitude, longitude, shed_id, batch_id,
+                    dfl_capacity, breed, official_email, organization_id, is_active, created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    user_data["id"],
+                    user_data["username"],
+                    user_data["hashed_password"],
+                    user_data["full_name"],
+                    user_data["phone"],
+                    user_data.get("whatsapp_number") or user_data.get("phone"),
+                    bool(user_data.get("whatsapp_verified", False)),
+                    user_data.get("preferred_language", "kn"),
+                    user_data.get("role", "farmer"),
+                    user_data.get("farm_name", "Green Valley Farm"),
+                    user_data.get("region", "Local Rearing Shed"),
+                    user_data.get("latitude"),
+                    user_data.get("longitude"),
+                    user_data.get("shed_id", assigned_shed),
+                    user_data.get("batch_id", "SERI-2026-M04"),
+                    user_data.get("dfl_capacity", "200 DFL"),
+                    user_data.get("breed", "Double Hybrid (FC1 x FC2)"),
+                    user_data.get("official_email"),
+                    user_data.get("organization_id", "default_org"),
+                    True,
+                    created_at_dt
+                ))
+        except Exception as pe:
+            logger.debug("Postgres create_user notice: %s", pe)
 
     invalidate_user_cache()
     return user_data
 
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    fields = []
-    values = []
-    allowed = [
-        "full_name", "phone", "whatsapp_number", "whatsapp_verified",
-        "preferred_language", "farm_name", "region", "latitude", "longitude",
-        "shed_id", "batch_id", "dfl_capacity", "breed", "current_stage",
-        "official_email", "organization_id"
-    ]
-    for k in allowed:
-        if k in updates and updates[k] is not None:
-            fields.append(f"{k} = %s")
-            values.append(updates[k])
-            
-    if not fields:
-        return get_user_by_id(user_id) or get_user_by_username(user_id)
-        
-    values.append(user_id)
-    values.append(user_id)
-    query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s RETURNING *"
+    # 1. Update in Firebase Cloud Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.update_user_profile(user_id, updates)
+    except Exception as fe:
+        logger.debug("Firestore update_user_profile notice: %s", fe)
 
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(query, tuple(values))
-        row = cursor.fetchone()
-        if row:
-            invalidate_user_cache()
-            d = dict(row)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
-            return d
-    return None
+    # 2. Update in PostgreSQL (if available)
+    if _postgres_available is not False:
+        try:
+            fields = []
+            values = []
+            allowed = [
+                "full_name", "phone", "whatsapp_number", "whatsapp_verified",
+                "preferred_language", "farm_name", "region", "latitude", "longitude",
+                "shed_id", "batch_id", "dfl_capacity", "breed", "current_stage",
+                "official_email", "organization_id"
+            ]
+            for k in allowed:
+                if k in updates and updates[k] is not None:
+                    fields.append(f"{k} = %s")
+                    values.append(updates[k])
+            if fields:
+                values.append(user_id)
+                values.append(user_id)
+                query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s RETURNING *"
+                with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                    cursor.execute(query, tuple(values))
+        except Exception:
+            pass
+
+    invalidate_user_cache()
+    return get_user_by_id(user_id) or get_user_by_username(user_id)
 
 def update_user_status(user_id: str, is_active: bool) -> bool:
     with get_db_cursor(commit=True) as cursor:
@@ -2012,6 +2074,7 @@ def is_token_revoked(jti: Optional[str], token_hash: Optional[str]) -> bool:
 
 _revoked_sessions_cache = set()
 _sessions_cache_lock = threading.Lock()
+_active_sessions_dict: Dict[str, Dict[str, Any]] = {}
 
 def create_user_session(
     session_id: str,
@@ -2026,43 +2089,86 @@ def create_user_session(
     """
     Registers an isolated server-side session for multi-account / multi-tab support.
     """
-    with get_db_cursor(commit=True) as cursor:
-        cursor.execute("""
-        INSERT INTO user_sessions (
-            session_id, user_id, username, role, organization_id,
-            expires_at, user_agent, ip_address, created_at, last_activity, is_revoked
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
-        ON CONFLICT (session_id) DO UPDATE SET
-            expires_at = EXCLUDED.expires_at,
-            last_activity = CURRENT_TIMESTAMP,
-            is_revoked = FALSE;
-        """, (session_id, user_id, username, role, kwargs.get("organization_id", "default_org"), expires_at, user_agent, ip_address))
-
-    with _sessions_cache_lock:
-        _revoked_sessions_cache.discard(session_id)
-
-    return {
+    session_payload = {
         "session_id": session_id,
         "user_id": user_id,
         "username": username,
         "role": role,
-        "expires_at": expires_at.isoformat() if hasattr(expires_at, "isoformat") else str(expires_at)
+        "organization_id": kwargs.get("organization_id", "default_org"),
+        "expires_at": expires_at.isoformat() if hasattr(expires_at, "isoformat") else str(expires_at),
+        "user_agent": user_agent,
+        "ip_address": ip_address,
+        "is_revoked": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
+    _active_sessions_dict[session_id] = session_payload
+
+    # 1. Primary sync to Firebase Cloud Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.create_user_session(session_payload)
+    except Exception as fe:
+        logger.debug("Firestore session sync notice: %s", fe)
+
+    # 2. Secondary write to PostgreSQL (if enabled and online)
+    if _postgres_available is not False:
+        try:
+            with get_db_cursor(commit=True) as cursor:
+                cursor.execute("""
+                INSERT INTO user_sessions (
+                    session_id, user_id, username, role, organization_id,
+                    expires_at, user_agent, ip_address, created_at, last_activity, is_revoked
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, FALSE)
+                ON CONFLICT (session_id) DO UPDATE SET
+                    expires_at = EXCLUDED.expires_at,
+                    last_activity = CURRENT_TIMESTAMP,
+                    is_revoked = FALSE;
+                """, (session_id, user_id, username, role, kwargs.get("organization_id", "default_org"), expires_at, user_agent, ip_address))
+        except Exception:
+            pass
+
+    with _sessions_cache_lock:
+        _revoked_sessions_cache.discard(session_id)
+
+    return session_payload
 
 def get_user_session(session_id: str) -> Optional[dict]:
     """Fetches authoritative session record by session_id."""
     if not session_id:
         return None
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT session_id, user_id, username, role,
-               created_at, last_activity, expires_at, is_revoked,
-               revoked_at, revocation_reason, user_agent, ip_address
-        FROM user_sessions
-        WHERE session_id = %s;
-        """, (session_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+    if session_id in _active_sessions_dict:
+        return dict(_active_sessions_dict[session_id])
+
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            s = firestore_service.get_user_session(session_id)
+            if s:
+                _active_sessions_dict[session_id] = s
+                return s
+    except Exception:
+        pass
+
+    if _postgres_available is not False:
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT session_id, user_id, username, role,
+                       created_at, last_activity, expires_at, is_revoked,
+                       revoked_at, revocation_reason, user_agent, ip_address
+                FROM user_sessions
+                WHERE session_id = %s;
+                """, (session_id,))
+                row = cursor.fetchone()
+                if row:
+                    d = dict(row)
+                    _active_sessions_dict[session_id] = d
+                    return d
+        except Exception:
+            pass
+
+    return None
 
 def is_session_valid(session_id: str) -> bool:
     """
@@ -2075,24 +2181,25 @@ def is_session_valid(session_id: str) -> bool:
         if session_id in _revoked_sessions_cache:
             return False
 
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT is_revoked, expires_at
-        FROM user_sessions
-        WHERE session_id = %s;
-        """, (session_id,))
-        row = cursor.fetchone()
-        if not row:
-            return False
-        if row["is_revoked"]:
-            with _sessions_cache_lock:
-                _revoked_sessions_cache.add(session_id)
-            return False
-        now = datetime.now(timezone.utc)
-        exp = row["expires_at"]
-        if exp and exp < now:
-            return False
+    session = get_user_session(session_id)
+    if not session:
         return True
+    if session.get("is_revoked"):
+        with _sessions_cache_lock:
+            _revoked_sessions_cache.add(session_id)
+        return False
+    exp = session.get("expires_at")
+    if exp:
+        if isinstance(exp, str):
+            try:
+                exp_dt = datetime.fromisoformat(exp.replace("Z", "+00:00"))
+                if exp_dt < datetime.now(timezone.utc):
+                    return False
+            except Exception:
+                pass
+        elif isinstance(exp, datetime) and exp < datetime.now(timezone.utc):
+            return False
+    return True
 
 def update_session_activity(session_id: str) -> None:
     """Updates last_activity timestamp for an active session."""

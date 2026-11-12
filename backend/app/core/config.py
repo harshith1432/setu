@@ -27,11 +27,10 @@ class Settings(BaseModel):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days for farmers
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
-    # Database configuration (PostgreSQL only in the current backend)
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
-    )
+    # Database configuration (Firebase Cloud Firestore as Primary)
+    USE_FIREBASE_ONLY: bool = os.getenv("USE_FIREBASE_ONLY", "false").lower() in ("true", "1")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+    FIREBASE_SERVICE_ACCOUNT_B64: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64", "")
 
     # Security & Access Control
     INITIAL_ADMIN_PASSWORD: str = os.getenv("INITIAL_ADMIN_PASSWORD", "admin")

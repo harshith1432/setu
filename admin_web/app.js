@@ -58,6 +58,30 @@ function escapeHtml(str) {
 }
 window.escapeHtml = escapeHtml;
 
+// Global DOMPurify safe fallback
+if (typeof window.DOMPurify === 'undefined') {
+  window.DOMPurify = {
+    sanitize: function(dirty) {
+      if (!dirty) return '';
+      try {
+        const doc = new DOMParser().parseFromString(dirty, 'text/html');
+        doc.querySelectorAll('script, iframe, object, embed, base, link[rel="import"]').forEach(el => el.remove());
+        doc.querySelectorAll('*').forEach(el => {
+          for (let i = el.attributes.length - 1; i >= 0; i--) {
+            const attr = el.attributes[i];
+            if (attr.name.toLowerCase().startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+              el.removeAttribute(attr.name);
+            }
+          }
+        });
+        return doc.body.innerHTML;
+      } catch (_) {
+        return escapeHtml(dirty);
+      }
+    }
+  };
+}
+
 // SEC-MULTI-TAB: Purge legacy shared localStorage tokens to prevent cross-tab contamination
 try {
   localStorage.removeItem('setu_admin_token');
@@ -2924,8 +2948,12 @@ function exportAnalyticsReport(format) {
 // ==========================================================================
 
 function openAppDrawer(title, htmlContent) {
-  document.getElementById('drawerTitle').innerHTML = title;
-  document.getElementById('drawerBody').innerHTML = htmlContent;
+  const drawerTitle = document.getElementById('drawerTitle');
+  if (drawerTitle) drawerTitle.textContent = title;
+  const drawerBody = document.getElementById('drawerBody');
+  if (drawerBody) {
+    drawerBody.innerHTML = DOMPurify.sanitize(htmlContent);
+  }
   document.getElementById('drawerBackdrop').classList.add('open', 'active');
   document.getElementById('appDrawer').classList.add('open', 'active');
   if (window.lucide) lucide.createIcons();
@@ -2937,8 +2965,12 @@ function closeAppDrawer() {
 }
 
 function openAppModal(title, htmlContent, size = '') {
-  document.getElementById('modalTitle').textContent = title;
-  document.getElementById('modalBody').innerHTML = htmlContent;
+  const modalTitle = document.getElementById('modalTitle');
+  if (modalTitle) modalTitle.textContent = title;
+  const modalBody = document.getElementById('modalBody');
+  if (modalBody) {
+    modalBody.innerHTML = DOMPurify.sanitize(htmlContent);
+  }
   const card = document.querySelector('#appModalBackdrop .modal-card');
   if (card) {
     card.classList.remove('modal-lg', 'modal-xl');
@@ -3174,15 +3206,35 @@ function showToast(message, type = 'info') {
 
   const iconName = type === 'success' ? 'check-circle-2' : (type === 'error' ? 'alert-triangle' : (type === 'warning' ? 'alert-circle' : 'info'));
 
-  toast.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-      <i data-lucide="${iconName}"></i>
-      <span style="line-height: 1.35;">${message}</span>
-    </div>
-    <button type="button" class="toast-close-btn" onclick="this.closest('.toast, .toast-item').remove()" title="Dismiss">
-      <i data-lucide="x" style="width: 13px; height: 13px;"></i>
-    </button>
-  `;
+  const contentDiv = document.createElement('div');
+  contentDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; flex: 1;';
+
+  const iconEl = document.createElement('i');
+  iconEl.setAttribute('data-lucide', iconName);
+
+  const spanEl = document.createElement('span');
+  spanEl.style.lineHeight = '1.35';
+  spanEl.textContent = String(message || '');
+
+  contentDiv.appendChild(iconEl);
+  contentDiv.appendChild(spanEl);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'toast-close-btn';
+  closeBtn.title = 'Dismiss';
+  closeBtn.onclick = function() {
+    const item = this.closest('.toast, .toast-item');
+    if (item) item.remove();
+  };
+
+  const closeIcon = document.createElement('i');
+  closeIcon.setAttribute('data-lucide', 'x');
+  closeIcon.style.cssText = 'width: 13px; height: 13px;';
+  closeBtn.appendChild(closeIcon);
+
+  toast.appendChild(contentDiv);
+  toast.appendChild(closeBtn);
 
   container.appendChild(toast);
   if (window.lucide) lucide.createIcons();

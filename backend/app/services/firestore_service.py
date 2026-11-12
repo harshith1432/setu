@@ -38,19 +38,44 @@ class FirestoreService:
             if not firebase_admin._apps:
                 cred = None
                 sa_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+                sa_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")
                 default_local_sa = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "credentials", "firebase-service-account.json"))
-                sa_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or (default_local_sa if os.path.exists(default_local_sa) else None)
+                render_secret_sa = "/etc/secrets/firebase-service-account.json"
+                root_secret_sa = os.path.abspath("firebase-service-account.json")
+                sa_path = (
+                    os.getenv("FIREBASE_CREDENTIALS_PATH")
+                    or os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
+                    or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                    or (render_secret_sa if os.path.exists(render_secret_sa) else None)
+                    or (root_secret_sa if os.path.exists(root_secret_sa) else None)
+                    or (default_local_sa if os.path.exists(default_local_sa) else None)
+                )
 
-                if sa_json and len(sa_json.strip()) > 20:
+                # 1. Base64 encoded Service Account JSON (ideal for Render single-line env var)
+                if sa_b64 and len(sa_b64.strip()) > 20:
+                    try:
+                        import base64
+                        decoded = base64.b64decode(sa_b64.strip()).decode("utf-8")
+                        sa_dict = json.loads(decoded)
+                        cred = credentials.Certificate(sa_dict)
+                        logger.info("Loaded Firebase credentials from FIREBASE_SERVICE_ACCOUNT_B64")
+                    except Exception as e:
+                        logger.warning("Could not parse FIREBASE_SERVICE_ACCOUNT_B64: %s", e)
+
+                # 2. Raw JSON string Service Account
+                if not cred and sa_json and len(sa_json.strip()) > 20:
                     try:
                         sa_dict = json.loads(sa_json)
                         cred = credentials.Certificate(sa_dict)
+                        logger.info("Loaded Firebase credentials from FIREBASE_SERVICE_ACCOUNT_JSON")
                     except Exception as e:
                         logger.warning("Could not parse FIREBASE_SERVICE_ACCOUNT_JSON: %s", e)
 
+                # 3. File path on disk
                 if not cred and sa_path and os.path.exists(sa_path):
                     try:
                         cred = credentials.Certificate(sa_path)
+                        logger.info("Loaded Firebase credentials from disk: %s", sa_path)
                     except Exception as e:
                         logger.warning("Could not load credentials from %s: %s", sa_path, e)
 
@@ -471,6 +496,126 @@ class FirestoreService:
             return True
         except Exception as e:
             logger.debug("Firestore mark_password_reset_used notice: %s", e)
+            return False
+
+    def update_user_profile(self, user_id: str, updates: Dict[str, Any]) -> bool:
+        """Updates user profile attributes in Firestore."""
+        if not self.is_available or not user_id:
+            return False
+        try:
+            clean_updates = dict(updates)
+            clean_updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("users").document(user_id).set(clean_updates, merge=True)
+            return True
+        except Exception as e:
+            logger.warning("Firestore update_user_profile error: %s", e)
+            return False
+
+    def get_user_by_username(self, username: str) -> Optional[Dict[str, Any]]:
+        """Retrieves user document by exact username from Firestore."""
+        return self.get_user_by_username_or_phone(username)
+
+    def get_all_users(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Lists users from Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("users").limit(limit).stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_all_users error: %s", e)
+            return []
+
+    # =========================================================================
+    # 6. SHEDS & FARM REARING MANAGEMENT
+    # =========================================================================
+
+    def create_shed(self, shed_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Creates or registers a rearing shed in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            s_id = shed_data.get("id") or shed_data.get("shed_id")
+            if not s_id:
+                s_id = f"shed_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(shed_data)
+            data["id"] = s_id
+            data["shed_id"] = s_id
+            now_iso = datetime.now(timezone.utc).isoformat()
+            data["created_at"] = data.get("created_at") or now_iso
+            data["updated_at"] = now_iso
+            self._db.collection("sheds").document(s_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore create_shed error: %s", e)
+            return None
+
+    def get_shed_by_id(self, shed_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a shed document by ID from Firestore."""
+        if not self.is_available or not shed_id:
+            return None
+        try:
+            doc = self._db.collection("sheds").document(shed_id).get()
+            if doc.exists:
+                return {"id": doc.id, **doc.to_dict()}
+            docs = list(self._db.collection("sheds").where("shed_id", "==", shed_id).limit(1).stream())
+            if docs:
+                return {"id": docs[0].id, **docs[0].to_dict()}
+        except Exception as e:
+            logger.debug("Firestore get_shed_by_id error: %s", e)
+        return None
+
+    def get_sheds_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """Retrieves sheds owned by a user from Firestore."""
+        if not self.is_available or not user_id:
+            return []
+        try:
+            docs = self._db.collection("sheds").where("user_id", "==", user_id).stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_sheds_by_user error: %s", e)
+            return []
+
+    def update_shed_settings(self, shed_id: str, settings_data: Dict[str, Any]) -> bool:
+        """Updates custom setpoints and parameters for a shed in Firestore."""
+        if not self.is_available or not shed_id:
+            return False
+        try:
+            self._db.collection("sheds").document(shed_id).set({
+                "settings": settings_data,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }, merge=True)
+            return True
+        except Exception as e:
+            logger.warning("Firestore update_shed_settings error: %s", e)
+            return False
+
+    def save_product(self, product_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Creates or updates a product in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            p_id = product_data.get("id") or product_data.get("sku") or f"prod_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(product_data)
+            data["id"] = p_id
+            now_iso = datetime.now(timezone.utc).isoformat()
+            data["created_at"] = data.get("created_at") or now_iso
+            data["updated_at"] = now_iso
+            self._db.collection("products").document(p_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_product error: %s", e)
+            return None
+
+    def delete_product(self, product_id: str) -> bool:
+        """Deletes a product from Firestore."""
+        if not self.is_available or not product_id:
+            return False
+        try:
+            self._db.collection("products").document(product_id).delete()
+            return True
+        except Exception as e:
+            logger.warning("Firestore delete_product error: %s", e)
             return False
 
 

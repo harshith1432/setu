@@ -20,7 +20,11 @@ services:
         value: backend
       - key: SETU_SECRET_KEY
         generateValue: true
-      - key: DATABASE_URL
+      - key: USE_FIREBASE_ONLY
+        value: "true"
+      - key: FIREBASE_PROJECT_ID
+        value: setu-a767c
+      - key: FIREBASE_SERVICE_ACCOUNT_B64
         sync: false
       - key: TWILIO_ACCOUNT_SID
         sync: false

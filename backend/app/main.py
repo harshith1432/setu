@@ -145,16 +145,30 @@ app.include_router(employees.router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 def startup_db_init():
-    from app.services.db_service import init_db
-    from app.services.enterprise_db import init_enterprise_tables
+    import logging
+    log = logging.getLogger("main")
+    from app.services.firestore_service import firestore_service
+    if firestore_service.is_available:
+        log.info("Firebase Cloud Firestore initialized and active as primary cloud database.")
+    else:
+        log.info("Firebase Cloud Firestore operating in fallback mode.")
+
+    from app.services.db_service import _postgres_available, get_pool
+    # If postgres is disabled or unavailable, skip without blocking
+    p = get_pool()
+    if not p:
+        log.info("Operating in pure Firebase Cloud Firestore mode. PostgreSQL startup skipped.")
+        return
+
     try:
+        from app.services.db_service import init_db
         init_db()
+        from app.services.enterprise_db import init_enterprise_tables
         init_enterprise_tables()
         from app.services.org_employee_db import init_org_employee_tables
         init_org_employee_tables()
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("Startup DB init deferred: %s", e)
+        log.info("Startup DB init deferred: %s", e)
 
 # Mount Super Admin Web Application
 admin_web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "admin_web"))
