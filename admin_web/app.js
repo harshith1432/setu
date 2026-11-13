@@ -153,16 +153,22 @@ window.fetch = async function(resource, init = {}) {
   init = init || {};
   init.headers = init.headers || {};
   if (adminToken && typeof init.headers === 'object') {
+    let activeSessId = currentSessionId;
+    try {
+      const p = parseJwt(adminToken);
+      if (p && p.session_id) activeSessId = p.session_id;
+    } catch (_) {}
+
     if (init.headers instanceof Headers) {
-      if (!init.headers.has('X-Session-ID') && currentSessionId) {
-        init.headers.set('X-Session-ID', currentSessionId);
+      if (!init.headers.has('X-Session-ID') && activeSessId) {
+        init.headers.set('X-Session-ID', activeSessId);
       }
       if (!init.headers.has('X-Tab-ID')) {
         init.headers.set('X-Tab-ID', tabId);
       }
     } else {
-      if (!init.headers['X-Session-ID'] && currentSessionId) {
-        init.headers['X-Session-ID'] = currentSessionId;
+      if (!init.headers['X-Session-ID'] && activeSessId) {
+        init.headers['X-Session-ID'] = activeSessId;
       }
       if (!init.headers['X-Tab-ID']) {
         init.headers['X-Tab-ID'] = tabId;
@@ -293,8 +299,17 @@ function updateTopBarControlsVisibility() {
 // 1. INITIALIZATION & LIFECYCLE
 // ==========================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
+let _hasInitializedPlatform = false;
+function initializePlatform() {
+  if (_hasInitializedPlatform) return;
+  _hasInitializedPlatform = true;
+
   if (window.lucide) lucide.createIcons();
+
+  // If already authenticated and on /login or login.html, route cleanly to /admin
+  if (adminToken && currentUser && (window.location.pathname === '/login' || window.location.pathname.endsWith('/login.html'))) {
+    try { window.location.replace('/admin'); return; } catch (_) {}
+  }
 
   // SEC-AUTH: If returning from Google OAuth redirect, capture and complete authentication immediately
   const oauthHash = window.location.hash;
@@ -436,9 +451,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (adminToken) {
     verifySession();
   } else {
+    document.documentElement.classList.remove('user-logged-in');
     showAuthView();
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializePlatform);
+} else {
+  initializePlatform();
+}
 
 function setupInactivityMonitor() {
   const resetTimer = () => { lastActivityTime = Date.now(); };
@@ -487,17 +509,27 @@ function showAuthView() {
 }
 
 function showDashboardView() {
-  document.getElementById('loadingGateway').classList.add('hidden');
-  document.getElementById('authView').classList.add('hidden');
-  document.getElementById('dashboardView').classList.remove('hidden');
+  document.documentElement.classList.add('user-logged-in');
+  const gw = document.getElementById('loadingGateway');
+  if (gw) gw.classList.add('hidden');
+  const av = document.getElementById('authView');
+  if (av) av.classList.add('hidden');
+  const dv = document.getElementById('dashboardView');
+  if (dv) dv.classList.remove('hidden');
 
   updateUserBadge();
   enforceRoleNavigation();
 
-  // Redirect to role-appropriate starting tab
+  // Restore current tab from storage if allowed for this role, else fallback to default tab
   const role = currentUser?.role || 'farmer';
   const defaultTab = ROLE_DEFAULT_TABS[role] || 'overview';
-  currentTab = defaultTab;
+  const allowedTabs = ROLE_PERMISSIONS[role] || [];
+  const savedTab = TAB_STORAGE.getItem('setu_tab_nav') || localStorage.getItem('setu_tab_nav');
+  if (savedTab && allowedTabs.includes(savedTab)) {
+    currentTab = savedTab;
+  } else {
+    currentTab = defaultTab;
+  }
   switchNavTab(currentTab);
   
   loadRoleDashboardHero();

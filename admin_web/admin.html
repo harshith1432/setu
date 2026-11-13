@@ -320,32 +320,6 @@
 </div>
 <!-- Topbar Controls -->
 <div class="top-bar-right">
-<!-- Active Shed & Telemetry Controls (Contextual: only displayed for authorized operational roles & relevant views) -->
-<div class="top-shed-telemetry-controls" id="topShedTelemetryControls" style="display: none; align-items: center; gap: 8px;">
-<!-- Active Shed Selector -->
-<div class="shed-select-wrap" id="topShedSelectWrap">
-<select id="shedSelect" onchange="handleShedChange(this.value)">
-<option disabled="" selected="" value="">Loading active shed...</option>
-</select>
-<i data-lucide="chevron-down"></i>
-</div>
-<!-- Real-Time Sync Clock & Health Indicator -->
-<div class="top-sync-clock" id="topSyncClock" title="Authoritative PostgreSQL Sync Time">
-              Synced: Just now
-            </div>
-<button class="btn btn-skin btn-sm" id="syncBtn" onclick="syncAllRealtimeData()" title="Authoritative Refresh">
-<i data-lucide="refresh-cw" id="syncIcon"></i>
-</button>
-<div class="top-health-pill" id="topHealthPill">
-<span class="pulse-dot"></span>
-<span id="topHealthText">SYSTEM OPERATIONAL</span>
-</div>
-<!-- Independent Multi-Account Tab Session Indicator -->
-<div class="top-health-pill" id="topTabSessionPill" style="background: var(--skin-bg-alt); border-color: var(--skin-border); gap: 6px;" title="Tab-Isolated Session Context">
-<i data-lucide="layers" style="width: 13px; height: 13px; color: var(--emerald-500);"></i>
-<span id="topTabSessionText" style="font-size: 0.72rem; font-weight: 700; color: var(--text-main);">TAB: ISOLATED</span>
-</div>
-</div>
 <!-- Notification Bell Center -->
 <div class="notif-btn-wrap">
 <button aria-label="Notification Center" class="btn-icon-badge" onclick="toggleNotificationDropdown()" title="Notification Center">
