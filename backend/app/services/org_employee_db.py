@@ -15,6 +15,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from app.services.db_service import get_db_cursor
 from app.core.security import get_password_hash
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
