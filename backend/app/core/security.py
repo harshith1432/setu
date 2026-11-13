@@ -159,21 +159,63 @@ def get_current_user_payload(credentials: HTTPAuthorizationCredentials = Securit
             payload["permissions"] = list(ALL_PERMISSION_CODES)
         except Exception:
             payload["permissions"] = []
-    elif username:
-        from app.services.db_service import get_user_by_username
-        user = get_user_by_username(username)
-        if not user or not user.get("is_active", 1):
+    elif username or user_id:
+        from app.services.db_service import get_user_by_username, get_user_by_id, get_user_by_username_or_phone
+        user = None
+        if username:
+            user = get_user_by_username(username)
+        if not user and user_id:
+            user = get_user_by_id(user_id)
+        if not user and username:
+            user = get_user_by_username_or_phone(username)
+        if not user and user_id:
+            user = get_user_by_username_or_phone(user_id)
+
+        # If user not found in local DB/cache but has a valid, cryptographically verified JWT issued by Setu,
+        # auto-heal/provision the farmer record to eliminate replica desync lockouts.
+        if not user and (username or user_id):
+            try:
+                from app.services.db_service import create_user
+                clean_name = payload.get("full_name") or (username.split("@")[0] if username and "@" in username else (username or "Setu User"))
+                auto_uid = user_id or f"usr_{(username or 'u')[:8]}"
+                new_user_data = {
+                    "id": auto_uid,
+                    "username": username or auto_uid,
+                    "hashed_password": "oauth_jwt_auto_provisioned",
+                    "full_name": clean_name,
+                    "phone": payload.get("phone") or "",
+                    "official_email": username if (username and "@" in username) else payload.get("email"),
+                    "role": user_role or "farmer",
+                    "is_active": True,
+                    "must_change_password": False,
+                }
+                user = create_user(new_user_data)
+            except Exception:
+                pass
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account not found. Please log in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check account suspension safely (None or True means active; only explicit False/0 means suspended)
+        act = user.get("is_active")
+        if act is False or act == 0 or act == "0" or str(act).lower() == "false":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Account has been suspended or deactivated",
             )
+
         # Check employee status if user_id or username exists
         try:
             from app.services.org_employee_db import get_user_access_context
             target_uid = user.get("id") or user_id
             if target_uid:
                 ctx = get_user_access_context(target_uid)
-                if not ctx.get("is_active", True):
+                ctx_act = ctx.get("is_active")
+                if ctx_act is False or ctx_act == 0 or ctx_act == "0" or str(ctx_act).lower() == "false":
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail="Account has been suspended or deactivated",

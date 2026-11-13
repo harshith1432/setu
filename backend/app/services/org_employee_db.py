@@ -14,7 +14,7 @@ import secrets
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
-from app.services.db_service import get_db_cursor
+from app.services.db_service import get_db_cursor, invalidate_user_cache
 from app.core.security import get_password_hash
 from app.core.config import settings
 
@@ -646,7 +646,7 @@ def get_user_access_context(user_id: str) -> Dict[str, Any]:
                     "access_scope": u.get("access_scope", "GLOBAL"),
                     "assigned_resources": {"sheds": [], "devices": []},
                     "permissions": get_user_effective_permissions(user_id, u_role),
-                    "is_active": bool(u.get("is_active", True))
+                    "is_active": False if (u.get("is_active") is False or u.get("is_active") == 0 or str(u.get("is_active")).lower() == "false") else True
                 }
             return {
                 "role": "farmer",
@@ -669,9 +669,10 @@ def get_user_access_context(user_id: str) -> Dict[str, Any]:
         elif not isinstance(assigned_res, dict):
             assigned_res = {"sheds": [], "devices": []}
 
-        # Check account suspension across both tables
-        is_active = bool(row.get("is_active", True))
-        if row.get("employment_status") == "SUSPENDED":
+        # Check account suspension across both tables (treat None / missing as Active)
+        row_act = row.get("is_active")
+        is_active = False if (row_act is False or row_act == 0 or str(row_act).lower() == "false") else True
+        if row.get("employment_status") == "SUSPENDED" or row.get("status") == "SUSPENDED":
             is_active = False
 
         return {
@@ -2137,18 +2138,32 @@ def accept_invitation_and_activate(
         WHERE id = %s
         """, (now_dt, inv["id"]))
 
+    invalidate_user_cache()
+
+    # Sync activation to Cloud Firestore
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.update_user_password(inv["user_id"], hashed_pwd, must_change_password=False)
+            firestore_service.update_user_profile(inv["user_id"], {
+                "is_active": True,
+                "mfa_enabled": mfa_enabled,
+                "must_change_password": False,
+                "updated_at": now_dt.isoformat()
+            })
+            firestore_service.update_employee(inv["employee_id"], {
+                "employment_status": "ACTIVE",
+                "invitation_status": "ACCEPTED",
+                "updated_at": now_dt.isoformat()
+            })
+    except Exception as fe:
+        logger.warning("Firestore sync during invitation accept notice: %s", fe)
+
     log_security_audit(
         actor=inv["username"],
         action="INVITATION_ACCEPTED",
         details=f"Employee {inv['corporate_emp_id']} ({inv['email']}) accepted invitation and established password",
         target_resource=inv["employee_id"],
-        
-    )
-    log_security_audit(
-        actor=inv["username"],
-        action="ACCOUNT_ACTIVATED",
-        details=f"Account for {inv['full_name']} activated successfully (MFA: {mfa_enabled})",
-        target_resource=inv["user_id"],
         
     )
 

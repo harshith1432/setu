@@ -3,6 +3,7 @@ import sys
 import logging
 import threading
 import time
+import secrets
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor, execute_values
@@ -858,7 +859,7 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
         from app.services.firestore_service import firestore_service
         if firestore_service.is_available:
             u = firestore_service.get_user_by_username_or_phone(clean_id)
-            if u:
+            if u and u.get("hashed_password"):
                 return u
     except Exception as fe:
         logger.debug("Firestore get_user notice: %s", fe)
@@ -875,9 +876,10 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
                            OR phone = ANY(%s) 
                            OR whatsapp_number = ANY(%s) 
                            OR LOWER(official_email) = ANY(%s)
+                           OR id = ANY(%s)
                         LIMIT 1
                         """,
-                        (unique_candidates, unique_candidates, unique_candidates, [c.lower() for c in unique_candidates]),
+                        (unique_candidates, unique_candidates, unique_candidates, [c.lower() for c in unique_candidates], unique_candidates),
                     )
                 except Exception:
                     cursor.execute(
@@ -885,9 +887,10 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
                         SELECT * FROM users 
                         WHERE username = ANY(%s) 
                            OR phone = ANY(%s) 
+                           OR id = ANY(%s)
                         LIMIT 1
                         """,
-                        (unique_candidates, unique_candidates),
+                        (unique_candidates, unique_candidates, unique_candidates),
                     )
                 row = cursor.fetchone()
                 if row:
@@ -897,6 +900,8 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
                         d["created_at"] = d["created_at"].isoformat()
                     d.setdefault("preferred_language", "en")
                     d.setdefault("role", "farmer")
+                    if d.get("is_active") is None:
+                        d["is_active"] = True
                     return d
         except Exception as e:
             logger.debug("Postgres get_user_by_username_or_phone notice: %s", e)
@@ -977,13 +982,18 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     if _postgres_available is not False:
         try:
             with get_db_cursor(dict_cursor=True) as cursor:
-                cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                cursor.execute(
+                    "SELECT * FROM users WHERE id = %s OR username = %s OR LOWER(official_email) = LOWER(%s) LIMIT 1",
+                    (user_id, user_id, user_id)
+                )
                 row = cursor.fetchone()
                 res = None
                 if row:
                     d = dict(row)
                     if isinstance(d.get("created_at"), datetime):
                         d["created_at"] = d["created_at"].isoformat()
+                    if d.get("is_active") is None:
+                        d["is_active"] = True
                     res = d
 
                 with _user_cache_lock:
@@ -1327,6 +1337,10 @@ def update_user_password(user_id: str, new_hashed_password: str, must_change_pas
     return True
 
 def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    # Always ensure user account remains active unless explicitly deactivated
+    if "is_active" not in updates:
+        updates["is_active"] = True
+
     # 1. Update in Firebase Cloud Firestore
     try:
         from app.services.firestore_service import firestore_service
@@ -1344,7 +1358,7 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
                 "full_name", "phone", "whatsapp_number", "whatsapp_verified",
                 "preferred_language", "farm_name", "region", "latitude", "longitude",
                 "shed_id", "batch_id", "dfl_capacity", "breed", "current_stage",
-                "official_email", "organization_id"
+                "official_email", "organization_id", "is_active"
             ]
             for k in allowed:
                 if k in updates and updates[k] is not None:
@@ -1353,14 +1367,15 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
             if fields:
                 values.append(user_id)
                 values.append(user_id)
-                query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s RETURNING *"
+                values.append(user_id)
+                query = f"UPDATE users SET {', '.join(fields)} WHERE id = %s OR username = %s OR LOWER(official_email) = LOWER(%s) RETURNING *"
                 with get_db_cursor(commit=True, dict_cursor=True) as cursor:
                     cursor.execute(query, tuple(values))
         except Exception:
             pass
 
     invalidate_user_cache()
-    return get_user_by_id(user_id) or get_user_by_username(user_id)
+    return get_user_by_id(user_id) or get_user_by_username(user_id) or get_user_by_username_or_phone(user_id)
 
 def update_user_status(user_id: str, is_active: bool) -> bool:
     with get_db_cursor(commit=True) as cursor:

@@ -335,7 +335,11 @@ class FirestoreService:
         res.setdefault("batch_id", "SERI-2026-M04")
         res.setdefault("dfl_capacity", "200 DFL")
         res.setdefault("breed", "Double Hybrid (FC1 x FC2)")
-        res.setdefault("is_active", True)
+        act_val = res.get("is_active")
+        if act_val is None:
+            res["is_active"] = True
+        else:
+            res["is_active"] = False if (act_val is False or act_val == 0 or str(act_val).lower() == "false") else True
         res.setdefault("access_scope", "GLOBAL")
         res.setdefault("whatsapp_verified", False)
         return res
@@ -349,6 +353,17 @@ class FirestoreService:
             return None
         try:
             users_ref = self._db.collection("users")
+
+            # 0. Direct document ID lookup
+            try:
+                doc = users_ref.document(clean_id).get()
+                if doc.exists:
+                    d_data = doc.to_dict()
+                    if d_data and d_data.get("hashed_password"):
+                        return self._normalize_user_doc(d_data, doc.id)
+            except Exception:
+                pass
+
             # 1. By exact username
             docs = list(users_ref.where("username", "==", clean_id).limit(1).stream())
             if docs:
@@ -360,12 +375,20 @@ class FirestoreService:
                 if docs:
                     return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 
-            # 3. By official_email
+            # 3. By official_email or email
             docs = list(users_ref.where("official_email", "==", clean_id).limit(1).stream())
             if docs:
                 return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
             if clean_id.lower() != clean_id:
                 docs = list(users_ref.where("official_email", "==", clean_id.lower()).limit(1).stream())
+                if docs:
+                    return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
+
+            docs = list(users_ref.where("email", "==", clean_id).limit(1).stream())
+            if docs:
+                return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
+            if clean_id.lower() != clean_id:
+                docs = list(users_ref.where("email", "==", clean_id.lower()).limit(1).stream())
                 if docs:
                     return self._normalize_user_doc(docs[0].to_dict(), docs[0].id)
 

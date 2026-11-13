@@ -10642,7 +10642,11 @@ async function openEditProfileModal() {
     const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : (TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token')));
     if (token) {
       const res = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Session-ID': currentSessionId || '',
+          'X-Tab-ID': tabId
+        }
       });
       if (res.ok) {
         freshUser = await res.json();
@@ -10829,7 +10833,9 @@ async function submitEditProfile(e) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'X-Session-ID': currentSessionId || '',
+        'X-Tab-ID': tabId
       },
       body: JSON.stringify(payload)
     });
