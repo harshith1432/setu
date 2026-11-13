@@ -53,6 +53,8 @@ async def test_farmer_registration_page_served(async_client):
 @pytest.mark.anyio
 async def test_unified_login_admin_success(async_client):
     """Verify admin user can log in via unified login endpoint"""
+    from app.services.enterprise_db import set_default_admin_enabled
+    set_default_admin_enabled(True, "test_setup")
     response = await async_client.post("/api/v1/auth/login", json={
         "username": "admin",
         "password": settings.INITIAL_ADMIN_PASSWORD
