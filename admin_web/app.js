@@ -502,9 +502,13 @@ function startSyncClock() {
 // ==========================================================================
 
 function showAuthView() {
-  document.getElementById('loadingGateway').classList.add('hidden');
-  document.getElementById('dashboardView').classList.add('hidden');
-  document.getElementById('authView').classList.remove('hidden');
+  document.documentElement.classList.remove('user-logged-in');
+  const gw = document.getElementById('loadingGateway');
+  if (gw) gw.classList.add('hidden');
+  const dv = document.getElementById('dashboardView');
+  if (dv) dv.classList.add('hidden');
+  const av = document.getElementById('authView');
+  if (av) av.classList.remove('hidden');
   if (window.lucide) lucide.createIcons();
 }
 
@@ -902,7 +906,7 @@ function showFirstLoginResetModal(token, user) {
         <div>
           <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin: 0;">Set Your Personal Password</h3>
           <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0;">
-            Welcome, <strong>${escapeHtml(user.full_name || user.username)}</strong>! You signed in with the default initial password (<code style="background: var(--bg-hover); padding: 2px 6px; border-radius: 4px;">Welcome@123</code>). For account security, you must create a new password to continue.
+            Welcome, <strong>${escapeHtml(user.full_name || user.username)}</strong>! You signed in with a temporary initial password. For account security, you must create a new personal password to continue.
           </p>
         </div>
       </div>
@@ -928,7 +932,7 @@ function showFirstLoginResetModal(token, user) {
               <i data-lucide="eye"></i>
             </button>
           </div>
-          <span style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-top: 4px;">Minimum 6 characters. Cannot be Welcome@123.</span>
+          <span style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-top: 4px;">Minimum 6 characters. Must differ from temporary initial password.</span>
         </div>
 
         <div class="form-group">
@@ -977,12 +981,6 @@ async function submitFirstLoginPasswordReset(e) {
   const btn = document.getElementById('btnSaveFirstPassword');
 
   errBox.classList.add('hidden');
-
-  if (newPassword === 'Welcome@123') {
-    errBox.textContent = 'Your new password cannot be the default "Welcome@123". Please choose a different personal password.';
-    errBox.classList.remove('hidden');
-    return;
-  }
   if (newPassword.length < 6) {
     errBox.textContent = 'Password must be at least 6 characters long.';
     errBox.classList.remove('hidden');
@@ -1081,6 +1079,8 @@ async function handleLogin(e) {
     TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
     localStorage.setItem('setu_token', adminToken);
     localStorage.setItem('setu_user', JSON.stringify(currentUser));
+    if (currentSessionId) localStorage.setItem('setu_session_id', currentSessionId);
+    document.documentElement.classList.add('user-logged-in');
 
     // Enforce First-Login Password Reset for new users using default password
     const mustChangePassword = Boolean(data.must_change_password || (currentUser && currentUser.must_change_password));
@@ -1105,12 +1105,20 @@ async function handleLogin(e) {
     const defTab = (ROLE_DEFAULT_TABS && ROLE_DEFAULT_TABS[currentUser.role]) || 'overview';
     currentTab = defTab;
     TAB_STORAGE.setItem('setu_tab_nav', currentTab);
+    try { localStorage.setItem('setu_tab_nav', currentTab); } catch (_) {}
     if (currentUser.shed_id) {
       selectedShedId = currentUser.shed_id;
       TAB_STORAGE.setItem('setu_tab_shed', selectedShedId);
+      try { localStorage.setItem('setu_tab_shed', selectedShedId); } catch (_) {}
     }
 
     showToast(`Welcome back, ${currentUser.full_name || currentUser.username}!`, 'success');
+
+    if (window.location.pathname === '/login' || window.location.pathname.endsWith('/login.html')) {
+      window.location.replace('/admin');
+      return;
+    }
+
     showDashboardView();
   } catch (err) {
     errorEl.innerHTML = `<i data-lucide="alert-circle" style="width: 18px; height: 18px; flex-shrink: 0;"></i><span>${escapeHtml(err.message)}</span>`;
@@ -1603,6 +1611,8 @@ async function verifySession() {
       currentUser = user;
       TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
       localStorage.setItem('setu_user', JSON.stringify(currentUser));
+      if (currentSessionId) localStorage.setItem('setu_session_id', currentSessionId);
+      document.documentElement.classList.add('user-logged-in');
       showDashboardView();
     }
   } catch (err) {
@@ -1615,7 +1625,10 @@ async function verifySession() {
       TAB_STORAGE.removeItem('setu_tab_session_id');
       TAB_STORAGE.removeItem('setu_tab_user');
       localStorage.removeItem('setu_token');
+      localStorage.removeItem('setu_admin_token');
       localStorage.removeItem('setu_user');
+      localStorage.removeItem('setu_session_id');
+      document.documentElement.classList.remove('user-logged-in');
       showAuthView();
     }
   }
@@ -1639,6 +1652,13 @@ async function handleLogout(msg) {
   TAB_STORAGE.removeItem('setu_tab_user');
   TAB_STORAGE.removeItem('setu_tab_nav');
   TAB_STORAGE.removeItem('setu_tab_shed');
+  localStorage.removeItem('setu_token');
+  localStorage.removeItem('setu_admin_token');
+  localStorage.removeItem('setu_user');
+  localStorage.removeItem('setu_session_id');
+  localStorage.removeItem('setu_tab_nav');
+  localStorage.removeItem('setu_tab_shed');
+  document.documentElement.classList.remove('user-logged-in');
 
   allFarmersData = [];
   farmersFilteredList = [];
@@ -1836,6 +1856,7 @@ async function simulateRoleChange(newRole) {
 function switchNavTab(tabName) {
   currentTab = tabName;
   TAB_STORAGE.setItem('setu_tab_nav', tabName);
+  try { localStorage.setItem('setu_tab_nav', tabName); } catch (_) {}
   closeSidebar();
 
   // Update active state in sidebar
@@ -3230,7 +3251,7 @@ function openAppDrawer(title, htmlContent) {
   if (drawerTitle) drawerTitle.textContent = title;
   const drawerBody = document.getElementById('drawerBody');
   if (drawerBody) {
-    drawerBody.innerHTML = DOMPurify.sanitize(htmlContent);
+    drawerBody.innerHTML = htmlContent;
   }
   document.getElementById('drawerBackdrop').classList.add('open', 'active');
   document.getElementById('appDrawer').classList.add('open', 'active');
@@ -3247,7 +3268,7 @@ function openAppModal(title, htmlContent, size = '') {
   if (modalTitle) modalTitle.textContent = title;
   const modalBody = document.getElementById('modalBody');
   if (modalBody) {
-    modalBody.innerHTML = DOMPurify.sanitize(htmlContent);
+    modalBody.innerHTML = htmlContent;
   }
   const card = document.querySelector('#appModalBackdrop .modal-card');
   if (card) {
@@ -4558,14 +4579,14 @@ async function openOnboardEmployeeModal() {
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
         <div class="form-group">
-          <label style="font-size: 0.8rem; font-weight: 700;">Account Password *</label>
+          <label style="font-size: 0.8rem; font-weight: 700;">Account Password</label>
           <div style="position: relative;">
-            <input type="password" id="onboardPassword" required value="Welcome@123" placeholder="Welcome@123" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+            <input type="password" id="onboardPassword" placeholder="Set password (or leave blank for env default)" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
             <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('onboardPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide Password">
               <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
             </button>
           </div>
-          <span style="font-size: 0.70rem; color: var(--text-muted); margin-top: 2px; display: block;">Default is <strong>Welcome@123</strong>. Employee can change it after login.</span>
+          <span style="font-size: 0.70rem; color: var(--text-muted); margin-top: 2px; display: block;">Leave blank to use environment default or secure activation token.</span>
         </div>
         <div class="form-group">
           <label style="font-size: 0.8rem; font-weight: 700;">Initial Access Status</label>
@@ -4577,7 +4598,7 @@ async function openOnboardEmployeeModal() {
       </div>
       <div style="background: var(--bg-subtle); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 0.74rem; color: var(--text-secondary); line-height: 1.4;">
         <i data-lucide="shield-check" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i>
-        Account will be provisioned with the initial password (default: <code>Welcome@123</code>). The employee can log in immediately or activate via the secure invitation URL and update their password at any time.
+        Account will be provisioned with an initial password. The employee can log in immediately or activate via the secure invitation URL and update their password at any time.
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
         <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
@@ -4600,7 +4621,7 @@ async function submitOnboardEmployee(e) {
   const role_code = document.getElementById('onboardRole').value;
   const access_scope = document.getElementById('onboardScope').value;
   const assigned_area = document.getElementById('onboardArea')?.value.trim() || 'Bengaluru';
-  const password = document.getElementById('onboardPassword')?.value.trim() || 'Welcome@123';
+  const password = document.getElementById('onboardPassword')?.value.trim() || undefined;
 
   try {
     const res = await fetch(`${API_BASE_URL}/employees`, {
@@ -9920,11 +9941,17 @@ function filterShedsFleet(query) {
 window.filterShedsFleet = filterShedsFleet;
 
 
-window.addEventListener("DOMContentLoaded", () => {
+function initGoogleAuthServices() {
   checkGoogleOAuthCallback();
   loadGoogleAuthConfig();
   initGoogleAuth();
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener("DOMContentLoaded", initGoogleAuthServices);
+} else {
+  initGoogleAuthServices();
+}
 
 // Explicit Global Window Exports for Dynamic Invocation & TableManager Interop
 window.showConfirmActionModal = showConfirmActionModal;
@@ -10590,7 +10617,7 @@ async function openEditProfileModal() {
   // Try to fetch latest fresh profile from /auth/me if token exists
   let freshUser = user;
   try {
-    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : localStorage.getItem('token'));
+    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : (TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token')));
     if (token) {
       const res = await fetch(`${API_BASE_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -10599,6 +10626,7 @@ async function openEditProfileModal() {
         freshUser = await res.json();
         currentUser = { ...currentUser, ...freshUser };
         TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+        localStorage.setItem('setu_user', JSON.stringify(currentUser));
       }
     }
   } catch (_) {}
@@ -10632,7 +10660,7 @@ async function openEditProfileModal() {
       </div>
 
       <!-- Edit Profile Form -->
-      <form id="editProfileForm" onsubmit="submitEditProfile(event)" style="display: flex; flex-direction: column; gap: 14px;">
+      <form id="editProfileForm" action="javascript:void(0);" onsubmit="submitEditProfile(event); return false;" style="display: flex; flex-direction: column; gap: 14px;">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
           <div class="form-group">
             <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
@@ -10705,7 +10733,7 @@ async function openEditProfileModal() {
         <!-- Action Footer -->
         <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--border-color);">
           <button type="button" class="btn btn-secondary" onclick="closeAppModal()">Cancel</button>
-          <button type="submit" id="btnSaveProfile" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+          <button type="button" id="btnSaveProfile" onclick="submitEditProfile(event)" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
             <i data-lucide="check" style="width: 15px; height: 15px;"></i>
             <span>Save Profile Changes</span>
           </button>
@@ -10716,10 +10744,31 @@ async function openEditProfileModal() {
 
   openAppModal('Edit User Profile', bodyHtml, 'lg');
   if (window.lucide) lucide.createIcons();
+
+  // Directly bind event listeners to ensure robust form handling
+  const form = document.getElementById('editProfileForm');
+  if (form) {
+    form.onsubmit = function(evt) {
+      if (evt && evt.preventDefault) evt.preventDefault();
+      submitEditProfile(evt);
+      return false;
+    };
+  }
+  const saveBtn = document.getElementById('btnSaveProfile');
+  if (saveBtn) {
+    saveBtn.onclick = function(evt) {
+      if (evt && evt.preventDefault) evt.preventDefault();
+      submitEditProfile(evt);
+      return false;
+    };
+  }
 }
 
 async function submitEditProfile(e) {
-  e.preventDefault();
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
   const fullName = document.getElementById('profFullName')?.value?.trim();
   const email = document.getElementById('profEmail')?.value?.trim();
   const phone = document.getElementById('profPhone')?.value?.trim();
@@ -10729,11 +10778,11 @@ async function submitEditProfile(e) {
 
   if (!fullName) {
     showToast('Full name is required', 'error');
-    return;
+    return false;
   }
   if (!phone) {
     showToast('Phone number is required', 'error');
-    return;
+    return false;
   }
 
   const saveBtn = document.getElementById('btnSaveProfile');
@@ -10753,7 +10802,7 @@ async function submitEditProfile(e) {
   if (region !== undefined) payload.region = region;
 
   try {
-    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : localStorage.getItem('token'));
+    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : (TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token')));
     const res = await fetch(`${API_BASE_URL}/auth/profile`, {
       method: 'PUT',
       headers: {
@@ -10768,9 +10817,10 @@ async function submitEditProfile(e) {
       throw new Error(data.detail || 'Failed to update profile');
     }
 
-    // Update in-memory state and sessionStorage
+    // Update in-memory state and both sessionStorage and localStorage safely
     currentUser = {
       ...(currentUser || {}),
+      ...(data || {}),
       full_name: data.full_name || fullName,
       phone: data.phone || phone,
       official_email: data.official_email || email,
@@ -10779,8 +10829,10 @@ async function submitEditProfile(e) {
     };
     if (farm_name) currentUser.farm_name = farm_name;
     if (region) currentUser.region = region;
+    window.currentUser = currentUser;
 
     TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+    localStorage.setItem('setu_user', JSON.stringify(currentUser));
 
     // Update UI headers and avatar labels immediately
     updateUserBadge();
@@ -10796,6 +10848,7 @@ async function submitEditProfile(e) {
       if (window.lucide) lucide.createIcons();
     }
   }
+  return false;
 }
 
 window.openEditProfileModal = openEditProfileModal;
@@ -10803,9 +10856,9 @@ window.submitEditProfile = submitEditProfile;
 
 function openChangePasswordModal() {
   const body = `
-    <form id="changePasswordForm" onsubmit="submitChangePassword(event)" style="display: flex; flex-direction: column; gap: 14px;">
+    <form id="changePasswordForm" action="javascript:void(0);" onsubmit="submitChangePassword(event); return false;" style="display: flex; flex-direction: column; gap: 14px;">
       <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
-        Update your account password below. Enter your current password (e.g. <code>Welcome@123</code> if newly onboarded) and choose a new secure password.
+        Update your account password below. Enter your current password and choose a new secure password.
       </p>
       <div class="form-group">
         <label style="font-size: 0.8rem; font-weight: 700;">Current Password *</label>
@@ -10836,30 +10889,43 @@ function openChangePasswordModal() {
       </div>
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
         <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="check"></i> Update Password</button>
+        <button type="button" onclick="submitChangePassword(event)" class="btn btn-primary btn-sm"><i data-lucide="check"></i> Update Password</button>
       </div>
     </form>
   `;
   openAppModal('Change Account Password', body);
+  if (window.lucide) lucide.createIcons();
+
+  const form = document.getElementById('changePasswordForm');
+  if (form) {
+    form.onsubmit = function(evt) {
+      if (evt && evt.preventDefault) evt.preventDefault();
+      submitChangePassword(evt);
+      return false;
+    };
+  }
 }
 
 async function submitChangePassword(e) {
-  e.preventDefault();
-  const current_password = document.getElementById('cpCurrentPassword').value;
-  const new_password = document.getElementById('cpNewPassword').value;
-  const confirm_password = document.getElementById('cpConfirmPassword').value;
+  if (e) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
+  }
+  const current_password = document.getElementById('cpCurrentPassword')?.value || '';
+  const new_password = document.getElementById('cpNewPassword')?.value || '';
+  const confirm_password = document.getElementById('cpConfirmPassword')?.value || '';
 
   if (new_password !== confirm_password) {
     showToast('New passwords do not match', 'error');
-    return;
+    return false;
   }
   if (new_password.length < 6) {
     showToast('New password must be at least 6 characters', 'error');
-    return;
+    return false;
   }
 
   try {
-    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : localStorage.getItem('token'));
+    const token = typeof adminToken !== 'undefined' && adminToken ? adminToken : (typeof authToken !== 'undefined' ? authToken : (TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token')));
     const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
@@ -10875,4 +10941,5 @@ async function submitChangePassword(e) {
   } catch (err) {
     showToast(err.message, 'error');
   }
+  return false;
 }
