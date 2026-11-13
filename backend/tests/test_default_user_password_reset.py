@@ -4,8 +4,8 @@ from app.services.db_service import create_user, get_user_by_username_or_phone
 
 @pytest.mark.anyio
 async def test_new_user_default_password_and_forced_reset_flow(async_client):
-    default_pwd = settings.DEFAULT_NEW_USER_PASSWORD
-    assert default_pwd == "Welcome@123"
+    default_pwd = settings.DEFAULT_NEW_USER_PASSWORD or "test_default_pwd_123"
+    assert len(default_pwd) >= 6
 
     test_username = "test_farmer_welcome_flow"
     # Ensure fresh state
@@ -19,11 +19,11 @@ async def test_new_user_default_password_and_forced_reset_flow(async_client):
         "preferred_language": "en"
     }
     
-    # 1. Create user without explicit password -> should receive Welcome@123 and must_change_password=True
+    # 1. Create user without explicit password -> should receive default password and must_change_password=True
     created = create_user(new_user_payload)
     assert created["must_change_password"] is True
     
-    # 2. Login with default password 'Welcome@123'
+    # 2. Login with configured default password
     login_res = await async_client.post(
         "/api/v1/auth/login",
         json={"username": test_username, "password": default_pwd}

@@ -1,3 +1,8 @@
+import os
+os.environ.setdefault("SUPERADMIN_PASSWORD", "test_admin_pwd")
+os.environ.setdefault("INITIAL_ADMIN_PASSWORD", "test_admin_pwd")
+os.environ.setdefault("DEFAULT_NEW_USER_PASSWORD", "test_default_pwd_123")
+
 import pytest
 import httpx
 from app.main import app

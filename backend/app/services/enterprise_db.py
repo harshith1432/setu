@@ -1150,93 +1150,110 @@ def _seed_sensors_registry(cursor, now_dt):
 
 def get_platform_overview_kpis() -> Dict[str, Any]:
     """
-    Computes 100% authoritative, real-time KPI metrics from PostgreSQL tables.
-    Returns honest values with last-updated timestamp and no fake numbers.
+    Computes 100% authoritative, real-time KPI metrics from PostgreSQL tables
+    with automatic failover to Firebase Cloud Firestore for cloud environments.
     """
+    from app.services.firestore_service import firestore_service
+    from app.services.db_service import is_postgres_available
+
+    if not is_postgres_available() and firestore_service.is_available:
+        return firestore_service.compute_overview_kpis()
+
     now_dt = datetime.now(timezone.utc)
-    with get_db_cursor(dict_cursor=True) as cursor:
-        # Total and active farmers
-        cursor.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_active = TRUE) as active FROM users WHERE role = 'farmer'")
-        farmer_stats = cursor.fetchone() or {"total": 0, "active": 0}
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            # Total and active farmers
+            cursor.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_active = TRUE) as active FROM users WHERE role = 'farmer'")
+            farmer_stats = cursor.fetchone() or {"total": 0, "active": 0}
 
-        # Unique rearing sheds in database belonging to enrolled farmers
-        cursor.execute("SELECT COUNT(DISTINCT shed_id) as shed_count FROM users WHERE role = 'farmer' AND shed_id IS NOT NULL AND shed_id != ''")
-        shed_stats = cursor.fetchone() or {"shed_count": 0}
+            # Unique rearing sheds in database belonging to enrolled farmers
+            cursor.execute("SELECT COUNT(DISTINCT shed_id) as shed_count FROM users WHERE role = 'farmer' AND shed_id IS NOT NULL AND shed_id != ''")
+            shed_stats = cursor.fetchone() or {"shed_count": 0}
 
-        # Devices count & live connectivity (online if last_seen within 300 seconds)
-        cursor.execute("""
-        SELECT 
-            COUNT(*) as total_devices,
-            COUNT(*) FILTER (WHERE status = 'ONLINE' OR (last_seen_at IS NOT NULL AND last_seen_at > %s)) as online_devices,
-            COUNT(*) FILTER (WHERE status != 'ONLINE' AND (last_seen_at IS NULL OR last_seen_at <= %s)) as offline_devices
-        FROM devices
-        """, (now_dt - timedelta(seconds=300), now_dt - timedelta(seconds=300)))
-        device_stats = cursor.fetchone() or {"total_devices": 0, "online_devices": 0, "offline_devices": 0}
+            # Devices count & live connectivity (online if last_seen within 300 seconds)
+            cursor.execute("""
+            SELECT 
+                COUNT(*) as total_devices,
+                COUNT(*) FILTER (WHERE status = 'ONLINE' OR (last_seen_at IS NOT NULL AND last_seen_at > %s)) as online_devices,
+                COUNT(*) FILTER (WHERE status != 'ONLINE' AND (last_seen_at IS NULL OR last_seen_at <= %s)) as offline_devices
+            FROM devices
+            """, (now_dt - timedelta(seconds=300), now_dt - timedelta(seconds=300)))
+            device_stats = cursor.fetchone() or {"total_devices": 0, "online_devices": 0, "offline_devices": 0}
 
-        # Active subscriptions & MRR (in minor units converted to whole currency)
-        cursor.execute("""
-        SELECT 
-            COUNT(*) as active_subs,
-            COALESCE(SUM(monthly_price_minor_units), 0) as mrr_minor
-        FROM subscriptions
-        WHERE status = 'ACTIVE'
-        """)
-        sub_stats = cursor.fetchone() or {"active_subs": 0, "mrr_minor": 0}
+            # Active subscriptions & MRR (in minor units converted to whole currency)
+            cursor.execute("""
+            SELECT 
+                COUNT(*) as active_subs,
+                COALESCE(SUM(monthly_price_minor_units), 0) as mrr_minor
+            FROM subscriptions
+            WHERE status = 'ACTIVE'
+            """)
+            sub_stats = cursor.fetchone() or {"active_subs": 0, "mrr_minor": 0}
 
-        # Pending orders
-        cursor.execute("SELECT COUNT(*) as pending_orders FROM orders WHERE status IN ('PENDING', 'PAYMENT_PENDING', 'PROCESSING')")
-        order_stats = cursor.fetchone() or {"pending_orders": 0}
+            # Pending orders
+            cursor.execute("SELECT COUNT(*) as pending_orders FROM orders WHERE status IN ('PENDING', 'PAYMENT_PENDING', 'PROCESSING')")
+            order_stats = cursor.fetchone() or {"pending_orders": 0}
 
-        # Open and critical support tickets
-        cursor.execute("""
-        SELECT 
-            COUNT(*) FILTER (WHERE status IN ('OPEN', 'ASSIGNED', 'IN_PROGRESS', 'ESCALATED')) as open_tickets,
-            COUNT(*) FILTER (WHERE priority = 'CRITICAL' AND status != 'CLOSED') as critical_tickets
-        FROM support_tickets
-        """)
-        ticket_stats = cursor.fetchone() or {"open_tickets": 0, "critical_tickets": 0}
+            # Open and critical support tickets
+            cursor.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE status IN ('OPEN', 'ASSIGNED', 'IN_PROGRESS', 'ESCALATED')) as open_tickets,
+                COUNT(*) FILTER (WHERE priority = 'CRITICAL' AND status != 'CLOSED') as critical_tickets
+            FROM support_tickets
+            """)
+            ticket_stats = cursor.fetchone() or {"open_tickets": 0, "critical_tickets": 0}
 
-        # Active critical alerts
-        cursor.execute("""
-        SELECT 
-            COUNT(*) as active_alerts,
-            COUNT(*) FILTER (WHERE severity = 'CRITICAL') as critical_alerts
-        FROM alerts
-        WHERE status = 'ACTIVE'
-        """)
-        alert_stats = cursor.fetchone() or {"active_alerts": 0, "critical_alerts": 0}
+            # Active critical alerts
+            cursor.execute("""
+            SELECT 
+                COUNT(*) as active_alerts,
+                COUNT(*) FILTER (WHERE severity = 'CRITICAL') as critical_alerts
+            FROM alerts
+            WHERE status = 'ACTIVE'
+            """)
+            alert_stats = cursor.fetchone() or {"active_alerts": 0, "critical_alerts": 0}
 
-        # Total revenue collected
-        cursor.execute("SELECT COALESCE(SUM(amount_minor_units), 0) as total_rev_minor FROM payments WHERE status = 'SUCCESS'")
-        rev_stats = cursor.fetchone() or {"total_rev_minor": 0}
+            # Total revenue collected
+            cursor.execute("SELECT COALESCE(SUM(amount_minor_units), 0) as total_rev_minor FROM payments WHERE status = 'SUCCESS'")
+            rev_stats = cursor.fetchone() or {"total_rev_minor": 0}
 
-        # Pending installations
-        cursor.execute("SELECT COUNT(*) as pending_jobs FROM installation_jobs WHERE status IN ('REQUESTED', 'SCHEDULED', 'ASSIGNED', 'IN_PROGRESS')")
-        install_stats = cursor.fetchone() or {"pending_jobs": 0}
+            # Pending installations
+            cursor.execute("SELECT COUNT(*) as pending_jobs FROM installation_jobs WHERE status IN ('REQUESTED', 'SCHEDULED', 'ASSIGNED', 'IN_PROGRESS')")
+            install_stats = cursor.fetchone() or {"pending_jobs": 0}
 
-        # Real total platform user count
-        cursor.execute("SELECT COUNT(*) as total_users FROM users")
-        user_stats = cursor.fetchone() or {"total_users": 0}
+            # Real total platform user count
+            cursor.execute("SELECT COUNT(*) as total_users FROM users")
+            user_stats = cursor.fetchone() or {"total_users": 0}
 
-        return {
-            "total_users": user_stats["total_users"],
-            "total_farmers": farmer_stats["total"],
-            "active_farmers": farmer_stats["active"],
-            "total_sheds": shed_stats["shed_count"],
-            "total_devices": device_stats["total_devices"],
-            "online_devices": device_stats["online_devices"],
-            "offline_devices": device_stats["offline_devices"],
-            "active_subscriptions": sub_stats["active_subs"],
-            "mrr_inr": sub_stats["mrr_minor"] / 100.0,
-            "total_revenue_inr": rev_stats["total_rev_minor"] / 100.0,
-            "pending_orders": order_stats["pending_orders"],
-            "open_tickets": ticket_stats["open_tickets"],
-            "critical_tickets": ticket_stats["critical_tickets"],
-            "active_alerts": alert_stats["active_alerts"],
-            "critical_alerts": alert_stats["critical_alerts"],
-            "pending_installations": install_stats["pending_jobs"],
-            "last_synced_at": now_dt.isoformat()
-        }
+            res = {
+                "total_users": user_stats["total_users"],
+                "total_farmers": farmer_stats["total"],
+                "active_farmers": farmer_stats["active"],
+                "total_sheds": shed_stats["shed_count"],
+                "total_devices": device_stats["total_devices"],
+                "online_devices": device_stats["online_devices"],
+                "offline_devices": device_stats["offline_devices"],
+                "active_subscriptions": sub_stats["active_subs"],
+                "mrr_inr": sub_stats["mrr_minor"] / 100.0,
+                "total_revenue_inr": rev_stats["total_rev_minor"] / 100.0,
+                "pending_orders": order_stats["pending_orders"],
+                "open_tickets": ticket_stats["open_tickets"],
+                "critical_tickets": ticket_stats["critical_tickets"],
+                "active_alerts": alert_stats["active_alerts"],
+                "critical_alerts": alert_stats["critical_alerts"],
+                "pending_installations": install_stats["pending_jobs"],
+                "last_synced_at": now_dt.isoformat()
+            }
+            if res["total_users"] == 0 and firestore_service.is_available:
+                f_kpis = firestore_service.compute_overview_kpis()
+                if f_kpis.get("total_users", 0) > 0:
+                    return f_kpis
+            return res
+    except Exception as e:
+        logger.warning("Error querying PostgreSQL KPIs: %s. Falling back to Firestore.", e)
+        if firestore_service.is_available:
+            return firestore_service.compute_overview_kpis()
+        raise
 
 
 def get_analytics_trends(days: int = 7) -> Dict[str, Any]:
@@ -3187,7 +3204,7 @@ def update_superadmin_credentials(username: str, current_password: str, new_emai
         custom_hash = get_default_superadmin_password_hash()
         if custom_hash:
             verified = verify_password(current_password, custom_hash)
-        if not verified and (current_password == settings.SUPERADMIN_PASSWORD or current_password == "admin"):
+        if not verified and settings.SUPERADMIN_PASSWORD and current_password == settings.SUPERADMIN_PASSWORD:
             verified = True
     else:
         # Check custom user in DB or Firestore

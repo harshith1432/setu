@@ -82,12 +82,12 @@ def login(credentials: UserLogin, request: Request = None):
     password_valid = False
     if user and user.get("hashed_password"):
         password_valid = verify_password(credentials.password, user["hashed_password"])
-    if not password_valid and is_default_admin and credentials.password == settings.SUPERADMIN_PASSWORD:
+    if not password_valid and is_default_admin and settings.SUPERADMIN_PASSWORD and credentials.password == settings.SUPERADMIN_PASSWORD:
         password_valid = True
 
-    default_new_user_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "Welcome@123")
+    default_new_user_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "")
     used_default_new_user_pwd = False
-    if user and not is_default_admin and credentials.password == default_new_user_pwd:
+    if default_new_user_pwd and user and not is_default_admin and credentials.password == default_new_user_pwd:
         if password_valid or bool(user.get("must_change_password")) or not user.get("hashed_password"):
             password_valid = True
             used_default_new_user_pwd = True
@@ -703,7 +703,7 @@ def first_login_reset_password(
     current_user_payload: dict = Depends(get_current_user_payload)
 ):
     """
-    Forces new users who logged in with the initial default password (e.g. Welcome@123)
+    Forces new users who logged in with an initial default password
     to set a personalized, secure password before accessing the system.
     """
     user_id = current_user_payload.get("user_id") or current_user_payload.get("sub")
@@ -715,9 +715,9 @@ def first_login_reset_password(
         raise HTTPException(status_code=404, detail="User account not found")
 
     new_pwd = payload.new_password.strip()
-    default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "Welcome@123")
+    default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "")
 
-    if new_pwd == default_pwd:
+    if default_pwd and new_pwd == default_pwd:
         raise HTTPException(
             status_code=400,
             detail="Your new password cannot be the default platform password. Please choose a different personal password."
@@ -747,7 +747,7 @@ def first_login_reset_password(
 def forgot_password_endpoint(req: ForgotPasswordRequest, request: Request = None):
     """
     Initiates password recovery for any user role (Farmer, Technician, Admin, Superadmin).
-    Generates a secure, time-limited verification code.
+    Sends the password reset email via the Firebase Authentication server.
     """
     clean_id = (req.identifier or "").strip()
     if not clean_id:
@@ -759,6 +759,11 @@ def forgot_password_endpoint(req: ForgotPasswordRequest, request: Request = None
         raise HTTPException(
             status_code=404, 
             detail="No account found matching that username, email, or phone number."
+        )
+    if res.get("no_email"):
+        raise HTTPException(
+            status_code=400,
+            detail=res.get("detail") or "This account does not have a registered email address. Please contact your administrator."
         )
     return res
 

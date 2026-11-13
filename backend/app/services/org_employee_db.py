@@ -1535,11 +1535,11 @@ def create_employee_with_invitation(
         cursor.execute("SELECT id FROM users WHERE username = %s", (base_username,))
         uname = base_username if not cursor.fetchone() else f"{base_username}_{secrets.token_hex(2)}"
 
-        # Initial account password: uses configured password or defaults to settings.DEFAULT_NEW_USER_PASSWORD
-        default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "Welcome@123")
-        raw_password = (data.get("initial_password") or data.get("password") or default_pwd).strip()
+        # Initial account password: uses configured password from environment or generates secure token
+        default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "")
+        raw_password = (data.get("initial_password") or data.get("password") or default_pwd or secrets.token_urlsafe(12)).strip()
         if len(raw_password) < 6:
-            raw_password = default_pwd
+            raw_password = default_pwd if len(default_pwd) >= 6 else secrets.token_urlsafe(12)
         initial_password_hash = get_password_hash(raw_password)
         user_id = f"usr_{secrets.token_hex(6)}"
 

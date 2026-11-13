@@ -293,8 +293,8 @@ class EmployeeCreate(BaseModel):
     access_scope: Optional[str] = "GLOBAL"
     assigned_resources: Optional[Dict[str, Any]] = None
     send_invitation: Optional[bool] = True
-    password: Optional[str] = "Welcome@123"
-    initial_password: Optional[str] = "Welcome@123"
+    password: Optional[str] = None
+    initial_password: Optional[str] = None
     assigned_area: Optional[str] = "Bengaluru"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -310,7 +310,8 @@ class EmployeeCreate(BaseModel):
             if not data.get("initial_password") and data.get("password"):
                 data["initial_password"] = data["password"]
             elif not data.get("initial_password"):
-                data["initial_password"] = "Welcome@123"
+                from app.core.config import settings
+                data["initial_password"] = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "") or None
         return data
 
 class EmployeeUpdate(BaseModel):

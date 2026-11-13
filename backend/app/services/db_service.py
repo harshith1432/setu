@@ -51,6 +51,18 @@ class _DummyRow(dict):
     def get(self, key, default=0):
         return super().get(key, default)
 
+    def __bool__(self):
+        return False
+
+
+def is_postgres_available() -> bool:
+    """Returns True if PostgreSQL connection pool is healthy and active."""
+    global _postgres_available
+    if _postgres_available is False:
+        return False
+    p = get_pool()
+    return _postgres_available is True and p is not None
+
 
 class _DummyCursor:
     """Safe no-op cursor for legacy SQL callers when running in pure Firebase mode."""
@@ -553,7 +565,8 @@ def init_db():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, stage)
 
-        admin_init_pw = settings.INITIAL_ADMIN_PASSWORD
+        admin_init_pw = settings.SUPERADMIN_PASSWORD or settings.INITIAL_ADMIN_PASSWORD
+        admin_pw_to_hash = admin_init_pw or secrets.token_urlsafe(16)
 
         cursor.execute("SELECT id FROM users WHERE username = 'superadmin'")
         if not cursor.fetchone():
@@ -563,7 +576,7 @@ def init_db():
             """, (
                 "usr_admin",
                 "superadmin",
-                get_password_hash(admin_init_pw if admin_init_pw != "admin" else "adminsecure2026"),
+                get_password_hash(admin_pw_to_hash),
                 "Setu Super Admin",
                 "+91 98450 99999",
                 "en",
@@ -588,7 +601,7 @@ def init_db():
                 """, (
                     "usr_admin_default",
                     "admin",
-                    get_password_hash(admin_init_pw),
+                    get_password_hash(admin_pw_to_hash),
                     "Setu Super Admin",
                     "+91 98450 99999",
                     "en",
@@ -1103,24 +1116,39 @@ def save_shed_settings(
         return res
 
 def get_all_farmers() -> List[Dict[str, Any]]:
-    ensure_unique_farmer_sheds()
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-            SELECT id, username, full_name, phone, whatsapp_number, whatsapp_verified, preferred_language, role, 
-                   farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at,
-                   COALESCE(current_stage, 3) as current_stage
-            FROM users 
-            WHERE role = 'farmer' 
-            ORDER BY created_at DESC
-        """)
-        rows = cursor.fetchall()
-        result = []
-        for r in rows:
-            d = dict(r)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
-            result.append(d)
-        return result
+    if is_postgres_available():
+        try:
+            ensure_unique_farmer_sheds()
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                    SELECT id, username, full_name, phone, whatsapp_number, whatsapp_verified, preferred_language, role, 
+                           farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at,
+                           COALESCE(current_stage, 3) as current_stage
+                    FROM users 
+                    WHERE role = 'farmer' 
+                    ORDER BY created_at DESC
+                """)
+                rows = cursor.fetchall()
+                if rows:
+                    result = []
+                    for r in rows:
+                        d = dict(r)
+                        if isinstance(d.get("created_at"), datetime):
+                            d["created_at"] = d["created_at"].isoformat()
+                        result.append(d)
+                    return result
+        except Exception as e:
+            logger.debug("PostgreSQL get_all_farmers error: %s", e)
+
+    # Cloud Firestore Fallback
+    if firestore_service.is_available:
+        try:
+            f_farmers = firestore_service.get_users_by_role("farmer")
+            if f_farmers:
+                return f_farmers
+        except Exception as e:
+            logger.debug("Firestore get_all_farmers fallback error: %s", e)
+    return []
 
 def get_farmers_by_shed_id(shed_id: str) -> List[Dict[str, Any]]:
     clean_shed_id = shed_id.strip().lower()
@@ -1131,23 +1159,41 @@ def get_farmers_by_shed_id(shed_id: str) -> List[Dict[str, Any]]:
             if now < exp:
                 return [dict(x) for x in val]
 
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-            SELECT * FROM users 
-            WHERE LOWER(shed_id) = %s AND role != 'superadmin' AND is_active = TRUE 
-            ORDER BY created_at ASC
-        """, (clean_shed_id,))
-        rows = cursor.fetchall()
-        result = []
-        for r in rows:
-            d = dict(r)
-            if isinstance(d.get("created_at"), datetime):
-                d["created_at"] = d["created_at"].isoformat()
-            result.append(d)
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                    SELECT * FROM users 
+                    WHERE LOWER(shed_id) = %s AND role != 'superadmin' AND is_active = TRUE 
+                    ORDER BY created_at ASC
+                """, (clean_shed_id,))
+                rows = cursor.fetchall()
+                if rows:
+                    result = []
+                    for r in rows:
+                        d = dict(r)
+                        if isinstance(d.get("created_at"), datetime):
+                            d["created_at"] = d["created_at"].isoformat()
+                        result.append(d)
 
-        with _user_cache_lock:
-            _farmers_by_shed_cache[clean_shed_id] = (now + USER_CACHE_TTL, result)
-        return [dict(x) for x in result]
+                    with _user_cache_lock:
+                        _farmers_by_shed_cache[clean_shed_id] = (now + USER_CACHE_TTL, result)
+                    return [dict(x) for x in result]
+        except Exception as e:
+            logger.debug("PostgreSQL get_farmers_by_shed_id notice: %s", e)
+
+    # Cloud Firestore Fallback
+    if firestore_service.is_available:
+        try:
+            all_f = firestore_service.get_users_by_role("farmer")
+            matched = [f for f in all_f if (f.get("shed_id") or "").strip().lower() == clean_shed_id]
+            if matched:
+                with _user_cache_lock:
+                    _farmers_by_shed_cache[clean_shed_id] = (now + USER_CACHE_TTL, matched)
+                return matched
+        except Exception as e:
+            logger.debug("Firestore get_farmers_by_shed_id notice: %s", e)
+    return []
 
 def get_farmer_by_shed_id(shed_id: str) -> Optional[Dict[str, Any]]:
     farmers = get_farmers_by_shed_id(shed_id)
@@ -2077,41 +2123,63 @@ def get_latest_telemetry_reading_from_db(shed_id: str) -> Optional[Dict[str, Any
                     return res
     except Exception as e:
         logger.debug("get_latest_telemetry_reading_from_db error: %s", e)
+
+    # Cloud Firestore Fallback
+    if firestore_service.is_available:
+        try:
+            f_reading = firestore_service.get_latest_telemetry(shed_id)
+            if f_reading:
+                _set_cached_latest_reading(shed_id, f_reading)
+                return f_reading
+        except Exception as e:
+            logger.debug("Firestore get_latest_telemetry notice: %s", e)
     return None
 
 
 def get_telemetry_history_from_db(shed_id: str, limit: int = 50) -> List[Dict[str, Any]]:
     """
-    Queries historical telemetry timeseries from PostgreSQL table 'shed_telemetry'.
-    Uses index idx_shed_telemetry_shed_time.
+    Queries historical telemetry timeseries from PostgreSQL table 'shed_telemetry'
+    with fallback to Firebase Cloud Firestore.
     """
-    try:
-        with get_db_cursor(dict_cursor=True) as cursor:
-            cursor.execute("""
-            SELECT time as timestamp, shed_id,
-                   temperature as indoor_temp, humidity as indoor_hum,
-                   COALESCE(air_quality, 88.0) as air_quality,
-                   COALESCE(light_lux, 22.0) as light_lux,
-                   outside_temperature as outside_temp, outside_humidity as outside_hum,
-                   cooler, heater, fan, humidifier,
-                   COALESCE(light, FALSE) as light,
-                   COALESCE(light_brightness, 0) as light_brightness,
-                   mode
-            FROM shed_telemetry
-            WHERE shed_id = %s
-            ORDER BY time DESC
-            LIMIT %s
-            """, (shed_id, limit))
-            rows = cursor.fetchall()
-            result = []
-            for r in reversed(rows):
-                d = dict(r)
-                if isinstance(d.get("timestamp"), datetime):
-                    d["timestamp"] = d["timestamp"].isoformat()
-                result.append(d)
-            return result
-    except Exception:
-        return []
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT time as timestamp, shed_id,
+                       temperature as indoor_temp, humidity as indoor_hum,
+                       COALESCE(air_quality, 88.0) as air_quality,
+                       COALESCE(light_lux, 22.0) as light_lux,
+                       outside_temperature as outside_temp, outside_humidity as outside_hum,
+                       cooler, heater, fan, humidifier,
+                       COALESCE(light, FALSE) as light,
+                       COALESCE(light_brightness, 0) as light_brightness,
+                       mode
+                FROM shed_telemetry
+                WHERE shed_id = %s
+                ORDER BY time DESC
+                LIMIT %s
+                """, (shed_id, limit))
+                rows = cursor.fetchall()
+                if rows:
+                    result = []
+                    for r in reversed(rows):
+                        d = dict(r)
+                        if isinstance(d.get("timestamp"), datetime):
+                            d["timestamp"] = d["timestamp"].isoformat()
+                        result.append(d)
+                    return result
+        except Exception as e:
+            logger.debug("PostgreSQL get_telemetry_history error: %s", e)
+
+    # Cloud Firestore Fallback
+    if firestore_service.is_available:
+        try:
+            f_history = firestore_service.get_telemetry_history(shed_id, limit=limit)
+            if f_history:
+                return f_history
+        except Exception as e:
+            logger.debug("Firestore get_telemetry_history notice: %s", e)
+    return []
 
 
 # --- Device Registry Operations ---
@@ -2529,7 +2597,8 @@ def revoke_user_session(session_id: str, reason: str = "User logout") -> bool:
 def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Generates a secure 6-digit OTP code and unique reset token for password recovery.
-    Dispatches notifications via SMTP Email and WhatsApp/SMS.
+    Dispatches the official recovery email via Firebase Authentication server (setu-a767c)
+    and optional SMTP/WhatsApp alerts ONLY to existing registered users.
     """
     clean_id = (identifier or "").strip()
     if not clean_id:
@@ -2539,6 +2608,23 @@ def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> 
     user = get_user_by_username_or_phone(clean_id)
     if not user:
         return None
+
+    # Determine recipient email address
+    user_email = (user.get("official_email") or "").strip().lower()
+    if not user_email and "@" in clean_id:
+        user_email = clean_id.lower()
+    elif not user_email and user.get("username") and "@" in user["username"]:
+        user_email = user["username"].lower()
+
+    # If no email is configured on this user account, return explicit no_email notification
+    if not user_email or "@" not in user_email:
+        logger.warning("User '%s' requested password reset but has no registered email.", user.get("username"))
+        return {
+            "success": False,
+            "no_email": True,
+            "username": user.get("username"),
+            "detail": "This account does not have a registered email address. Please contact your administrator to configure your email."
+        }
 
     import secrets
     import string
@@ -2583,20 +2669,24 @@ def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> 
 
     log_audit(user["username"], "PASSWORD_RESET_REQUESTED", f"Password reset OTP initiated for user {user['username']}")
 
-    # 3. Determine recipient email address
-    user_email = user.get("official_email") or ""
-    if not user_email and "@" in clean_id:
-        user_email = clean_id
-    elif not user_email and user.get("username") and "@" in user["username"]:
-        user_email = user["username"]
+    # 3. Dispatch official Password Reset Email via Firebase Authentication server
+    firebase_sent = False
+    try:
+        from app.services.email_service import send_firebase_password_reset_email
+        firebase_sent = send_firebase_password_reset_email(
+            to_email=user_email,
+            display_name=user.get("full_name") or user.get("username")
+        )
+    except Exception as fbe:
+        logger.warning("Firebase Authentication email dispatch error: %s", fbe)
 
-    email_sent = False
-    if user_email:
-        try:
-            from app.services.email_service import send_password_reset_email
-            email_sent = send_password_reset_email(user_email, user.get("full_name") or user["username"], reset_code)
-        except Exception as ee:
-            logger.warning("Email dispatch error for password reset: %s", ee)
+    # 4. Optional SMTP notification (dual channel / fallback)
+    smtp_sent = False
+    try:
+        from app.services.email_service import send_password_reset_email
+        smtp_sent = send_password_reset_email(user_email, user.get("full_name") or user["username"], reset_code)
+    except Exception as ee:
+        logger.debug("SMTP email dispatch notice for password reset: %s", ee)
 
     phone = user.get("phone") or ""
     masked_phone = f"+91 ***** **{phone[-3:]}" if len(phone) >= 4 else "+91 **********"
@@ -2617,16 +2707,21 @@ def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> 
     except Exception:
         pass
 
-    return {
+    result = {
         "success": True,
         "reset_token": reset_token,
-        "reset_code": reset_code,
         "username": user["username"],
         "masked_phone": masked_phone,
         "masked_email": masked_email or user_email,
-        "email_sent": email_sent,
+        "email_sent": firebase_sent or smtp_sent,
         "expires_in_minutes": 15
     }
+
+    # Only include reset_code in automated unit test environments (never leaked in production)
+    if settings.ENVIRONMENT.lower() in ("test", "testing"):
+        result["reset_code"] = reset_code
+
+    return result
 
 def verify_and_complete_password_reset(
     code_or_token: str, 
@@ -2634,7 +2729,8 @@ def verify_and_complete_password_reset(
     ip_address: Optional[str] = None
 ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
     """
-    Validates recovery code and updates the user's password with OWASP session revocation.
+    Validates recovery code (Firebase email oobCode or 6-digit OTP / reset token)
+    and updates the user's password across PostgreSQL, Cloud Firestore, and Firebase Auth.
     Returns (success, message, user_dict) to enable immediate automated login.
     """
     clean_val = (code_or_token or "").strip()
@@ -2650,7 +2746,35 @@ def verify_and_complete_password_reset(
     user_record = None
     reset_record = None
 
-    # 1. Check PostgreSQL first
+    # 1. Check if code_or_token is a Firebase Authentication action oobCode
+    if len(clean_val) > 18 and not clean_val.startswith("rst_"):
+        try:
+            from app.services.email_service import verify_and_apply_firebase_password_reset
+            confirmed_email = verify_and_apply_firebase_password_reset(clean_val, new_password)
+            if confirmed_email:
+                user_record = get_user_by_username_or_phone(confirmed_email)
+                if user_record:
+                    u_id = user_record["id"]
+                    try:
+                        with get_db_cursor(commit=True) as cursor:
+                            cursor.execute("UPDATE users SET hashed_password = %s WHERE id = %s", (hashed_pw, u_id))
+                            cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (u_id,))
+                    except Exception as pe:
+                        logger.warning("Postgres update for Firebase reset notice: %s", pe)
+                    try:
+                        from app.services.firestore_service import firestore_service
+                        firestore_service.update_user_password(u_id, hashed_pw)
+                    except Exception as fe:
+                        logger.debug("Firestore update for Firebase reset notice: %s", fe)
+
+                    user_record["hashed_password"] = hashed_pw
+                    invalidate_user_cache()
+                    log_audit(user_record["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via Firebase email link for {user_record['username']}")
+                    return True, "Password has been successfully reset. You are now logged in.", user_record
+        except Exception as fbe:
+            logger.debug("Firebase oobCode verification check: %s", fbe)
+
+    # 2. Check PostgreSQL password_resets table
     try:
         with get_db_cursor(commit=True, dict_cursor=True) as cursor:
             cursor.execute(
@@ -2678,7 +2802,7 @@ def verify_and_complete_password_reset(
     except Exception as pe:
         logger.warning("Postgres verify_and_complete_password_reset notice: %s", pe)
 
-    # 2. Check Firebase Cloud Firestore
+    # 3. Check Firebase Cloud Firestore password_resets collection
     try:
         from app.services.firestore_service import firestore_service
         fs_reset = firestore_service.get_active_password_reset(clean_val)
@@ -2702,6 +2826,18 @@ def verify_and_complete_password_reset(
 
     user_record["hashed_password"] = hashed_pw
     invalidate_user_cache()
+
+    # 4. Synchronize password update in Firebase Authentication
+    try:
+        from app.services.email_service import sync_firebase_user_password
+        target_email = user_record.get("official_email")
+        if not target_email and "@" in user_record.get("username", ""):
+            target_email = user_record["username"]
+        if target_email:
+            sync_firebase_user_password(target_email, new_password)
+    except Exception as synce:
+        logger.debug("Firebase Auth password sync notice: %s", synce)
+
     log_audit(user_record["username"], "PASSWORD_RESET_COMPLETED", f"Password successfully reset via OTP for user {user_record['username']}")
 
     return True, "Password has been successfully reset. You are now logged in.", user_record

@@ -210,11 +210,13 @@ Setu uses PostgreSQL with dynamic schema migrations on startup.
    cp .env.example .env
    cp .env.example backend/.env
    ```
-   Default local connection string:
+   Default local connection string and environment settings in `.env`:
    ```env
    DATABASE_URL="postgresql://setu_user:setu_password@127.0.0.1:5432/setu"
-   SETU_SECRET_KEY="setu-secure-production-master-secret-key-2026"
-   INITIAL_ADMIN_PASSWORD="admin"
+   SETU_SECRET_KEY="your-secure-production-secret-key-here"
+   INITIAL_ADMIN_PASSWORD="your-secure-admin-password"
+   SUPERADMIN_PASSWORD="your-secure-superadmin-password"
+   DEFAULT_NEW_USER_PASSWORD="your-secure-default-user-password"
    ```
 
 ---
@@ -271,12 +273,12 @@ python -m pytest backend/tests/test_org_employee_rbac.py -v
 
 ---
 
-## 🔐 Default Administrative Credentials
+## 🔐 Administrative Credentials
 
-The database pre-seeds an initial administrative identity for first-time environment setup:
+The platform authenticates administrative identities configured in your local `.env` file:
 
-- **Username / Identifier:** `admin` (or `+91 98450 99999`)
-- **Default Initial Password:** `admin` *(Configurable via `INITIAL_ADMIN_PASSWORD` in `.env`)*
+- **Username / Identifier:** `superadmin` (Configurable via `SUPERADMIN_USERNAME` in `.env`)
+- **Initial Password:** *(Configured via `SUPERADMIN_PASSWORD` or `INITIAL_ADMIN_PASSWORD` in `.env`)*
 - **Primary Persona:** `superadmin` (Authoritative platform administration access)
 
 *Note: For self-service farmer testing, register any new account at [http://127.0.0.1:8000/register](http://127.0.0.1:8000/register).*

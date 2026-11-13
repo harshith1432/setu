@@ -656,6 +656,331 @@ class FirestoreService:
             logger.warning("Firestore delete_product error: %s", e)
             return False
 
+    # =========================================================================
+    # 7. DEVICES & HARDWARE NODES
+    # =========================================================================
+
+    def get_all_devices(self) -> List[Dict[str, Any]]:
+        """Retrieves all IoT nodes from Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("devices").stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_all_devices error: %s", e)
+            return []
+
+    def get_device(self, device_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves specific IoT device by ID."""
+        if not self.is_available or not device_id:
+            return None
+        try:
+            doc = self._db.collection("devices").document(device_id).get()
+            if doc.exists:
+                return {"id": doc.id, **doc.to_dict()}
+            docs = list(self._db.collection("devices").where("device_id", "==", device_id).limit(1).stream())
+            if docs:
+                return {"id": docs[0].id, **docs[0].to_dict()}
+        except Exception as e:
+            logger.debug("Firestore get_device error: %s", e)
+        return None
+
+    def save_device(self, device_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Registers or updates IoT device in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            d_id = device_data.get("id") or device_data.get("device_id") or f"dev_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(device_data)
+            data["id"] = d_id
+            data["device_id"] = d_id
+            now_iso = datetime.now(timezone.utc).isoformat()
+            data.setdefault("created_at", now_iso)
+            data["updated_at"] = now_iso
+            self._db.collection("devices").document(d_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_device error: %s", e)
+            return None
+
+    def update_device_heartbeat(self, device_id: str, seq: Optional[int] = None) -> bool:
+        """Updates device last_seen_at timestamp and ONLINE status."""
+        if not self.is_available or not device_id:
+            return False
+        try:
+            updates = {
+                "status": "ONLINE",
+                "last_seen_at": datetime.now(timezone.utc).isoformat()
+            }
+            if seq is not None:
+                updates["last_sequence"] = seq
+            self._db.collection("devices").document(device_id).set(updates, merge=True)
+            return True
+        except Exception as e:
+            logger.debug("Firestore update_device_heartbeat notice: %s", e)
+            return False
+
+    # =========================================================================
+    # 8. SHEDS, SUBSCRIPTIONS, TICKETS, ALERTS, INSTALLATIONS
+    # =========================================================================
+
+    def get_all_sheds(self) -> List[Dict[str, Any]]:
+        """Retrieves sheds from Firestore, augmenting with active farmers' sheds."""
+        if not self.is_available:
+            return []
+        try:
+            sheds_dict = {}
+            # 1. Direct sheds collection
+            for d in self._db.collection("sheds").stream():
+                data = d.to_dict()
+                s_id = data.get("shed_id") or data.get("id") or d.id
+                sheds_dict[s_id] = {"id": d.id, "shed_id": s_id, **data}
+
+            # 2. Derive sheds from registered farmers
+            farmers = self.get_users_by_role("farmer")
+            for f in farmers:
+                s_id = f.get("shed_id")
+                if s_id and s_id not in sheds_dict:
+                    farm_name = f.get("farm_name") or "Rearing Shed"
+                    farmer_name = f.get("full_name") or f.get("username") or "Farmer"
+                    sheds_dict[s_id] = {
+                        "id": s_id,
+                        "shed_id": s_id,
+                        "farm_name": farm_name,
+                        "farmer_name": farmer_name,
+                        "farmer_id": f.get("id"),
+                        "region": f.get("region") or "Karnataka",
+                        "display_name": f"{farm_name} ({farmer_name})",
+                        "is_active": bool(f.get("is_active", True))
+                    }
+            return list(sheds_dict.values())
+        except Exception as e:
+            logger.debug("Firestore get_all_sheds error: %s", e)
+            return []
+
+    def get_all_subscriptions(self) -> List[Dict[str, Any]]:
+        """Retrieves all active subscriptions from Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("subscriptions").stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_all_subscriptions error: %s", e)
+            return []
+
+    def save_subscription(self, sub_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves subscription record in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            s_id = sub_data.get("id") or f"sub_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(sub_data)
+            data["id"] = s_id
+            self._db.collection("subscriptions").document(s_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_subscription error: %s", e)
+            return None
+
+    def get_all_support_tickets(self) -> List[Dict[str, Any]]:
+        """Retrieves support tickets from Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("support_tickets").order_by("created_at", direction="DESCENDING").stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception:
+            try:
+                docs = self._db.collection("support_tickets").stream()
+                return [{"id": d.id, **d.to_dict()} for d in docs]
+            except Exception as e:
+                logger.debug("Firestore get_all_support_tickets error: %s", e)
+                return []
+
+    def save_support_ticket(self, ticket_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves support ticket in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            t_id = ticket_data.get("id") or f"tkt_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(ticket_data)
+            data["id"] = t_id
+            data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+            self._db.collection("support_tickets").document(t_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_support_ticket error: %s", e)
+            return None
+
+    def get_all_alerts(self) -> List[Dict[str, Any]]:
+        """Retrieves active alerts from Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("alerts").stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_all_alerts error: %s", e)
+            return []
+
+    def save_alert(self, alert_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves alert document in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            a_id = alert_data.get("id") or f"alt_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(alert_data)
+            data["id"] = a_id
+            data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+            self._db.collection("alerts").document(a_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_alert error: %s", e)
+            return None
+
+    def get_all_installations(self) -> List[Dict[str, Any]]:
+        """Retrieves installation jobs from Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("installation_jobs").stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_all_installations error: %s", e)
+            return []
+
+    def save_installation(self, job_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves installation job document in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            j_id = job_data.get("id") or f"job_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(job_data)
+            data["id"] = j_id
+            data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+            self._db.collection("installation_jobs").document(j_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_installation error: %s", e)
+            return None
+
+    # =========================================================================
+    # 9. REAL-TIME AUTHORITATIVE KPI COMPUTATION
+    # =========================================================================
+
+    def compute_overview_kpis(self) -> Dict[str, Any]:
+        """
+        Computes 100% authoritative platform KPIs directly from Cloud Firestore collections.
+        Used as authoritative source on cloud workers where PostgreSQL is unreachable.
+        """
+        now_dt = datetime.now(timezone.utc)
+        now_iso = now_dt.isoformat()
+
+        if not self.is_available:
+            return {
+                "total_users": 0, "total_farmers": 0, "active_farmers": 0,
+                "total_sheds": 0, "total_devices": 0, "online_devices": 0, "offline_devices": 0,
+                "active_subscriptions": 0, "mrr_inr": 0.0, "pending_orders": 0, "total_revenue_inr": 0.0,
+                "open_tickets": 0, "critical_tickets": 0, "active_alerts": 0, "critical_alerts": 0,
+                "pending_installations": 0, "last_updated": now_iso
+            }
+
+        try:
+            # 1. Users & Farmers
+            all_users = list(self._db.collection("users").stream())
+            total_users = len(all_users)
+            farmers = []
+            for u in all_users:
+                ud = u.to_dict()
+                if ud.get("role") == "farmer":
+                    farmers.append(ud)
+            total_farmers = len(farmers)
+            active_farmers = sum(1 for f in farmers if f.get("is_active", True))
+
+            # 2. Unique monitored sheds
+            shed_ids = set()
+            for s in self._db.collection("sheds").stream():
+                sd = s.to_dict()
+                sid = sd.get("shed_id") or sd.get("id") or s.id
+                if sid:
+                    shed_ids.add(sid)
+            for f in farmers:
+                sid = f.get("shed_id")
+                if sid:
+                    shed_ids.add(sid)
+            total_sheds = len(shed_ids)
+
+            # 3. Devices
+            devices = [d.to_dict() for d in self._db.collection("devices").stream()]
+            total_devices = len(devices)
+            online_devices = 0
+            cutoff = (now_dt - timedelta(seconds=300)).isoformat()
+            for dev in devices:
+                status = dev.get("status")
+                last_seen = dev.get("last_seen_at") or ""
+                if status == "ONLINE" or (last_seen and last_seen > cutoff):
+                    online_devices += 1
+            offline_devices = max(0, total_devices - online_devices)
+
+            # 4. Subscriptions & MRR
+            subscriptions = [s.to_dict() for s in self._db.collection("subscriptions").stream()]
+            active_subs = [s for s in subscriptions if s.get("status") == "ACTIVE"]
+            active_subscriptions = len(active_subs)
+            mrr_minor = sum(s.get("monthly_price_minor_units", 0) for s in active_subs)
+            mrr_inr = round(mrr_minor / 100.0, 2)
+
+            # 5. Orders & Revenue
+            orders = [o.to_dict() for o in self._db.collection("orders").stream()]
+            pending_orders = sum(1 for o in orders if o.get("status") in ("PENDING", "PAYMENT_PENDING", "PROCESSING"))
+            total_rev_minor = sum(o.get("total_price_minor_units", o.get("total_amount", 0) * 100) for o in orders if o.get("status") in ("PAID", "DELIVERED", "COMPLETED"))
+            total_revenue_inr = round(total_rev_minor / 100.0, 2)
+
+            # 6. Support Tickets
+            tickets = [t.to_dict() for t in self._db.collection("support_tickets").stream()]
+            open_tickets = sum(1 for t in tickets if t.get("status") in ("OPEN", "ASSIGNED", "IN_PROGRESS", "ESCALATED"))
+            critical_tickets = sum(1 for t in tickets if t.get("priority") == "CRITICAL" and t.get("status") != "CLOSED")
+
+            # 7. Alerts
+            alerts = [a.to_dict() for a in self._db.collection("alerts").stream()]
+            active_alerts_list = [a for a in alerts if a.get("status") == "ACTIVE"]
+            active_alerts = len(active_alerts_list)
+            critical_alerts = sum(1 for a in active_alerts_list if a.get("severity") == "CRITICAL")
+
+            # 8. Installations
+            jobs = [j.to_dict() for j in self._db.collection("installation_jobs").stream()]
+            pending_jobs = sum(1 for j in jobs if j.get("status") in ("REQUESTED", "SCHEDULED", "ASSIGNED", "IN_PROGRESS"))
+
+            return {
+                "total_users": total_users,
+                "total_farmers": total_farmers,
+                "active_farmers": active_farmers,
+                "total_sheds": total_sheds,
+                "total_devices": total_devices,
+                "online_devices": online_devices,
+                "offline_devices": offline_devices,
+                "active_subscriptions": active_subscriptions,
+                "mrr_inr": mrr_inr,
+                "pending_orders": pending_orders,
+                "total_revenue_inr": total_revenue_inr,
+                "open_tickets": open_tickets,
+                "critical_tickets": critical_tickets,
+                "active_alerts": active_alerts,
+                "critical_alerts": critical_alerts,
+                "pending_installations": pending_jobs,
+                "last_updated": now_iso
+            }
+        except Exception as e:
+            logger.error("Error computing Firestore overview KPIs: %s", e)
+            return {
+                "total_users": 0, "total_farmers": 0, "active_farmers": 0,
+                "total_sheds": 0, "total_devices": 0, "online_devices": 0, "offline_devices": 0,
+                "active_subscriptions": 0, "mrr_inr": 0.0, "pending_orders": 0, "total_revenue_inr": 0.0,
+                "open_tickets": 0, "critical_tickets": 0, "active_alerts": 0, "critical_alerts": 0,
+                "pending_installations": 0, "last_updated": now_iso
+            }
+
 
 # Global singleton instance
 firestore_service = FirestoreService()

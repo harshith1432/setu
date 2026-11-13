@@ -117,6 +117,18 @@ def list_monitored_sheds(current_user: dict = Depends(get_current_user_payload))
             })
             seen_ids.add(s_id)
 
+    # 2. Augment from Firestore sheds collection
+    if firestore_service.is_available:
+        try:
+            f_sheds = firestore_service.get_all_sheds()
+            for s in f_sheds:
+                s_id = s.get("shed_id") or s.get("id")
+                if s_id and s_id not in seen_ids:
+                    sheds_list.append(s)
+                    seen_ids.add(s_id)
+        except Exception:
+            pass
+
     return sheds_list
 
 @router.get("/farmers")
