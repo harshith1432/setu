@@ -117,18 +117,6 @@ def list_monitored_sheds(current_user: dict = Depends(get_current_user_payload))
             })
             seen_ids.add(s_id)
 
-    # 2. Only if no farmers exist in database at all, provide a single default fallback shed
-    if not sheds_list:
-        sheds_list.append({
-            "shed_id": "shed_01",
-            "farm_name": "Rearing Shed 01",
-            "farmer_name": "Default Farmer",
-            "region": "Sericulture Shed",
-            "batch_id": "SERI-2026",
-            "display_name": "Rearing Shed 01",
-            "is_active": True
-        })
-
     return sheds_list
 
 @router.get("/farmers")

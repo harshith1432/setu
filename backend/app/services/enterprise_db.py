@@ -13,6 +13,7 @@ Extends base PostgreSQL storage with:
 """
 
 import os
+import sys
 import uuid
 import json
 import logging
@@ -422,19 +423,23 @@ def init_enterprise_tables():
         CREATE INDEX IF NOT EXISTS idx_faqs_order ON faqs (display_order ASC);
         """)
 
-        # Seed essential role accounts if not present
-        _seed_enterprise_users(cursor, now_dt)
+        is_test_env = bool("pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SEED_DEMO_DATA", "false").lower() in ("true", "1"))
+        # Seed essential role accounts only in test or demo environments
+        if is_test_env:
+            _seed_enterprise_users(cursor, now_dt)
         # Seed realistic products catalogue if table empty
         _seed_products_catalogue(cursor, now_dt)
         # Seed default guidance articles
         _seed_guidance_articles(cursor, now_dt)
         # Seed integration configs
         _seed_integration_status(cursor, now_dt)
-        # Seed default sensors for connected devices
-        _seed_sensors_registry(cursor, now_dt)
+        # Seed default sensors for connected devices if in test or demo environments
+        if is_test_env:
+            _seed_sensors_registry(cursor, now_dt)
         # Seed public FAQs
         _seed_faqs(cursor, now_dt)
-        _seed_orders_subscriptions_and_tickets(cursor, now_dt)
+        if is_test_env:
+            _seed_orders_subscriptions_and_tickets(cursor, now_dt)
 
         # Smart installation & dispatch schema extensions
         cursor.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS assigned_area VARCHAR(128) DEFAULT 'Bengaluru';")
@@ -1154,8 +1159,8 @@ def get_platform_overview_kpis() -> Dict[str, Any]:
         cursor.execute("SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE is_active = TRUE) as active FROM users WHERE role = 'farmer'")
         farmer_stats = cursor.fetchone() or {"total": 0, "active": 0}
 
-        # Unique rearing sheds in database
-        cursor.execute("SELECT COUNT(DISTINCT shed_id) as shed_count FROM users WHERE shed_id IS NOT NULL AND shed_id != ''")
+        # Unique rearing sheds in database belonging to enrolled farmers
+        cursor.execute("SELECT COUNT(DISTINCT shed_id) as shed_count FROM users WHERE role = 'farmer' AND shed_id IS NOT NULL AND shed_id != ''")
         shed_stats = cursor.fetchone() or {"shed_count": 0}
 
         # Devices count & live connectivity (online if last_seen within 300 seconds)
@@ -1209,10 +1214,15 @@ def get_platform_overview_kpis() -> Dict[str, Any]:
         cursor.execute("SELECT COUNT(*) as pending_jobs FROM installation_jobs WHERE status IN ('REQUESTED', 'SCHEDULED', 'ASSIGNED', 'IN_PROGRESS')")
         install_stats = cursor.fetchone() or {"pending_jobs": 0}
 
+        # Real total platform user count
+        cursor.execute("SELECT COUNT(*) as total_users FROM users")
+        user_stats = cursor.fetchone() or {"total_users": 0}
+
         return {
+            "total_users": user_stats["total_users"],
             "total_farmers": farmer_stats["total"],
             "active_farmers": farmer_stats["active"],
-            "total_sheds": max(shed_stats["shed_count"], 1),
+            "total_sheds": shed_stats["shed_count"],
             "total_devices": device_stats["total_devices"],
             "online_devices": device_stats["online_devices"],
             "offline_devices": device_stats["offline_devices"],

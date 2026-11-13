@@ -246,6 +246,7 @@ def init_db():
     - 'shed_telemetry_partitioned': High-scale time-partitioned telemetry store
     """
     with get_db_cursor(commit=True) as cursor:
+        now_dt = datetime.now(timezone.utc)
         # 1. Farmers & Users Table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -316,19 +317,21 @@ def init_db():
         END $$;
         """)
 
-        # Pre-seed default hardware nodes for demo sheds
-        now_dt = datetime.now(timezone.utc)
-        default_devices = [
-            ("esp32_shed_01", "shed_01", "Shed 01 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-            ("esp32_shed_02", "shed_02", "Shed 02 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-            ("esp32_shed_03", "shed_03", "Shed 03 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-        ]
-        for dev in default_devices:
-            cursor.execute("""
-            INSERT INTO devices (device_id, shed_id, device_name, firmware_version, status, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (device_id) DO NOTHING;
-            """, dev)
+        is_test_env = bool("pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SEED_DEMO_DATA", "false").lower() in ("true", "1"))
+        # Pre-seed default hardware nodes only in test or demo environments
+        if is_test_env:
+            now_dt = datetime.now(timezone.utc)
+            default_devices = [
+                ("esp32_shed_01", "shed_01", "Shed 01 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
+                ("esp32_shed_02", "shed_02", "Shed 02 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
+                ("esp32_shed_03", "shed_03", "Shed 03 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
+            ]
+            for dev in default_devices:
+                cursor.execute("""
+                INSERT INTO devices (device_id, shed_id, device_name, firmware_version, status, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (device_id) DO NOTHING;
+                """, dev)
 
         # 3. Device Command Lifecycle Table (Safe bidirectional controls)
         cursor.execute("""
@@ -516,12 +519,6 @@ def init_db():
             target_humidity DOUBLE PRECISION DEFAULT 75.0,
             created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        INSERT INTO sheds (id, name, location, current_stage, target_temp, target_humidity)
-        VALUES 
-            ('shed_01', 'Shed 01 - Main Chawki Hub', 'Kolar Rearing Center', 3, 26.0, 75.0),
-            ('shed_02', 'Shed 02 - Late Age Rearing', 'Mysuru Facility', 4, 25.0, 70.0),
-            ('shed_03', 'Shed 03 - Commercial Batch', 'Bengaluru Rural', 2, 27.0, 80.0)
-        ON CONFLICT (id) DO NOTHING;
         CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
         CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
         CREATE INDEX IF NOT EXISTS idx_user_sessions_is_revoked ON user_sessions (is_revoked);
@@ -529,6 +526,16 @@ def init_db():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_correlation ON device_commands (correlation_id);")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);")
+
+        if is_test_env:
+            cursor.execute("""
+            INSERT INTO sheds (id, name, location, current_stage, target_temp, target_humidity)
+            VALUES 
+                ('shed_01', 'Shed 01 - Main Chawki Hub', 'Kolar Rearing Center', 3, 26.0, 75.0),
+                ('shed_02', 'Shed 02 - Late Age Rearing', 'Mysuru Facility', 4, 25.0, 70.0),
+                ('shed_03', 'Shed 03 - Commercial Batch', 'Bengaluru Rural', 2, 27.0, 80.0)
+            ON CONFLICT (id) DO NOTHING;
+            """)
 
         # Pre-seed Stage Thresholds if empty
         cursor.execute("SELECT COUNT(*) FROM stage_thresholds")
@@ -546,30 +553,7 @@ def init_db():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, stage)
 
-        # Pre-seed Admin accounts safely (SEC-02)
         admin_init_pw = settings.INITIAL_ADMIN_PASSWORD
-        cursor.execute("SELECT id FROM users WHERE username = 'admin'")
-        if not cursor.fetchone():
-            cursor.execute("""
-            INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                "usr_admin_default",
-                "admin",
-                get_password_hash(admin_init_pw),
-                "Setu Super Admin",
-                "+91 98450 99999",
-                "en",
-                "superadmin",
-                "Central Sericulture Command",
-                "Central Sericulture Command HQ",
-                "shed_01",
-                "CENTRAL-HQ",
-                "N/A",
-                "N/A",
-                True,
-                now_dt
-            ))
 
         cursor.execute("SELECT id FROM users WHERE username = 'superadmin'")
         if not cursor.fetchone():
@@ -593,6 +577,31 @@ def init_db():
                 True,
                 now_dt
             ))
+
+        # Seed admin test fixture in test environments
+        if is_test_env:
+            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    "usr_admin_default",
+                    "admin",
+                    get_password_hash(admin_init_pw),
+                    "Setu Super Admin",
+                    "+91 98450 99999",
+                    "en",
+                    "superadmin",
+                    "Central Sericulture Command",
+                    "Central Sericulture Command HQ",
+                    "shed_01",
+                    "CENTRAL-HQ",
+                    "N/A",
+                    "N/A",
+                    True,
+                    now_dt
+                ))
 
         # Pre-seed Demo Farmers if testing
         sample_farmers = [
@@ -932,7 +941,7 @@ def get_user_by_username_or_phone(identifier: str) -> Optional[Dict[str, Any]]:
         return {
             "id": "usr_ramesh",
             "username": "ramesh_farmer",
-            "hashed_password": get_password_hash("farmer123"),
+            "hashed_password": get_password_hash("setu2026"),
             "full_name": "Ramesh Gowda",
             "phone": "+91 98450 12345",
             "official_email": "ramesh.farmer@sericare.io",

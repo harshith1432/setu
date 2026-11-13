@@ -2205,16 +2205,18 @@ async function syncLiveTelemetryStream() {
 function updateLiveDashboardMetrics(overview) {
   if (!overview) return;
 
+  const isOffline = (!overview.indoor_temp || overview.indoor_temp <= 0 || overview.overall_status === 'OFFLINE');
+
   // Overview microclimate cards
   const tempEl = document.getElementById('overviewIndoorTemp');
   const humEl = document.getElementById('overviewIndoorHum');
   const aqEl = document.getElementById('overviewIndoorAq');
   const luxEl = document.getElementById('overviewIndoorLux');
 
-  if (tempEl) tempEl.textContent = `${overview.indoor_temp.toFixed(1)}°C`;
-  if (humEl) humEl.textContent = `${overview.indoor_humidity.toFixed(1)}%`;
-  if (aqEl) aqEl.textContent = `${overview.indoor_air_quality.toFixed(1)}%`;
-  if (luxEl) luxEl.textContent = `${overview.indoor_light_lux.toFixed(0)} Lux`;
+  if (tempEl) tempEl.textContent = isOffline ? '--' : `${overview.indoor_temp.toFixed(1)}°C`;
+  if (humEl) humEl.textContent = isOffline ? '--' : `${overview.indoor_humidity.toFixed(1)}%`;
+  if (aqEl) aqEl.textContent = isOffline ? '--' : `${overview.indoor_air_quality.toFixed(1)}%`;
+  if (luxEl) luxEl.textContent = isOffline ? '--' : `${overview.indoor_light_lux.toFixed(0)} Lux`;
 
   // Live Gauges section
   const gTemp = document.getElementById('liveGaugeTemp');
@@ -2222,10 +2224,10 @@ function updateLiveDashboardMetrics(overview) {
   const gAq = document.getElementById('liveGaugeAq');
   const gLux = document.getElementById('liveGaugeLux');
 
-  if (gTemp) gTemp.textContent = overview.indoor_temp.toFixed(1);
-  if (gHum) gHum.textContent = overview.indoor_humidity.toFixed(1);
-  if (gAq) gAq.textContent = overview.indoor_air_quality.toFixed(1);
-  if (gLux) gLux.textContent = overview.indoor_light_lux.toFixed(0);
+  if (gTemp) gTemp.textContent = isOffline ? '--' : overview.indoor_temp.toFixed(1);
+  if (gHum) gHum.textContent = isOffline ? '--' : overview.indoor_humidity.toFixed(1);
+  if (gAq) gAq.textContent = isOffline ? '--' : overview.indoor_air_quality.toFixed(1);
+  if (gLux) gLux.textContent = isOffline ? '--' : overview.indoor_light_lux.toFixed(0);
 
   // Actuator items
   const coolerEl = document.getElementById('overviewActCooler');
@@ -2366,11 +2368,11 @@ function renderTempHumChart(trends) {
   chartTempHum = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: labels.length ? labels : ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5'],
+      labels: labels,
       datasets: [
         {
           label: 'Avg Temperature (°C)',
-          data: temps.length ? temps : [26.5, 27.0, 26.8, 27.2, 26.9],
+          data: temps,
           borderColor: '#10B981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',
           tension: 0.3,
@@ -2378,7 +2380,7 @@ function renderTempHumChart(trends) {
         },
         {
           label: 'Avg Humidity (%)',
-          data: hums.length ? hums : [78, 80, 77, 82, 79],
+          data: hums,
           borderColor: '#3B82F6',
           backgroundColor: 'rgba(59, 130, 246, 0.05)',
           tension: 0.3,
@@ -2408,10 +2410,10 @@ function renderOrdersRevChart(trends) {
   chartOrdersRev = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: labels.length ? labels : ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5'],
+      labels: labels,
       datasets: [{
         label: 'Revenue (₹)',
-        data: revs.length ? revs : [17298, 8500, 12400, 6500, 9990],
+        data: revs,
         backgroundColor: '#1C4D37',
         borderRadius: 4
       }]
@@ -2437,9 +2439,9 @@ function renderRegionalChart(dist) {
   chartRegional = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: labels.length ? labels : ['Mysuru', 'Kolar', 'Chikkaballapura', 'Ramanagara', 'Bengaluru'],
+      labels: labels,
       datasets: [{
-        data: counts.length ? counts : [35, 28, 22, 14, 8],
+        data: counts,
         backgroundColor: ['#133323', '#1C4D37', '#2A6A4A', '#4E9571', '#70B591']
       }]
     },
@@ -2461,10 +2463,10 @@ function renderFarmerGrowthChart(growth) {
   chartFarmerGrowth = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: labels.length ? labels : ['W1', 'W2', 'W3', 'W4'],
+      labels: labels,
       datasets: [{
         label: 'New Farmers Enrolled',
-        data: counts.length ? counts : [12, 18, 24, 32],
+        data: counts,
         borderColor: '#B46C12',
         backgroundColor: 'rgba(180, 108, 18, 0.1)',
         fill: true,
@@ -8692,6 +8694,12 @@ async function loadSensors() {
     if (!res.ok) throw new Error('Failed to load sensors');
     const sensors = await res.json();
 
+    if (!sensors || sensors.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 28px; color: var(--text-muted);">No sensors registered yet. Real sensors will appear once IoT nodes connect.</td></tr>';
+      if (window.SetuTableManager) SetuTableManager.syncTable('sensorsTable');
+      return;
+    }
+
     tbody.innerHTML = sensors.map(s => `
       <tr data-id="${s.id}">
         <td class="td-bulk-select" style="text-align: center;">
@@ -8704,7 +8712,7 @@ async function loadSensors() {
         <td>${s.min_safe_range} - ${s.max_safe_range} ${escapeHtml(s.unit || '')}</td>
         <td>${s.reporting_interval_seconds}s</td>
         <td style="font-weight: 700;">${s.calibration_offset >= 0 ? '+' : ''}${s.calibration_offset}</td>
-        <td><span class="badge badge-success">${escapeHtml(s.status)}</span></td>
+        <td><span class="badge ${s.status === 'ONLINE' ? 'badge-success' : 'badge-warning'}">${escapeHtml(s.status || 'STANDBY')}</span></td>
         <td>
           <button type="button" class="btn btn-outline btn-xs" onclick="showToast('Calibrated ' + '${escapeHtml(s.id)}')">Calibrate</button>
         </td>
@@ -8770,6 +8778,12 @@ async function loadDevices() {
     if (!res.ok) throw new Error('Failed to load gateways');
     const sheds = await res.json();
 
+    if (!sheds || sheds.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 28px; color: var(--text-muted);">No IoT devices registered yet. Real gateways will appear when provisioned.</td></tr>';
+      if (window.SetuTableManager) SetuTableManager.syncTable('devicesTable');
+      return;
+    }
+
     tbody.innerHTML = sheds.map((s, idx) => `
       <tr data-id="dev_${s.shed_id}">
         <td class="td-bulk-select" style="text-align: center;">
@@ -8777,11 +8791,11 @@ async function loadDevices() {
         </td>
         <td style="font-family: var(--font-mono); font-weight: 700;">GW-ESP32-${s.shed_id.toUpperCase()}</td>
         <td style="font-weight: 600;">Setu Industrial Gateway Node</td>
-        <td>${escapeHtml(s.shed_name || s.shed_id)}</td>
+        <td>${escapeHtml(s.farm_name || s.shed_name || s.shed_id)}</td>
         <td style="font-family: var(--font-mono); font-size: 0.78rem;">v2.4.1-prod</td>
         <td><span class="badge badge-info">mTLS + ECC608</span></td>
-        <td><span class="badge badge-success">ONLINE</span></td>
-        <td style="font-size: 0.78rem;">Just now</td>
+        <td><span class="badge ${s.is_active ? 'badge-success' : 'badge-danger'}">${s.status || (s.is_active ? 'ONLINE' : 'OFFLINE')}</span></td>
+        <td style="font-size: 0.78rem;">${s.last_seen_at ? new Date(s.last_seen_at).toLocaleTimeString() : 'Never'}</td>
         <td>
           <button type="button" class="btn btn-outline btn-xs" onclick="showToast('Reboot command sent to ' + '${s.shed_id}')">Reboot</button>
         </td>

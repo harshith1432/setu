@@ -147,7 +147,33 @@ def get_role_based_dashboard_view(
         org_detail = {}
 
     # Base platform KPIs
+    # Base platform KPIs
     base_kpis = get_platform_overview_kpis()
+
+    # Authoritative real database counts for role badges
+    from app.services.db_service import get_db_cursor
+    with get_db_cursor(dict_cursor=True) as cur:
+        cur.execute("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE")
+        row = cur.fetchone()
+        products_count = row["cnt"] if row else 0
+        cur.execute("SELECT COUNT(*) as cnt FROM enquiries")
+        row = cur.fetchone()
+        enquiries_count = row["cnt"] if row else 0
+        cur.execute("SELECT COUNT(*) as cnt FROM shed_telemetry")
+        row = cur.fetchone()
+        telemetry_count = row["cnt"] if row else 0
+        cur.execute("SELECT COUNT(*) as cnt FROM guidance_articles")
+        row = cur.fetchone()
+        articles_count = row["cnt"] if row else 0
+        cur.execute("SELECT COUNT(*) as cnt FROM sensors")
+        row = cur.fetchone()
+        sensors_count = row["cnt"] if row else 0
+        cur.execute("SELECT COUNT(*) as cnt FROM departments")
+        row = cur.fetchone()
+        departments_count = row["cnt"] if row else 0
+        cur.execute("SELECT COUNT(*) as cnt FROM employees")
+        row = cur.fetchone()
+        employees_count = row["cnt"] if row else 0
 
     role_views = {
         "superadmin": {
@@ -157,9 +183,9 @@ def get_role_based_dashboard_view(
             "default_tab": "overview",
             "kpis": [
                 {"label": "System Status", "value": "ONLINE", "sub": "All Services Operational", "icon": "check-circle", "tab": "overview"},
-                {"label": "Platform Users", "value": base_kpis.get("total_farmers", 0) + 10, "sub": "Active Across Fleet", "icon": "users", "tab": "employees"},
+                {"label": "Platform Users", "value": base_kpis.get("total_users", 0), "sub": "Total Accounts", "icon": "users", "tab": "users"},
                 {"label": "Monitored Sheds", "value": base_kpis.get("total_sheds", 0), "sub": "IoT Clusters", "icon": "warehouse", "tab": "sheds"},
-                {"label": "System Subscriptions", "value": base_kpis.get("active_subscriptions", 0), "sub": f"MRR: ₹{base_kpis.get('mrr_inr', '0')}", "icon": "credit-card", "tab": "billing"}
+                {"label": "System Subscriptions", "value": base_kpis.get("active_subscriptions", 0), "sub": f"MRR: ₹{base_kpis.get('mrr_inr', 0):,.2f}", "icon": "credit-card", "tab": "billing"}
             ]
         },
         "company_admin": {
@@ -168,10 +194,10 @@ def get_role_based_dashboard_view(
             "subtitle": f"Organization administration, personnel management, and rearing asset oversight for {org_detail.get('code', 'ORG')}.",
             "default_tab": "overview",
             "kpis": [
-                {"label": "Company Employees", "value": org_detail.get("employee_count", 0), "sub": "Active Staff", "icon": "user-check", "tab": "employees"},
-                {"label": "Managed Sheds", "value": org_detail.get("shed_count", base_kpis.get("total_sheds", 0)), "sub": "Authorized Clusters", "icon": "warehouse", "tab": "sheds"},
-                {"label": "IoT Nodes", "value": org_detail.get("device_count", 3), "sub": "Online Controllers", "icon": "cpu", "tab": "devices"},
-                {"label": "Subscription Tier", "value": org_detail.get("subscription_tier", "ENTERPRISE"), "sub": f"Max Sheds: {org_detail.get('max_sheds', 50)}", "icon": "award", "tab": "organizations"}
+                {"label": "Company Employees", "value": employees_count, "sub": "Active Staff", "icon": "user-check", "tab": "employees"},
+                {"label": "Managed Sheds", "value": base_kpis.get("total_sheds", 0), "sub": "Authorized Clusters", "icon": "warehouse", "tab": "sheds"},
+                {"label": "IoT Nodes", "value": base_kpis.get("online_devices", 0), "sub": "Online Controllers", "icon": "cpu", "tab": "devices"},
+                {"label": "Subscription Tier", "value": org_detail.get("subscription_tier", "STANDARD"), "sub": f"Max Sheds: {org_detail.get('max_sheds', 10)}", "icon": "award", "tab": "organizations"}
             ]
         },
         "ceo": {
@@ -180,10 +206,10 @@ def get_role_based_dashboard_view(
             "subtitle": "High-level strategic metrics, financial run-rate, operational health, and harvest capacity.",
             "default_tab": "overview",
             "kpis": [
-                {"label": "Monthly Recurring Revenue", "value": f"₹{base_kpis.get('mrr_inr', '0')}", "sub": f"Subscriptions: {base_kpis.get('active_subscriptions', 0)}", "icon": "trending-up", "tab": "billing"},
-                {"label": "Total Revenue", "value": f"₹{base_kpis.get('total_revenue_inr', '0')}", "sub": "Products & Hardware", "icon": "dollar-sign", "tab": "orders"},
+                {"label": "Monthly Recurring Revenue", "value": f"₹{base_kpis.get('mrr_inr', 0):,.2f}", "sub": f"Subscriptions: {base_kpis.get('active_subscriptions', 0)}", "icon": "trending-up", "tab": "billing"},
+                {"label": "Total Revenue", "value": f"₹{base_kpis.get('total_revenue_inr', 0):,.2f}", "sub": "Products & Hardware", "icon": "dollar-sign", "tab": "orders"},
                 {"label": "Active Rearing Facilities", "value": base_kpis.get("total_sheds", 0), "sub": f"{base_kpis.get('total_farmers', 0)} Enrolled Farmers", "icon": "activity", "tab": "analytics"},
-                {"label": "Operational Efficiency", "value": "98.4%", "sub": "Zero Crop Failures", "icon": "shield-check", "tab": "overview"}
+                {"label": "Operational Efficiency", "value": "100%" if base_kpis.get("active_alerts", 0) == 0 and base_kpis.get("total_sheds", 0) > 0 else ("N/A" if base_kpis.get("total_sheds", 0) == 0 else f"{max(0, 100 - base_kpis.get('active_alerts', 0) * 10)}%"), "sub": "Real-time Telemetry Health", "icon": "shield-check", "tab": "overview"}
             ]
         },
         "hr": {
@@ -192,10 +218,10 @@ def get_role_based_dashboard_view(
             "subtitle": "Workforce directory, secure employee onboarding, reporting hierarchies, and team departments.",
             "default_tab": "employees",
             "kpis": [
-                {"label": "Total Employees", "value": org_detail.get("employee_count", 10), "sub": "Onboarded Personnel", "icon": "users", "tab": "employees"},
-                {"label": "Active Departments", "value": org_detail.get("department_count", 6), "sub": "Organizational Teams", "icon": "briefcase", "tab": "departments"},
-                {"label": "Pending Onboarding", "value": 1, "sub": "Awaiting Activation", "icon": "mail", "tab": "employees"},
-                {"label": "Role Templates", "value": "10 Standard", "sub": "Granular RBAC", "icon": "shield", "tab": "roles"}
+                {"label": "Total Employees", "value": employees_count, "sub": "Onboarded Personnel", "icon": "users", "tab": "employees"},
+                {"label": "Active Departments", "value": departments_count, "sub": "Organizational Teams", "icon": "briefcase", "tab": "departments"},
+                {"label": "Pending Onboarding", "value": 0, "sub": "Awaiting Activation", "icon": "mail", "tab": "employees"},
+                {"label": "Role Templates", "value": "Active", "sub": "Granular RBAC", "icon": "shield", "tab": "roles"}
             ]
         },
         "operations_manager": {
@@ -205,7 +231,7 @@ def get_role_based_dashboard_view(
             "default_tab": "sheds",
             "kpis": [
                 {"label": "Monitored Sheds", "value": base_kpis.get("total_sheds", 0), "sub": "Active Climate Envelopes", "icon": "warehouse", "tab": "sheds"},
-                {"label": "Active Relays", "value": "Heater / Fan Auto", "sub": "Automated PID Control", "icon": "sliders", "tab": "sensor-config"},
+                {"label": "Active Relays", "value": "STANDBY" if base_kpis.get("total_sheds", 0) == 0 else "AUTOMATED", "sub": "PID Microclimate Regulation", "icon": "sliders", "tab": "sensor-config"},
                 {"label": "Active Warnings", "value": base_kpis.get("active_alerts", 0), "sub": "Interlock Triggers", "icon": "alert-triangle", "tab": "alerts"},
                 {"label": "Field Deployments", "value": base_kpis.get("pending_installations", 0), "sub": "Scheduled Installations", "icon": "truck", "tab": "installations"}
             ]
@@ -218,8 +244,8 @@ def get_role_based_dashboard_view(
             "kpis": [
                 {"label": "Pending Jobs", "value": base_kpis.get("pending_installations", 0), "sub": "Assigned to You", "icon": "wrench", "tab": "installations"},
                 {"label": "Installed Gateways", "value": base_kpis.get("online_devices", 0), "sub": "Verified Commissioned", "icon": "cpu", "tab": "devices"},
-                {"label": "Calibrated Sensors", "value": "12 Units", "sub": "SHT31 / MQ-135 Probes", "icon": "check-circle", "tab": "sensor-config"},
-                {"label": "Sign-off Completion", "value": "100%", "sub": "Customer Verified", "icon": "file-check", "tab": "install-team"}
+                {"label": "Calibrated Sensors", "value": f"{sensors_count} Probes", "sub": "Sensor Array Registry", "icon": "check-circle", "tab": "sensor-config"},
+                {"label": "Sign-off Completion", "value": "100%" if base_kpis.get("pending_installations", 0) == 0 else "Pending", "sub": "Customer Sign-offs", "icon": "file-check", "tab": "install-team"}
             ]
         },
         "sales": {
@@ -229,9 +255,9 @@ def get_role_based_dashboard_view(
             "default_tab": "orders",
             "kpis": [
                 {"label": "Hardware Orders", "value": base_kpis.get("pending_orders", 0), "sub": "Pending Fulfilment", "icon": "shopping-cart", "tab": "orders"},
-                {"label": "Catalogue Products", "value": "8 Active", "sub": "Gateways & Sensor Kits", "icon": "package", "tab": "products"},
-                {"label": "Active Subscriptions", "value": base_kpis.get("active_subscriptions", 0), "sub": f"₹{base_kpis.get('mrr_inr', '0')} Monthly", "icon": "credit-card", "tab": "billing"},
-                {"label": "Customer Enquiries", "value": "3 Open", "sub": "Farmer Quotations", "icon": "message-square", "tab": "orders"}
+                {"label": "Catalogue Products", "value": f"{products_count} Active", "sub": "Gateways & Sensor Kits", "icon": "package", "tab": "products"},
+                {"label": "Active Subscriptions", "value": base_kpis.get("active_subscriptions", 0), "sub": f"₹{base_kpis.get('mrr_inr', 0):,.2f} Monthly", "icon": "credit-card", "tab": "billing"},
+                {"label": "Customer Enquiries", "value": f"{enquiries_count} Open", "sub": "Farmer Quotations", "icon": "message-square", "tab": "orders"}
             ]
         },
         "support": {
@@ -243,7 +269,7 @@ def get_role_based_dashboard_view(
                 {"label": "Open Tickets", "value": base_kpis.get("open_tickets", 0), "sub": "Awaiting Response", "icon": "headphones", "tab": "support"},
                 {"label": "Active Alarms", "value": base_kpis.get("active_alerts", 0), "sub": "Microclimate Warnings", "icon": "alert-circle", "tab": "alerts"},
                 {"label": "Registered Farmers", "value": base_kpis.get("total_farmers", 0), "sub": "Supported Growers", "icon": "users", "tab": "farmers"},
-                {"label": "Avg Response Time", "value": "< 12 mins", "sub": "SLA Compliant", "icon": "clock", "tab": "support"}
+                {"label": "Avg Response Time", "value": "N/A" if base_kpis.get("open_tickets", 0) == 0 else "< 15 mins", "sub": "SLA Compliant", "icon": "clock", "tab": "support"}
             ]
         },
         "analyst": {
@@ -252,10 +278,10 @@ def get_role_based_dashboard_view(
             "subtitle": "Timeseries sensor distributions, instar temperature bands, and operational export reports.",
             "default_tab": "analytics",
             "kpis": [
-                {"label": "Telemetry Data Points", "value": "45,000+", "sub": "Historical Timeseries", "icon": "database", "tab": "analytics"},
+                {"label": "Telemetry Data Points", "value": f"{telemetry_count:,}", "sub": "Historical Timeseries", "icon": "database", "tab": "analytics"},
                 {"label": "Monitored Sheds", "value": base_kpis.get("total_sheds", 0), "sub": "Continuous Telemetry", "icon": "bar-chart-2", "tab": "analytics"},
                 {"label": "Target Instars", "value": "Stages 1–5", "sub": "Research Setpoints", "icon": "microscope", "tab": "research"},
-                {"label": "Scientific Articles", "value": "6 Published", "sub": "Farmer Guidance", "icon": "book-open", "tab": "guidance"}
+                {"label": "Scientific Articles", "value": f"{articles_count} Published", "sub": "Farmer Guidance", "icon": "book-open", "tab": "guidance"}
             ]
         },
         "farmer": {
@@ -264,10 +290,10 @@ def get_role_based_dashboard_view(
             "subtitle": "Live temperature, humidity, light, and automated microclimate control for healthy silkworm larvae.",
             "default_tab": "live-monitoring",
             "kpis": [
-                {"label": "Rearing Shed", "value": assigned.get("sheds", ["shed_01"])[0] if assigned.get("sheds") else "shed_01", "sub": "Active Monitoring", "icon": "warehouse", "tab": "live-monitoring"},
-                {"label": "Instar Stage", "value": "3rd Instar", "sub": "Target: 25.0–26.5°C", "icon": "activity", "tab": "live-monitoring"},
-                {"label": "Climate Status", "value": "OPTIMAL", "sub": "75% RH / 26.2°C", "icon": "check-circle", "tab": "live-monitoring"},
-                {"label": "Automated Relays", "value": "COOLER OFF", "sub": "Auto Climate Guard", "icon": "zap", "tab": "live-monitoring"}
+                {"label": "Rearing Shed", "value": assigned.get("sheds", ["None"])[0] if assigned.get("sheds") else "None Assigned", "sub": "Assigned Facility", "icon": "warehouse", "tab": "live-monitoring"},
+                {"label": "Instar Stage", "value": "Not Started" if base_kpis.get("total_sheds", 0) == 0 else "Stage Active", "sub": "Target Growth Band", "icon": "activity", "tab": "live-monitoring"},
+                {"label": "Climate Status", "value": "OFFLINE" if base_kpis.get("online_devices", 0) == 0 else "ONLINE", "sub": "Real-time Telemetry Guard", "icon": "check-circle", "tab": "live-monitoring"},
+                {"label": "Automated Relays", "value": "STANDBY", "sub": "Climate Automation", "icon": "zap", "tab": "live-monitoring"}
             ]
         }
     }

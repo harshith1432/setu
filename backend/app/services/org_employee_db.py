@@ -9,6 +9,7 @@ Provides PostgreSQL schema migrations, data queries, and security enforcement fo
 """
 
 import os
+import sys
 import secrets
 import logging
 from datetime import datetime, timezone, timedelta
@@ -386,8 +387,10 @@ def init_org_employee_tables():
                 description = EXCLUDED.description;
             """, (*dept, now_dt))
 
-        # 13. Ensure Seed Users & Link Employee Records
-        _seed_all_role_employees(cursor, now_dt)
+        # 13. Ensure Seed Users & Link Employee Records only in test or demo environments
+        is_test_env = bool("pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SEED_DEMO_DATA", "false").lower() in ("true", "1"))
+        if is_test_env:
+            _seed_all_role_employees(cursor, now_dt)
 
 
 def _seed_all_role_employees(cursor, now_dt):

@@ -468,30 +468,35 @@ class TelemetryService:
             actuators = session.get("actuators") or db_actuators
             if "is_auto_mode" not in session:
                 is_auto_mode = (latest_reading.get("mode", "AUTO") == "AUTO")
+
+            # Evaluate rules engine on real sensor reading
+            status, headline, subline, next_actuators, photo_mode = rules_engine.evaluate(
+                current_temp=current_temp,
+                current_hum=current_hum,
+                outside_temp=outside_temp,
+                stage=current_stage,
+                is_auto_mode=is_auto_mode,
+                current_actuators=actuators,
+                is_advanced_mode=is_advanced_mode,
+                manual_temp_target=temp_target,
+                manual_hum_target=hum_target,
+                current_air_quality=current_air_quality,
+                current_light_lux=current_light_lux,
+                air_quality_target=air_quality_target,
+                light_lux_target=light_lux_target
+            )
         else:
-            current_temp = 25.0
-            current_hum = 75.0
-            current_air_quality = 88.0
-            current_light_lux = 22.0
+            current_temp = 0.0
+            current_hum = 0.0
+            current_air_quality = 0.0
+            current_light_lux = 0.0
             last_updated = datetime.now(timezone.utc)
             actuators = session.get("actuators", ActuatorStates())
-
-        # Evaluate rules engine
-        status, headline, subline, next_actuators, photo_mode = rules_engine.evaluate(
-            current_temp=current_temp,
-            current_hum=current_hum,
-            outside_temp=outside_temp,
-            stage=current_stage,
-            is_auto_mode=is_auto_mode,
-            current_actuators=actuators,
-            is_advanced_mode=is_advanced_mode,
-            manual_temp_target=temp_target,
-            manual_hum_target=hum_target,
-            current_air_quality=current_air_quality,
-            current_light_lux=current_light_lux,
-            air_quality_target=air_quality_target,
-            light_lux_target=light_lux_target
-        )
+            status = "OFFLINE"
+            headline = "Sensors Disconnected"
+            subline = "No active telemetry received from shed sensors."
+            next_actuators = ActuatorStates()
+            photo_mode = "STANDBY"
 
         stage_info = STAGE_THRESHOLDS.get(current_stage, STAGE_THRESHOLDS[3])
         stage_name = stage_info.get("name", "Instar")
