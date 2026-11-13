@@ -476,6 +476,8 @@ class FirestoreService:
             u_id = user_data.get("id") or f"usr_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             clean_data = dict(user_data)
             clean_data["id"] = u_id
+            clean_data.setdefault("is_active", True)
+            clean_data.setdefault("status", "ACTIVE")
             self._db.collection("users").document(u_id).set(clean_data, merge=True)
             return clean_data
         except Exception as e:
@@ -613,7 +615,7 @@ class FirestoreService:
             return []
         try:
             docs = self._db.collection("users").limit(limit).stream()
-            return [{"id": d.id, **d.to_dict()} for d in docs]
+            return [self._normalize_user_doc(d.to_dict(), d.id) for d in docs]
         except Exception as e:
             logger.debug("Firestore get_all_users error: %s", e)
             return []
@@ -624,10 +626,21 @@ class FirestoreService:
             return []
         try:
             docs = self._db.collection("users").where("role", "==", role).stream()
-            return [{"id": d.id, **d.to_dict()} for d in docs]
+            return [self._normalize_user_doc(d.to_dict(), d.id) for d in docs]
         except Exception as e:
             logger.debug("Firestore get_users_by_role notice: %s", e)
             return []
+
+    def delete_user(self, user_id: str) -> bool:
+        """Deletes user document from Firestore."""
+        if not self.is_available or not user_id:
+            return False
+        try:
+            self._db.collection("users").document(user_id).delete()
+            return True
+        except Exception as e:
+            logger.warning("Firestore delete_user error: %s", e)
+            return False
 
     # =========================================================================
     # 6. SHEDS & FARM REARING MANAGEMENT

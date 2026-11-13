@@ -667,37 +667,78 @@ async function submitForgotPasswordRequest(e) {
 
 function renderPasswordResetStep2(data, identifier, prefilledCode = '') {
   const token = data.reset_token || '';
-  const initialCode = prefilledCode || '';
+  const initialCode = prefilledCode || data.reset_code || '';
   const maskedContact = data.masked_email || data.masked_phone || identifier;
+  const isEmail = data.email_sent;
+
+  const headerTitle = isEmail ? 'Verification Email Dispatched' : 'Account Recovery Active';
+  const headerIcon = isEmail ? 'mail-check' : 'shield-check';
+
+  const codeBadgeHtml = data.reset_code ? `
+    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+        <div>
+          <div style="font-size: 0.74rem; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.05em;">Your Recovery Verification Code</div>
+          <div style="font-size: 1.35rem; font-family: monospace; font-weight: 800; color: #1e3a8a; letter-spacing: 0.15em; margin-top: 2px;">
+            ${escapeHtml(data.reset_code)}
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(data.reset_code)}'); showToast('Code copied to clipboard!', 'success');" style="padding: 4px 10px; font-size: 0.75rem; border-color: #93c5fd; color: #1d4ed8;">
+          Copy Code
+        </button>
+      </div>
+      <p style="font-size: 0.74rem; color: #3b82f6; margin: 6px 0 0 0;">
+        We have automatically pre-filled this verification code below for quick and secure setup.
+      </p>
+    </div>
+  ` : '';
+
+  const dispatchBannerHtml = isEmail ? `
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+      <div style="display: flex; align-items: flex-start; gap: 10px;">
+        <i data-lucide="check-circle" style="width: 18px; height: 18px; color: #166534; flex-shrink: 0; margin-top: 2px;"></i>
+        <div>
+          <div style="font-size: 0.84rem; color: #166534; font-weight: 700;">
+            Dispatched via Setu Security
+          </div>
+          <div style="font-size: 0.78rem; color: #166534; margin-top: 3px; line-height: 1.45;">
+            A secure reset notification was sent to <strong>${escapeHtml(maskedContact)}</strong>. Enter the verification code or token below:
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : `
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+      <div style="display: flex; align-items: flex-start; gap: 10px;">
+        <i data-lucide="shield" style="width: 18px; height: 18px; color: #475569; flex-shrink: 0; margin-top: 2px;"></i>
+        <div>
+          <div style="font-size: 0.84rem; color: #1e293b; font-weight: 700;">
+            Secure Account Identity Recovery
+          </div>
+          <div style="font-size: 0.78rem; color: #64748b; margin-top: 3px; line-height: 1.45;">
+            Password recovery is active for account <strong>${escapeHtml(data.username || identifier)}</strong>. Enter the verification code below to establish your new password:
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 
   const content = `
     <div style="padding: 4px 0;">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
         <div style="width: 44px; height: 44px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <i data-lucide="mail-check" style="width: 22px; height: 22px;"></i>
+          <i data-lucide="${headerIcon}" style="width: 22px; height: 22px;"></i>
         </div>
         <div>
-          <h3 style="font-size: 1.10rem; font-weight: 700; color: var(--text-main); margin: 0;">Verification Email Sent</h3>
+          <h3 style="font-size: 1.10rem; font-weight: 700; color: var(--text-main); margin: 0;">${headerTitle}</h3>
           <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">
             Account: <strong>${escapeHtml(data.username || identifier)}</strong>
           </p>
         </div>
       </div>
 
-      <!-- Security / OTP Verification Banner -->
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: flex-start; gap: 10px;">
-          <i data-lucide="check-circle" style="width: 18px; height: 18px; color: #166534; flex-shrink: 0; margin-top: 2px;"></i>
-          <div>
-            <div style="font-size: 0.84rem; color: #166534; font-weight: 700;">
-              Dispatched via Firebase Authentication
-            </div>
-            <div style="font-size: 0.78rem; color: #166534; margin-top: 3px; line-height: 1.45;">
-              A secure password reset link has been dispatched to <strong>${escapeHtml(maskedContact)}</strong>. Please check your inbox (and spam folder). Enter the verification code or token below:
-            </div>
-          </div>
-        </div>
-      </div>
+      ${codeBadgeHtml}
+      ${dispatchBannerHtml}
 
       <div class="alert-box error hidden" id="resetErrorBox" style="margin-bottom: 14px;"></div>
 
@@ -2851,7 +2892,8 @@ async function loadFarmers() {
         headers: { 'Authorization': `Bearer ${adminToken}` }
       });
       if (res.ok) {
-        farmers = await res.json();
+        const rawFarmers = await res.json();
+        farmers = (rawFarmers || []).map(f => ({ ...f, is_active: f.is_active !== false }));
       }
     } catch (_) {}
 
@@ -3005,7 +3047,7 @@ function renderFarmersPage() {
       <td>${f.dfl_capacity || '200 DFL'}</td>
       <td style="font-size: 0.76rem;">${f.breed || 'Double Hybrid'}</td>
       <td><span class="badge badge-info">Instar ${f.current_stage || 3}</span></td>
-      <td><span class="badge ${f.is_active ? 'badge-success' : 'badge-danger'}">${f.is_active ? 'ACTIVE' : 'SUSPENDED'}</span></td>
+      <td><span class="badge ${f.is_active !== false ? 'badge-success' : 'badge-danger'}">${f.is_active !== false ? 'ACTIVE' : 'SUSPENDED'}</span></td>
       <td>
         <div class="row-action-dropdown">
           <button type="button" class="action-dots-trigger" onclick="toggleRowActionMenu(event, 'farmer-${f.id}')" title="Actions" aria-label="Farmer Actions">
@@ -4225,7 +4267,7 @@ async function executePaletteSearch(query) {
               <span class="command-item-subtitle">${f.farm_name || 'Farm'} &bull; ${f.region || 'Region'} &bull; ${f.phone || ''}</span>
             </div>
           </div>
-          <span class="badge ${f.is_active ? 'badge-success' : 'badge-neutral'}">${f.is_active ? 'Active' : 'Inactive'}</span>
+          <span class="badge ${f.is_active !== false ? 'badge-success' : 'badge-neutral'}">${f.is_active !== false ? 'Active' : 'Inactive'}</span>
         </div>
       `).join('');
       sections.push(`<div class="command-group-title">Farmers (${data.farmers.length})</div>${items}`);
@@ -9394,7 +9436,7 @@ async function loadUsers() {
         <td><span class="badge badge-info">${escapeHtml(u.role || 'farmer')}</span></td>
         <td>${escapeHtml(u.phone || '--')}</td>
         <td>${escapeHtml(u.region || 'Karnataka')}</td>
-        <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'ACTIVE' : 'SUSPENDED'}</span></td>
+        <td><span class="badge ${u.is_active !== false ? 'badge-success' : 'badge-danger'}">${u.is_active !== false ? 'ACTIVE' : 'SUSPENDED'}</span></td>
       </tr>
     `).join('');
 

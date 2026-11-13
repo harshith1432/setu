@@ -271,6 +271,8 @@ def register(user_in: UserCreate, request: Request = None):
         "batch_id": user_in.batch_id or "SERI-2026-M04",
         "dfl_capacity": user_in.dfl_capacity or "200 DFL",
         "breed": user_in.breed or "Double Hybrid (FC1 x FC2)",
+        "is_active": True,
+        "status": "ACTIVE",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     create_user(new_user_data)
@@ -476,6 +478,9 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
             updates["farm_name"] = req.farm_name.strip()
         if req.region and req.region.strip() and not existing.get("region"):
             updates["region"] = req.region.strip()
+        if existing.get("is_active") is None:
+            updates["is_active"] = True
+            existing["is_active"] = True
 
         if updates:
             updated_user = update_user_profile(existing["id"], updates)
@@ -528,6 +533,8 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
         "batch_id": req.batch_id.strip() if req.batch_id else "SERI-2026-B01",
         "dfl_capacity": req.dfl_capacity.strip() if req.dfl_capacity else "200 DFL",
         "breed": req.breed.strip() if req.breed else "Double Hybrid (FC1 x FC2)",
+        "is_active": True,
+        "status": "ACTIVE",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     create_user(new_user_data)
@@ -776,11 +783,6 @@ def forgot_password_endpoint(req: ForgotPasswordRequest, request: Request = None
         raise HTTPException(
             status_code=404, 
             detail="No account found matching that username, email, or phone number."
-        )
-    if res.get("no_email"):
-        raise HTTPException(
-            status_code=400,
-            detail=res.get("detail") or "This account does not have a registered email address. Please contact your administrator."
         )
     return res
 

@@ -134,7 +134,11 @@ def list_monitored_sheds(current_user: dict = Depends(get_current_user_payload))
 
 @router.get("/farmers")
 def list_enrolled_farmers(admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "support", "sales", "analyst"]))) -> List[Dict[str, Any]]:
-    return get_all_farmers()
+    farmers = get_all_farmers()
+    for f in farmers:
+        f["is_active"] = (f.get("is_active") is not False)
+        f.setdefault("status", "ACTIVE" if f["is_active"] else "SUSPENDED")
+    return farmers
 
 @router.get("/farmers/{farmer_id}")
 def get_farmer_detail(farmer_id: str, admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "support", "sales", "analyst"]))):
