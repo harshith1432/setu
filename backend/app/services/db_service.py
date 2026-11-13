@@ -2473,9 +2473,15 @@ def is_session_valid(session_id: str) -> bool:
                     return False
             except Exception:
                 pass
-        elif isinstance(exp, datetime) and exp < datetime.now(timezone.utc):
-            return False
-    return True
+        elif isinstance(exp, datetime):
+            try:
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                if exp < datetime.now(timezone.utc):
+                    return False
+            except Exception:
+                pass
+        return True
 
 def update_session_activity(session_id: str) -> None:
     """Updates last_activity timestamp for an active session."""

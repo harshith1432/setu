@@ -28,23 +28,66 @@ if (!tabId) {
   TAB_STORAGE.setItem('setu_tab_id', tabId);
 }
 
+function parseJwt(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+window.parseJwt = parseJwt;
+
 // Global Application State - Tab-isolated with persistent fallback
 let adminToken = TAB_STORAGE.getItem('setu_tab_token') ||
   localStorage.getItem('setu_token') ||
   localStorage.getItem('setu_admin_token') ||
   null;
-if (adminToken && !TAB_STORAGE.getItem('setu_tab_token')) {
-  try { TAB_STORAGE.setItem('setu_tab_token', adminToken); } catch (_) {}
+
+let currentSessionId = TAB_STORAGE.getItem('setu_tab_session_id') ||
+  localStorage.getItem('setu_session_id') ||
+  null;
+
+if (adminToken) {
+  try {
+    const payload = parseJwt(adminToken);
+    if (payload && payload.session_id) {
+      currentSessionId = payload.session_id;
+    }
+  } catch (_) {}
+
+  if (!TAB_STORAGE.getItem('setu_tab_token')) {
+    try { TAB_STORAGE.setItem('setu_tab_token', adminToken); } catch (_) {}
+  }
+  if (currentSessionId && !TAB_STORAGE.getItem('setu_tab_session_id')) {
+    try { TAB_STORAGE.setItem('setu_tab_session_id', currentSessionId); } catch (_) {}
+  }
+  if (currentSessionId) {
+    try { localStorage.setItem('setu_session_id', currentSessionId); } catch (_) {}
+  }
 }
+
 window.adminToken = adminToken;
+window.currentSessionId = currentSessionId;
 window.API_BASE_URL = API_BASE_URL;
-let currentSessionId = TAB_STORAGE.getItem('setu_tab_session_id') || null;
+
 let currentUser = JSON.parse(TAB_STORAGE.getItem('setu_tab_user') || localStorage.getItem('setu_user') || 'null');
 if (currentUser && !TAB_STORAGE.getItem('setu_tab_user')) {
   try { TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser)); } catch (_) {}
 }
-let currentTab = TAB_STORAGE.getItem('setu_tab_nav') || 'overview';
-let selectedShedId = TAB_STORAGE.getItem('setu_tab_shed') || 'shed_01';
+if (adminToken && currentUser) {
+  try { document.documentElement.classList.add('user-logged-in'); } catch (_) {}
+}
+
+let currentTab = TAB_STORAGE.getItem('setu_tab_nav') || localStorage.getItem('setu_tab_nav') || 'overview';
+let selectedShedId = TAB_STORAGE.getItem('setu_tab_shed') || localStorage.getItem('setu_tab_shed') || 'shed_01';
 
 // Global safe HTML escaping utility
 function escapeHtml(str) {
@@ -288,7 +331,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (icon) icon.setAttribute('data-lucide', 'panel-left-open');
   }
 
-  // Keyboard shortcut listener (Ctrl+K for Command Palette, ESC to close, Arrow keys & Enter for Modal control)
+  // Bind Enter key listener on login inputs to immediately trigger Login button
+  const bindLoginEnter = () => {
+    ['username', 'password'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.enterBound) {
+        el.dataset.enterBound = 'true';
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            if (btn && !btn.disabled) {
+              btn.click();
+            }
+          }
+        });
+      }
+    });
+  };
+  bindLoginEnter();
+
+  // Keyboard shortcut listener (Ctrl+K for Command Palette, ESC to close, Arrow keys & Enter for Modal control & Login)
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
@@ -321,6 +384,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (activeModalCard) {
       handleModalKeyboardNavigation(e, activeModalCard);
+      return;
+    }
+
+    // Enter key handling for Login screen: pressing Enter clicks the Login button
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const authView = document.getElementById('authView');
+      const fpModal = document.getElementById('forgotPasswordModal');
+      const isFpModalOpen = fpModal && !fpModal.classList.contains('hidden');
+
+      if (!activeModalCard && !isFpModalOpen && authView && !authView.classList.contains('hidden')) {
+        const target = e.target;
+        if (target) {
+          if (target.id === 'googleSignInBtn' || (target.closest && target.closest('#googleSignInBtn'))) return;
+          if (target.id === 'togglePasswordBtn' || (target.closest && target.closest('#togglePasswordBtn'))) return;
+          if (target.tagName === 'A' || (target.closest && target.closest('a'))) return;
+        }
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginBtn && !loginBtn.disabled) {
+          e.preventDefault();
+          loginBtn.click();
+          return;
+        }
+      }
     }
   });
 
@@ -1000,7 +1086,7 @@ async function handleLogin(e) {
     if (window.lucide) lucide.createIcons();
   } finally {
     loginBtn.disabled = false;
-    loginBtn.innerHTML = '<span>Sign In</span><i data-lucide="arrow-right"></i>';
+    loginBtn.innerHTML = '<span>Login</span><i data-lucide="arrow-right"></i>';
     if (window.lucide) lucide.createIcons();
   }
 }
@@ -1108,7 +1194,7 @@ async function completeGoogleLogin(googleUserData) {
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
           <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
         </svg>
-        <span>Sign in with Google</span>
+        <span>Continue with Google</span>
       `;
     }
   }
@@ -1289,7 +1375,7 @@ async function handleGoogleSignIn() {
           <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"></path>
           <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"></path>
         </svg>
-        <span>Sign in with Google</span>
+        <span>Continue with Google</span>
       `;
     }
   };
