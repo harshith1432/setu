@@ -1103,7 +1103,46 @@ def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
         except Exception as e:
             logger.debug("Postgres get_user_by_id notice: %s", e)
 
-    # 3. Built-in Authoritative SuperAdmin & System Fallback
+    # 3. Fallback resolution via persistent local JSON store
+    try:
+        fallback_users = _load_fallback_users()
+        clean_uid = user_id.strip()
+        if clean_uid in fallback_users:
+            d = dict(fallback_users[clean_uid])
+            d.setdefault("is_active", True)
+            d.setdefault("role", "farmer")
+            with _user_cache_lock:
+                _user_cache[cache_key] = (now + USER_CACHE_TTL, d)
+            return d
+        for u in fallback_users.values():
+            if str(u.get("id") or "") == clean_uid or str(u.get("username") or "") == clean_uid:
+                d = dict(u)
+                d.setdefault("is_active", True)
+                d.setdefault("role", "farmer")
+                with _user_cache_lock:
+                    _user_cache[cache_key] = (now + USER_CACHE_TTL, d)
+                return d
+    except Exception as e:
+        logger.debug("Fallback store get_user_by_id notice: %s", e)
+
+    # 4. Fallback resolution via active tab sessions
+    try:
+        with _sessions_lock:
+            for s in _active_sessions_dict.values():
+                if s.get("user_id") == user_id or s.get("username") == user_id:
+                    return {
+                        "id": s["user_id"],
+                        "username": s["username"],
+                        "role": s.get("role", "farmer"),
+                        "organization_id": s.get("organization_id", "default_org"),
+                        "is_active": True,
+                        "full_name": s.get("full_name") or s["username"],
+                        "shed_id": s.get("shed_id", "shed_01")
+                    }
+    except Exception:
+        pass
+
+    # 5. Built-in Authoritative SuperAdmin & System Fallback
     uid_clean = user_id.strip()
     if uid_clean in ["usr_admin", "usr_admin_default"]:
         from app.core.security import get_password_hash
@@ -1473,6 +1512,26 @@ def create_user(user_data: Dict[str, Any]) -> Dict[str, Any]:
         except Exception as pe:
             logger.debug("Postgres create_user notice: %s", pe)
 
+    # 3. Persistent fallback write
+    _save_fallback_user(user_data)
+
+    # 4. Update in-memory user cache with generous TTL
+    now = time.time()
+    with _user_cache_lock:
+        if user_data.get("username"):
+            _user_cache[f"user:{user_data['username'].strip()}"] = (now + 86400, dict(user_data))
+            _user_cache[f"user:{user_data['username'].strip().lower()}"] = (now + 86400, dict(user_data))
+        if user_data.get("id"):
+            _user_cache[f"id:{user_data['id'].strip()}"] = (now + 86400, dict(user_data))
+        if user_data.get("phone"):
+            _user_cache[f"user:{user_data['phone'].strip()}"] = (now + 86400, dict(user_data))
+
+    # 5. If role is farmer, also add to CANONICAL_FARMERS_FALLBACK so it is always discoverable
+    if user_data.get("role") == "farmer":
+        existing_ids = {f.get("id") for f in CANONICAL_FARMERS_FALLBACK}
+        if user_data.get("id") not in existing_ids:
+            CANONICAL_FARMERS_FALLBACK.append(dict(user_data))
+
     invalidate_user_cache()
     return user_data
 
@@ -1497,6 +1556,9 @@ def update_user_password(user_id: str, new_hashed_password: str, must_change_pas
                 """, (new_hashed_password, must_change_password, user_id))
         except Exception as pe:
             logger.debug("Postgres update_user_password notice: %s", pe)
+
+    # 3. Update in persistent fallback store
+    _update_fallback_user(user_id, {"hashed_password": new_hashed_password, "must_change_password": must_change_password})
 
     invalidate_user_cache()
     return True
@@ -1538,6 +1600,14 @@ def update_user_profile(user_id: str, updates: Dict[str, Any]) -> Optional[Dict[
                     cursor.execute(query, tuple(values))
         except Exception:
             pass
+
+    # 3. Update in persistent fallback store
+    _update_fallback_user(user_id, updates)
+
+    # 4. Update in CANONICAL_FARMERS_FALLBACK
+    for f in CANONICAL_FARMERS_FALLBACK:
+        if f.get("id") == user_id or f.get("username") == user_id or f.get("phone") == user_id:
+            f.update(updates)
 
     invalidate_user_cache()
     return get_user_by_id(user_id) or get_user_by_username(user_id) or get_user_by_username_or_phone(user_id)
