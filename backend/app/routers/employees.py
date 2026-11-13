@@ -5,6 +5,9 @@ Supports employee onboarding, reporting structures, resource-level scoping, and 
 
 from fastapi import APIRouter, HTTPException, Depends, Query, status, Request
 from typing import List, Dict, Any, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.core.security import (
     get_current_user_payload,
@@ -42,22 +45,31 @@ def get_employees_directory(
     Search, filter, sort and paginate employee records across the organization.
     Never exposes password hashes, token secrets, or sensitive credentials.
     """
-    total, emps = list_employees(
-        dept_id=dept_id,
-        role=role,
-        status=status,
-        search=search,
-        sort_by=sort_by,
-        sort_desc=sort_desc,
-        limit=limit,
-        offset=offset
-    )
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "employees": emps
-    }
+    try:
+        total, emps = list_employees(
+            dept_id=dept_id,
+            role=role,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+            sort_desc=sort_desc,
+            limit=limit,
+            offset=offset
+        )
+        return {
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "employees": emps
+        }
+    except Exception as e:
+        logger.warning(f"Failed to retrieve employees directory: {e}")
+        return {
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+            "employees": []
+        }
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

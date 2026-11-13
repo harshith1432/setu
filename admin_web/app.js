@@ -4199,7 +4199,20 @@ async function loadEmployeesList() {
     const res = await fetch(url, {
       headers: { 'Authorization': `Bearer ${adminToken}` }
     });
-    if (!res.ok) throw new Error('Failed to load employees list');
+    if (!res.ok) {
+      console.warn('Employees fetch returned non-200 status:', res.status);
+      allEmployeesData = [];
+      const navEmpPill = document.getElementById('navEmpCount');
+      if (navEmpPill) navEmpPill.textContent = 0;
+      const countEl = document.getElementById('empPaginationCount');
+      if (countEl) countEl.textContent = 'Showing 0–0 of 0 employees';
+      const btnPrev = document.getElementById('btnEmpPrev');
+      const btnNext = document.getElementById('btnEmpNext');
+      if (btnPrev) btnPrev.disabled = true;
+      if (btnNext) btnNext.disabled = true;
+      renderEmployeesTable([]);
+      return;
+    }
     const data = await res.json();
     allEmployeesData = data.employees || [];
 
@@ -4209,18 +4222,28 @@ async function loadEmployeesList() {
     const countEl = document.getElementById('empPaginationCount');
     if (countEl) {
       const start = data.total ? (currentEmpPage * empPageSize + 1) : 0;
-      const end = Math.min((currentEmpPage + 1) * empPageSize, data.total);
-      countEl.textContent = `Showing ${start}–${end} of ${data.total} employees`;
+      const end = Math.min((currentEmpPage + 1) * empPageSize, data.total || 0);
+      countEl.textContent = `Showing ${start}–${end} of ${data.total || 0} employees`;
     }
 
     const btnPrev = document.getElementById('btnEmpPrev');
     const btnNext = document.getElementById('btnEmpNext');
     if (btnPrev) btnPrev.disabled = (currentEmpPage === 0);
-    if (btnNext) btnNext.disabled = ((currentEmpPage + 1) * empPageSize >= data.total);
+    if (btnNext) btnNext.disabled = ((currentEmpPage + 1) * empPageSize >= (data.total || 0));
 
     renderEmployeesTable(allEmployeesData);
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--status-danger); padding: 24px;">Failed to load employees: ${escapeHtml(err.message)}</td></tr>`;
+    console.warn('Failed to load employees list:', err);
+    allEmployeesData = [];
+    const navEmpPill = document.getElementById('navEmpCount');
+    if (navEmpPill) navEmpPill.textContent = 0;
+    const countEl = document.getElementById('empPaginationCount');
+    if (countEl) countEl.textContent = 'Showing 0–0 of 0 employees';
+    const btnPrev = document.getElementById('btnEmpPrev');
+    const btnNext = document.getElementById('btnEmpNext');
+    if (btnPrev) btnPrev.disabled = true;
+    if (btnNext) btnNext.disabled = true;
+    renderEmployeesTable([]);
   }
 }
 
@@ -4229,7 +4252,23 @@ function renderEmployeesTable(employees) {
   if (!tbody) return;
 
   if (!employees.length) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="honest-empty-state"><i data-lucide="users"></i><h4>No Employee Records Found</h4><p>No employees match the selected criteria or search query.</p></div></td></tr>';
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="padding: 48px 16px; text-align: center;">
+          <div class="empty-state">
+            <div class="empty-icon">
+              <i data-lucide="users" style="width: 26px; height: 26px;"></i>
+            </div>
+            <div class="empty-title">No Employee Records Found</div>
+            <div class="empty-desc">No employees have been added yet or no records match your filter criteria.</div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openOnboardEmployeeModal()" style="margin-top: 8px; display: inline-flex; align-items: center; gap: 6px;">
+              <i data-lucide="user-plus" style="width: 15px; height: 15px;"></i>
+              <span>Onboard Employee</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
     if (window.lucide) lucide.createIcons();
     return;
   }

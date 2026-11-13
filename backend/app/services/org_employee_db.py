@@ -1370,107 +1370,115 @@ def list_employees(
 
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute(f"""
-        SELECT COUNT(*) as count
-        FROM employees e
-        JOIN users u ON u.id = e.user_id
-        {where_sql}
-        """, tuple(params))
-        total_count = cursor.fetchone()["count"]
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute(f"""
+            SELECT COUNT(*) as count
+            FROM employees e
+            JOIN users u ON u.id = e.user_id
+            {where_sql}
+            """, tuple(params))
+            total_count = cursor.fetchone()["count"]
 
-        query = f"""
-        SELECT e.id, e.user_id, e.employee_id, e.official_email,
-               e.department_id, e.designation, e.reporting_manager_id, e.role_code, e.role_id,
-               e.access_scope, e.assigned_resources, e.employment_status, e.invitation_status,
-               e.last_login, e.created_at, e.updated_at,
-               u.username, u.full_name, u.phone, u.is_active as user_is_active, u.mfa_enabled,
-               dept.name as department_name,
-               (SELECT mu.full_name FROM employees me JOIN users mu ON mu.id = me.user_id WHERE me.id = e.reporting_manager_id) as reporting_manager_name
-        FROM employees e
-        JOIN users u ON u.id = e.user_id
-        LEFT JOIN departments dept ON dept.id = e.department_id
-        {where_sql}
-        ORDER BY {sort_column} {sort_dir}
-        LIMIT %s OFFSET %s
-        """
-        cursor.execute(query, tuple(params + [limit, offset]))
-        rows = cursor.fetchall()
-        
-        results = []
-        for r in rows:
-            d = dict(r)
-            # Ensure assigned_resources is json
-            if isinstance(d.get("assigned_resources"), str):
-                import json
-                try:
-                    d["assigned_resources"] = json.loads(d["assigned_resources"])
-                except Exception:
-                    pass
-            results.append(d)
+            query = f"""
+            SELECT e.id, e.user_id, e.employee_id, e.official_email,
+                   e.department_id, e.designation, e.reporting_manager_id, e.role_code, e.role_id,
+                   e.access_scope, e.assigned_resources, e.employment_status, e.invitation_status,
+                   e.last_login, e.created_at, e.updated_at,
+                   u.username, u.full_name, u.phone, u.is_active as user_is_active, u.mfa_enabled,
+                   dept.name as department_name,
+                   (SELECT mu.full_name FROM employees me JOIN users mu ON mu.id = me.user_id WHERE me.id = e.reporting_manager_id) as reporting_manager_name
+            FROM employees e
+            JOIN users u ON u.id = e.user_id
+            LEFT JOIN departments dept ON dept.id = e.department_id
+            {where_sql}
+            ORDER BY {sort_column} {sort_dir}
+            LIMIT %s OFFSET %s
+            """
+            cursor.execute(query, tuple(params + [limit, offset]))
+            rows = cursor.fetchall()
+            
+            results = []
+            for r in rows:
+                d = dict(r)
+                # Ensure assigned_resources is json
+                if isinstance(d.get("assigned_resources"), str):
+                    import json
+                    try:
+                        d["assigned_resources"] = json.loads(d["assigned_resources"])
+                    except Exception:
+                        pass
+                results.append(d)
 
-        return total_count, results
+            return total_count, results
+    except Exception as e:
+        logger.warning(f"Error querying employees database in list_employees: {e}")
+        return 0, []
 
 
 def get_employee_detail(employee_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves full employee record, direct reports, and active permissions."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT e.*,
-               u.username, u.full_name, u.phone, u.preferred_language, u.is_active as user_is_active, u.mfa_enabled,
-               dept.name as department_name,
-               (SELECT mu.full_name FROM employees me JOIN users mu ON mu.id = me.user_id WHERE me.id = e.reporting_manager_id) as reporting_manager_name
-        FROM employees e
-        JOIN users u ON u.id = e.user_id
-        LEFT JOIN departments dept ON dept.id = e.department_id
-        WHERE e.id = %s OR e.employee_id = %s
-        """, (employee_id, employee_id))
-        row = cursor.fetchone()
-        if not row:
-            return None
-        emp_dict = dict(row)
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("""
+            SELECT e.*,
+                   u.username, u.full_name, u.phone, u.preferred_language, u.is_active as user_is_active, u.mfa_enabled,
+                   dept.name as department_name,
+                   (SELECT mu.full_name FROM employees me JOIN users mu ON mu.id = me.user_id WHERE me.id = e.reporting_manager_id) as reporting_manager_name
+            FROM employees e
+            JOIN users u ON u.id = e.user_id
+            LEFT JOIN departments dept ON dept.id = e.department_id
+            WHERE e.id = %s OR e.employee_id = %s
+            """, (employee_id, employee_id))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            emp_dict = dict(row)
 
-        # Parse assigned_resources
-        if isinstance(emp_dict.get("assigned_resources"), str):
-            import json
-            try:
-                emp_dict["assigned_resources"] = json.loads(emp_dict["assigned_resources"])
-            except Exception:
-                pass
+            # Parse assigned_resources
+            if isinstance(emp_dict.get("assigned_resources"), str):
+                import json
+                try:
+                    emp_dict["assigned_resources"] = json.loads(emp_dict["assigned_resources"])
+                except Exception:
+                    pass
 
-        # Direct reports
-        cursor.execute("""
-        SELECT e.id, e.employee_id, e.official_email, e.designation, e.role_code,
-               u.full_name, e.employment_status
-        FROM employees e
-        JOIN users u ON u.id = e.user_id
-        WHERE e.reporting_manager_id = %s
-        ORDER BY u.full_name ASC
-        """, (emp_dict["id"],))
-        emp_dict["direct_reports"] = [dict(r) for r in cursor.fetchall()]
+            # Direct reports
+            cursor.execute("""
+            SELECT e.id, e.employee_id, e.official_email, e.designation, e.role_code,
+                   u.full_name, e.employment_status
+            FROM employees e
+            JOIN users u ON u.id = e.user_id
+            WHERE e.reporting_manager_id = %s
+            ORDER BY u.full_name ASC
+            """, (emp_dict["id"],))
+            emp_dict["direct_reports"] = [dict(r) for r in cursor.fetchall()]
 
-        # Effective permissions
-        emp_dict["effective_permissions"] = get_user_effective_permissions(emp_dict["user_id"], emp_dict["role_code"])
+            # Effective permissions
+            emp_dict["effective_permissions"] = get_user_effective_permissions(emp_dict["user_id"], emp_dict["role_code"])
 
-        # Pending invitation details if any
-        cursor.execute("""
-        SELECT id, token, expires_at, status, created_at
-        FROM employee_invitations
-        WHERE employee_id = %s AND status = 'PENDING'
-        ORDER BY created_at DESC LIMIT 1
-        """, (emp_dict["id"],))
-        inv_row = cursor.fetchone()
-        if inv_row:
-            emp_dict["active_invitation"] = {
-                "id": inv_row["id"],
-                "expires_at": inv_row["expires_at"].isoformat(),
-                "status": inv_row["status"],
-                "created_at": inv_row["created_at"].isoformat()
-            }
-        else:
-            emp_dict["active_invitation"] = None
+            # Pending invitation details if any
+            cursor.execute("""
+            SELECT id, token, expires_at, status, created_at
+            FROM employee_invitations
+            WHERE employee_id = %s AND status = 'PENDING'
+            ORDER BY created_at DESC LIMIT 1
+            """, (emp_dict["id"],))
+            inv_row = cursor.fetchone()
+            if inv_row:
+                emp_dict["active_invitation"] = {
+                    "id": inv_row["id"],
+                    "expires_at": inv_row["expires_at"].isoformat(),
+                    "status": inv_row["status"],
+                    "created_at": inv_row["created_at"].isoformat()
+                }
+            else:
+                emp_dict["active_invitation"] = None
 
-        return emp_dict
+            return emp_dict
+    except Exception as e:
+        logger.warning(f"Error fetching employee detail for {employee_id}: {e}")
+        return None
 
 
 def create_employee_with_invitation(

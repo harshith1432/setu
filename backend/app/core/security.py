@@ -148,7 +148,18 @@ def get_current_user_payload(credentials: HTTPAuthorizationCredentials = Securit
                 pass
     user_id = payload.get("user_id")
 
-    if username and username != "admin":
+    user_role = (payload.get("role") or "").lower()
+    is_superadmin = (username and username.lower() in ["admin", "superadmin"]) or user_role in ["admin", "superadmin"]
+
+    if is_superadmin:
+        payload["access_scope"] = "GLOBAL"
+        payload["assigned_resources"] = {"sheds": ["shed_01", "shed_02", "shed_03"], "devices": []}
+        try:
+            from app.services.org_employee_db import ALL_PERMISSION_CODES
+            payload["permissions"] = list(ALL_PERMISSION_CODES)
+        except Exception:
+            payload["permissions"] = []
+    elif username:
         from app.services.db_service import get_user_by_username
         user = get_user_by_username(username)
         if not user or not user.get("is_active", 1):
@@ -177,14 +188,6 @@ def get_current_user_payload(credentials: HTTPAuthorizationCredentials = Securit
             raise
         except Exception:
             pass
-    elif username == "admin":
-        payload["access_scope"] = "GLOBAL"
-        payload["assigned_resources"] = {"sheds": ["shed_01", "shed_02", "shed_03"], "devices": []}
-        try:
-            from app.services.org_employee_db import ALL_PERMISSION_CODES
-            payload["permissions"] = list(ALL_PERMISSION_CODES)
-        except Exception:
-            payload["permissions"] = []
 
     return payload
 
