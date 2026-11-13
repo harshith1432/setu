@@ -774,6 +774,159 @@ window.submitForgotPasswordRequest = submitForgotPasswordRequest;
 window.renderPasswordResetStep2 = renderPasswordResetStep2;
 window.submitNewPassword = submitNewPassword;
 
+function showFirstLoginResetModal(token, user) {
+  const content = `
+    <div style="padding: 6px 0;">
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
+        <div style="width: 48px; height: 48px; border-radius: 50%; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <i data-lucide="shield-alert" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin: 0;">Set Your Personal Password</h3>
+          <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 4px 0 0 0;">
+            Welcome, <strong>${escapeHtml(user.full_name || user.username)}</strong>! You signed in with the default initial password (<code style="background: var(--bg-hover); padding: 2px 6px; border-radius: 4px;">Welcome@123</code>). For account security, you must create a new password to continue.
+          </p>
+        </div>
+      </div>
+
+      <div class="alert-box error hidden" id="firstLoginErrorBox" style="margin-bottom: 14px;"></div>
+
+      <form id="firstLoginForm" onsubmit="submitFirstLoginPasswordReset(event)" style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            New Password <span style="color: #ef4444;">*</span>
+          </label>
+          <div class="password-input-wrapper" style="position: relative;">
+            <input 
+              type="password" 
+              id="newFirstPassword" 
+              class="form-control" 
+              required 
+              minlength="6"
+              placeholder="Enter your new secure password" 
+              style="width: 100%; padding: 10px 40px 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.90rem;" 
+            />
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('newFirstPassword', this)" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+          <span style="font-size: 0.75rem; color: var(--text-secondary); display: block; margin-top: 4px;">Minimum 6 characters. Cannot be Welcome@123.</span>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
+            Confirm New Password <span style="color: #ef4444;">*</span>
+          </label>
+          <div class="password-input-wrapper" style="position: relative;">
+            <input 
+              type="password" 
+              id="confirmFirstPassword" 
+              class="form-control" 
+              required 
+              minlength="6"
+              placeholder="Re-enter your new password" 
+              style="width: 100%; padding: 10px 40px 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.90rem;" 
+            />
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('confirmFirstPassword', this)" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+              <i data-lucide="eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+          <button type="submit" id="btnSaveFirstPassword" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; width: 100%; justify-content: center; padding: 11px;">
+            <i data-lucide="check-circle-2"></i>
+            <span>Save New Password &amp; Continue</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  openAppModal('Initial Password Setup Required', content);
+  const backdrop = document.getElementById('appModalBackdrop');
+  if (backdrop) backdrop.classList.remove('hidden');
+  const modalEl = document.getElementById('appModal');
+  if (modalEl) modalEl.classList.remove('hidden');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function submitFirstLoginPasswordReset(e) {
+  e.preventDefault();
+  const newPassword = document.getElementById('newFirstPassword').value;
+  const confirmPassword = document.getElementById('confirmFirstPassword').value;
+  const errBox = document.getElementById('firstLoginErrorBox');
+  const btn = document.getElementById('btnSaveFirstPassword');
+
+  errBox.classList.add('hidden');
+
+  if (newPassword === 'Welcome@123') {
+    errBox.textContent = 'Your new password cannot be the default "Welcome@123". Please choose a different personal password.';
+    errBox.classList.remove('hidden');
+    return;
+  }
+  if (newPassword.length < 6) {
+    errBox.textContent = 'Password must be at least 6 characters long.';
+    errBox.classList.remove('hidden');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    errBox.textContent = 'Passwords do not match.';
+    errBox.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span>Saving new password...</span>';
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/first-login-reset-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        new_password: newPassword,
+        confirm_password: confirmPassword
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Failed to update password');
+    }
+
+    if (currentUser) {
+      currentUser.must_change_password = false;
+      TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+      localStorage.setItem('setu_user', JSON.stringify(currentUser));
+    }
+
+    closeAppModal();
+    showToast('Your new password has been saved! Welcome to Setu.', 'success');
+
+    const defTab = (ROLE_DEFAULT_TABS && ROLE_DEFAULT_TABS[currentUser.role]) || 'overview';
+    currentTab = defTab;
+    TAB_STORAGE.setItem('setu_tab_nav', currentTab);
+    if (currentUser.shed_id) {
+      selectedShedId = currentUser.shed_id;
+      TAB_STORAGE.setItem('setu_tab_shed', selectedShedId);
+    }
+    showDashboardView();
+  } catch (err) {
+    errBox.textContent = err.message || 'Failed to save new password. Please try again.';
+    errBox.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="check-circle-2"></i><span>Save New Password &amp; Continue</span>';
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+window.showFirstLoginResetModal = showFirstLoginResetModal;
+window.submitFirstLoginPasswordReset = submitFirstLoginPasswordReset;
+
 async function handleLogin(e) {
   e.preventDefault();
   const username = document.getElementById('username').value.trim();
@@ -810,8 +963,13 @@ async function handleLogin(e) {
     TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
     localStorage.setItem('setu_token', adminToken);
     localStorage.setItem('setu_user', JSON.stringify(currentUser));
-    localStorage.setItem('setu_token', adminToken);
-    localStorage.setItem('setu_user', JSON.stringify(currentUser));
+
+    // Enforce First-Login Password Reset for new users using default password
+    const mustChangePassword = Boolean(data.must_change_password || (currentUser && currentUser.must_change_password));
+    if (mustChangePassword && currentUser.role !== 'superadmin') {
+      showFirstLoginResetModal(adminToken, currentUser);
+      return;
+    }
 
     // Check if redirected from landing page direct checkout
     const urlParams = new URLSearchParams(window.location.search);
