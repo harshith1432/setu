@@ -85,6 +85,56 @@ def send_firebase_password_reset_email(to_email: str, continue_url: Optional[str
         logger.warning("Firebase sendOobCode error for %s: %s", clean_email, e)
         return False
 
+def send_firebase_welcome_email(
+    to_email: str,
+    full_name: str,
+    role_code: str = "technician",
+    continue_url: Optional[str] = None
+) -> bool:
+    """
+    Sends the official Welcome & Account Activation email to newly added users / employees
+    via the Firebase Authentication email server (Project: setu-a767c).
+    When the recipient clicks the link in their inbox, they arrive on the platform, reset/set their password,
+    and are immediately authenticated into their dashboard.
+    """
+    clean_email = (to_email or "").strip().lower()
+    if not clean_email or "@" not in clean_email:
+        logger.warning("Invalid recipient email for welcome email: '%s'", to_email)
+        return False
+
+    api_key = settings.FIREBASE_WEB_API_KEY
+    if not api_key:
+        logger.warning("FIREBASE_WEB_API_KEY is not configured.")
+        return False
+
+    # Ensure user exists in Firebase Auth before dispatching
+    ensure_firebase_user_exists(clean_email, display_name=full_name)
+
+    target_continue_url = continue_url or "https://setu-adminweb.vercel.app/login?mode=resetPassword"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}"
+    payload = {
+        "requestType": "PASSWORD_RESET",
+        "email": clean_email,
+        "continueUrl": target_continue_url
+    }
+
+    try:
+        data_bytes = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data_bytes,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.status == 200:
+                logger.info("Firebase Auth Welcome / Password Reset email dispatched to %s", clean_email)
+                return True
+            logger.warning("Firebase sendOobCode unexpected status %s for %s", resp.status, clean_email)
+            return False
+    except Exception as e:
+        logger.warning("Firebase sendOobCode welcome email notice for %s: %s", clean_email, e)
+        return False
+
 def verify_and_apply_firebase_password_reset(oob_code: str, new_password: str) -> Optional[str]:
     """
     Applies the new password in Firebase Authentication using the verified oobCode

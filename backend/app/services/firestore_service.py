@@ -10,7 +10,7 @@ import json
 import logging
 import warnings
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 warnings.filterwarnings("ignore", category=UserWarning, module=".*firestore.*")
 
@@ -981,7 +981,129 @@ class FirestoreService:
                 "pending_installations": 0, "last_updated": now_iso
             }
 
+    # =========================================================================
+    # 10. EMPLOYEE DIRECTORY & INVITATIONS
+    # =========================================================================
+
+    def create_employee(self, emp_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves an employee profile document into Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            emp_id = emp_data.get("id") or f"emp_{emp_data.get('employee_id', 'new')}"
+            data_to_store = dict(emp_data)
+            if "created_at" not in data_to_store:
+                data_to_store["created_at"] = datetime.now(timezone.utc).isoformat()
+            data_to_store["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("employees").document(emp_id).set(data_to_store, merge=True)
+            logger.info("Created employee %s (%s) in Cloud Firestore", emp_id, emp_data.get("official_email"))
+            return data_to_store
+        except Exception as e:
+            logger.error("Error creating employee in Cloud Firestore: %s", e)
+            return None
+
+    def get_employee(self, employee_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves an employee record by id, employee_id code, or official_email."""
+        if not self.is_available:
+            return None
+        try:
+            doc = self._db.collection("employees").document(employee_id).get()
+            if doc.exists:
+                d = doc.to_dict()
+                d["id"] = doc.id
+                return d
+
+            # Query by employee_id or official_email
+            for field in ["employee_id", "official_email", "user_id"]:
+                docs = list(self._db.collection("employees").where(field, "==", employee_id).limit(1).stream())
+                if docs:
+                    d = docs[0].to_dict()
+                    d["id"] = docs[0].id
+                    return d
+            return None
+        except Exception as e:
+            logger.warning("Error fetching employee %s from Firestore: %s", employee_id, e)
+            return None
+
+    def list_employees(self, limit: int = 50, offset: int = 0) -> Tuple[int, List[Dict[str, Any]]]:
+        """Lists all employees from Cloud Firestore with pagination support."""
+        if not self.is_available:
+            return 0, []
+        try:
+            all_emps = []
+            for doc in self._db.collection("employees").stream():
+                d = doc.to_dict()
+                d["id"] = doc.id
+                all_emps.append(d)
+            # Sort by created_at desc
+            all_emps.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+            total = len(all_emps)
+            return total, all_emps[offset:offset + limit]
+        except Exception as e:
+            logger.warning("Error listing employees from Firestore: %s", e)
+            return 0, []
+
+    def update_employee(self, employee_id: str, updates: Dict[str, Any]) -> bool:
+        """Updates employee fields in Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            emp = self.get_employee(employee_id)
+            if not emp:
+                return False
+            actual_id = emp.get("id") or employee_id
+            updates_copy = dict(updates)
+            updates_copy["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("employees").document(actual_id).update(updates_copy)
+            return True
+        except Exception as e:
+            logger.warning("Error updating employee %s in Firestore: %s", employee_id, e)
+            return False
+
+    def delete_employee(self, employee_id: str) -> bool:
+        """Removes an employee document from Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            emp = self.get_employee(employee_id)
+            if not emp:
+                return False
+            actual_id = emp.get("id") or employee_id
+            self._db.collection("employees").document(actual_id).delete()
+            return True
+        except Exception as e:
+            logger.warning("Error deleting employee %s from Firestore: %s", employee_id, e)
+            return False
+
+    def create_employee_invitation(self, inv_data: Dict[str, Any]) -> bool:
+        """Persists single-use employee invitation token in Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            inv_id = inv_data.get("id") or f"inv_{inv_data.get('token', 'tok')[:10]}"
+            self._db.collection("employee_invitations").document(inv_id).set(inv_data, merge=True)
+            return True
+        except Exception as e:
+            logger.warning("Error saving employee invitation in Firestore: %s", e)
+            return False
+
+    def get_employee_invitation(self, token: str) -> Optional[Dict[str, Any]]:
+        """Finds active employee invitation token in Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            docs = list(self._db.collection("employee_invitations").where("token", "==", token).limit(1).stream())
+            if docs:
+                d = docs[0].to_dict()
+                d["id"] = docs[0].id
+                return d
+            return None
+        except Exception as e:
+            logger.warning("Error querying employee invitation in Firestore: %s", e)
+            return None
+
 
 # Global singleton instance
 firestore_service = FirestoreService()
+
 

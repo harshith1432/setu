@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from contextlib import contextmanager
 from app.core.config import settings
 from app.core.security import get_password_hash
+from app.services.firestore_service import firestore_service
 
 logger = logging.getLogger(__name__)
 

@@ -554,6 +554,7 @@ a {
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   min-height: 100vh;
+  width: 100%;
   transition: grid-template-columns var(--transition-normal);
 }
 
@@ -962,6 +963,8 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: 100%;
+  flex: 1;
   height: 100vh;
   overflow-y: auto;
   background: var(--bg-body);
@@ -981,6 +984,7 @@ a {
   top: 0;
   z-index: 90;
   box-shadow: var(--shadow-xs);
+  width: 100%;
 }
 
 .top-bar-left {
@@ -1287,9 +1291,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1600px;
   width: 100%;
-  margin: 0 auto;
+  max-width: 100%;
 }
 
 .view-section {

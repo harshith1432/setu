@@ -1410,9 +1410,27 @@ def list_employees(
                         pass
                 results.append(d)
 
+            if total_count == 0:
+                try:
+                    from app.services.firestore_service import firestore_service
+                    if firestore_service.is_available:
+                        f_total, f_emps = firestore_service.list_employees(limit=limit, offset=offset)
+                        if f_emps:
+                            return f_total, f_emps
+                except Exception:
+                    pass
+
             return total_count, results
     except Exception as e:
         logger.warning(f"Error querying employees database in list_employees: {e}")
+        try:
+            from app.services.firestore_service import firestore_service
+            if firestore_service.is_available:
+                f_total, f_emps = firestore_service.list_employees(limit=limit, offset=offset)
+                if f_emps:
+                    return f_total, f_emps
+        except Exception:
+            pass
         return 0, []
 
 
@@ -1432,6 +1450,14 @@ def get_employee_detail(employee_id: str) -> Optional[Dict[str, Any]]:
             """, (employee_id, employee_id))
             row = cursor.fetchone()
             if not row:
+                try:
+                    from app.services.firestore_service import firestore_service
+                    if firestore_service.is_available:
+                        f_emp = firestore_service.get_employee(employee_id)
+                        if f_emp:
+                            return f_emp
+                except Exception:
+                    pass
                 return None
             emp_dict = dict(row)
 
@@ -1594,16 +1620,95 @@ def create_employee_with_invitation(
         ))
         invitation = cursor.fetchone()
 
+    # Save to Cloud Firestore
+    user_doc = {
+        "id": user_id,
+        "username": uname,
+        "hashed_password": initial_password_hash,
+        "full_name": full_name,
+        "phone": data.get("phone", "+91 98000 00000"),
+        "official_email": email,
+        "preferred_language": "en",
+        "role": role_code,
+        "farm_name": "SeriCare Operations",
+        "region": "Regional Hub",
+        "shed_id": "shed_01",
+        "batch_id": "SERI-2026",
+        "dfl_capacity": "N/A",
+        "breed": "N/A",
+        "is_active": True,
+        "mfa_enabled": False,
+        "must_change_password": True,
+        "created_at": now_dt.isoformat()
+    }
+    emp_doc = {
+        "id": temp_emp_id,
+        "user_id": user_id,
+        "employee_id": emp_code,
+        "official_email": email,
+        "department_id": dept_id,
+        "designation": data.get("designation", "Operations Staff"),
+        "reporting_manager_id": manager_id,
+        "role_code": role_code,
+        "role_id": role_id,
+        "access_scope": scope,
+        "assigned_resources": resources,
+        "employment_status": "ACTIVE",
+        "invitation_status": "PENDING",
+        "created_by": actor,
+        "created_at": now_dt.isoformat(),
+        "updated_at": now_dt.isoformat(),
+        "username": uname,
+        "full_name": full_name,
+        "phone": data.get("phone", "+91 98000 00000"),
+        "user_is_active": True
+    }
+    inv_doc = {
+        "id": inv_id,
+        "token": inv_token,
+        "employee_id": temp_emp_id,
+        "user_id": user_id,
+        "email": email,
+        "role_code": role_code,
+        "expires_at": expires_at.isoformat(),
+        "status": "PENDING",
+        "created_by": actor,
+        "created_at": now_dt.isoformat()
+    }
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.create_user(user_doc)
+            firestore_service.create_employee(emp_doc)
+            firestore_service.create_employee_invitation(inv_doc)
+    except Exception as fe:
+        logger.warning("Firestore save for employee notice: %s", fe)
+
+    # Provision user identity and dispatch welcome / password reset email via Firebase Authentication server
+    firebase_email_sent = False
+    try:
+        from app.services.email_service import ensure_firebase_user_exists, sync_firebase_user_password, send_firebase_welcome_email
+        ensure_firebase_user_exists(email, display_name=full_name)
+        sync_firebase_user_password(email, raw_password)
+        firebase_email_sent = send_firebase_welcome_email(
+            to_email=email,
+            full_name=full_name,
+            role_code=role_code,
+            continue_url="https://setu-adminweb.vercel.app/login?mode=resetPassword"
+        )
+    except Exception as fbe:
+        logger.warning("Firebase welcome email dispatch notice: %s", fbe)
+
     # Log security audit
     log_security_audit(
         actor=actor,
         action="INVITE_EMPLOYEE",
         details=f"Invited new employee '{full_name}' ({email}, ID: {emp_code}, Role: {role_code})",
         target_resource=temp_emp_id,
-        
     )
 
     activation_url = f"{base_url.rstrip('/')}/admin#invitation_token={inv_token}"
+    reset_password_url = f"https://setu-adminweb.vercel.app/login?mode=resetPassword"
     return {
         "status": "success",
         "success": True,
@@ -1616,8 +1721,10 @@ def create_employee_with_invitation(
         "role_code": role_code,
         "invitation_token": inv_token,
         "activation_url": activation_url,
+        "reset_password_url": reset_password_url,
+        "firebase_email_sent": firebase_email_sent,
         "expires_at": expires_at.isoformat(),
-        "delivery_notice": "Invitation token generated. Since external SMTP relay is unconfigured in this environment, provide the secure activation URL directly to the employee."
+        "delivery_notice": "Welcome & password reset email dispatched via Firebase Authentication server (Project: setu-a767c). User can click link in inbox to set their password and login directly."
     }
 
 

@@ -28,7 +28,7 @@ class Settings(BaseModel):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
     # Database configuration (Firebase Cloud Firestore as Primary)
-    USE_FIREBASE_ONLY: bool = os.getenv("USE_FIREBASE_ONLY", "false").lower() in ("true", "1")
+    USE_FIREBASE_ONLY: bool = os.getenv("USE_FIREBASE_ONLY", "true").lower() in ("true", "1")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     FIREBASE_SERVICE_ACCOUNT_B64: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64", "")
 
@@ -48,7 +48,8 @@ class Settings(BaseModel):
         if origin.strip()
     ]
     FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "setu-a767c")
-    FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "AIzaSyB4gmvhHcOaPJ3WjpVXi6S26OS0vFm-zDQ")
+    FIREBASE_APP_ID: str = os.getenv("FIREBASE_APP_ID", "")
+    FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "")
     FIREBASE_CLIENT_EMAIL: str = os.getenv("FIREBASE_CLIENT_EMAIL", "")
     FIREBASE_CLIENT_ID: str = os.getenv("FIREBASE_CLIENT_ID", "")
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")

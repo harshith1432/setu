@@ -21,6 +21,7 @@ from app.services.db_service import (
 )
 from app.services.rules_engine import sync_thresholds_from_db, STAGE_THRESHOLDS
 from app.services.telemetry_service import telemetry_service
+from app.services.firestore_service import firestore_service
 
 router = APIRouter(prefix="/admin", tags=["Super Admin"])
 
