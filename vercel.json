@@ -28,6 +28,22 @@
       "destination": "/register.html"
     },
     {
+      "source": "/forgot-password",
+      "destination": "/forgot-password.html"
+    },
+    {
+      "source": "/forgot",
+      "destination": "/forgot-password.html"
+    },
+    {
+      "source": "/admin/purify.min.js",
+      "destination": "/purify.min.js"
+    },
+    {
+      "source": "/admin/firebase-db.js",
+      "destination": "/firebase-db.js"
+    },
+    {
       "source": "/admin/style.css",
       "destination": "/style.css"
     },
