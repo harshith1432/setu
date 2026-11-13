@@ -201,42 +201,45 @@ async def test_env_superadmin_verification_and_toggle_flow(async_client, admin_t
     )
     assert login_custom.status_code == 200
 
-    # 4. Disable the default .env super admin
-    toggle_off = await async_client.post(
-        "/api/v1/platform/superadmins/toggle-default",
-        json={"enabled": False},
-        headers=headers
-    )
-    assert toggle_off.status_code == 200
-    assert toggle_off.json()["default_admin_enabled"] is False
+    try:
+        # 4. Disable the default .env super admin
+        toggle_off = await async_client.post(
+            "/api/v1/platform/superadmins/toggle-default",
+            json={"enabled": False},
+            headers=headers
+        )
+        assert toggle_off.status_code == 200
+        assert toggle_off.json()["default_admin_enabled"] is False
 
-    # 5. Verify default admin from .env is now BLOCKED (403 Forbidden)
-    blocked_login = await async_client.post(
-        "/api/v1/auth/login",
-        json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
-    )
-    assert blocked_login.status_code == 403
-    assert "disabled" in blocked_login.json()["detail"].lower()
+        # 5. Verify default admin from .env is now BLOCKED (403 Forbidden)
+        blocked_login = await async_client.post(
+            "/api/v1/auth/login",
+            json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
+        )
+        assert blocked_login.status_code == 403
+        assert "disabled" in blocked_login.json()["detail"].lower()
 
-    # 6. Verify custom super admin can STILL authenticate while default admin is disabled
-    login_custom_while_disabled = await async_client.post(
-        "/api/v1/auth/login",
-        json={"username": new_admin_user, "password": new_admin_pw}
-    )
-    assert login_custom_while_disabled.status_code == 200
+        # 6. Verify custom super admin can STILL authenticate while default admin is disabled
+        login_custom_while_disabled = await async_client.post(
+            "/api/v1/auth/login",
+            json={"username": new_admin_user, "password": new_admin_pw}
+        )
+        assert login_custom_while_disabled.status_code == 200
 
-    # 7. Re-enable the default super admin
-    toggle_on = await async_client.post(
-        "/api/v1/platform/superadmins/toggle-default",
-        json={"enabled": True},
-        headers=headers
-    )
-    assert toggle_on.status_code == 200
-    assert toggle_on.json()["default_admin_enabled"] is True
+        # 7. Re-enable the default super admin
+        toggle_on = await async_client.post(
+            "/api/v1/platform/superadmins/toggle-default",
+            json={"enabled": True},
+            headers=headers
+        )
+        assert toggle_on.status_code == 200
+        assert toggle_on.json()["default_admin_enabled"] is True
 
-    # 8. Verify default admin can log in again
-    re_login = await async_client.post(
-        "/api/v1/auth/login",
-        json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
-    )
-    assert re_login.status_code == 200
+        # 8. Verify default admin can log in again
+        re_login = await async_client.post(
+            "/api/v1/auth/login",
+            json={"username": settings.SUPERADMIN_USERNAME, "password": default_pw}
+        )
+        assert re_login.status_code == 200
+    finally:
+        set_default_admin_enabled(True, "test_teardown")
