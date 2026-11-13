@@ -300,3 +300,24 @@ async def test_forgot_and_reset_password_flow(async_client):
     assert new_login.status_code == 200
     assert "access_token" in new_login.json()
 
+
+@pytest.mark.anyio
+async def test_audit_logs_and_metrics_access(async_client: httpx.AsyncClient):
+    from app.core.security import create_access_token
+    token = create_access_token({"sub": "superadmin", "role": "superadmin"})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    logs_resp = await async_client.get("/api/v1/admin/audit-logs?limit=50", headers=headers)
+    assert logs_resp.status_code == 200
+    logs = logs_resp.json()
+    assert isinstance(logs, list)
+    assert len(logs) > 0
+
+    metrics_resp = await async_client.get("/api/v1/admin/audit-logs/metrics", headers=headers)
+    assert metrics_resp.status_code == 200
+    metrics = metrics_resp.json()
+    assert "total_events" in metrics
+    assert "data_modifications" in metrics
+    assert "security_alerts" in metrics
+
+
