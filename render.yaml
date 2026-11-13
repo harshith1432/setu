@@ -23,9 +23,13 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: USE_FIREBASE_ONLY
-        value: "false"
+        value: "true"
       - key: FIREBASE_PROJECT_ID
         value: setu-a767c
+      - key: FIREBASE_APP_ID
+        value: "1:97434241991:web:f3efcfd3f68ece773ce7e2"
+      - key: FIREBASE_WEB_API_KEY
+        sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_B64
         sync: false
       - key: TWILIO_ACCOUNT_SID
