@@ -245,6 +245,7 @@ async def test_forgot_and_reset_password_flow(async_client):
     reg_res = await async_client.post("/api/v1/auth/register", json={
         "full_name": "Password Reset Tester",
         "username": test_user,
+        "email": f"{test_user}@sericare.internal",
         "phone": test_phone,
         "password": initial_pass,
         "confirm_password": initial_pass,
@@ -282,7 +283,7 @@ async def test_forgot_and_reset_password_flow(async_client):
         "new_password": new_pass,
         "confirm_password": new_pass
     })
-    assert good_reset.status_code == 200
+    assert good_reset.status_code == 200, f"Reset failed: {good_reset.text}"
     assert good_reset.json()["success"] is True
 
     # 6. Old password no longer works

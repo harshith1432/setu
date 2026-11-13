@@ -332,6 +332,9 @@ function initializePlatform() {
     if (token) checkAndOpenInvitationModal(token);
   }
 
+  // Check for Firebase Password Reset action link (?mode=resetPassword&oobCode=...)
+  checkUrlForPasswordReset();
+
   // Initialize theme
   const savedTheme = localStorage.getItem('setu_theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
@@ -662,38 +665,37 @@ async function submitForgotPasswordRequest(e) {
   }
 }
 
-function renderPasswordResetStep2(data, identifier) {
-  const code = data.reset_code || '';
+function renderPasswordResetStep2(data, identifier, prefilledCode = '') {
   const token = data.reset_token || '';
-  const maskedContact = data.masked_phone || data.masked_email || identifier;
+  const initialCode = prefilledCode || '';
+  const maskedContact = data.masked_email || data.masked_phone || identifier;
 
   const content = `
     <div style="padding: 4px 0;">
       <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color);">
         <div style="width: 44px; height: 44px; border-radius: 50%; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-          <i data-lucide="shield-check" style="width: 22px; height: 22px;"></i>
+          <i data-lucide="mail-check" style="width: 22px; height: 22px;"></i>
         </div>
         <div>
-          <h3 style="font-size: 1.10rem; font-weight: 700; color: var(--text-main); margin: 0;">Set New Password</h3>
+          <h3 style="font-size: 1.10rem; font-weight: 700; color: var(--text-main); margin: 0;">Verification Email Sent</h3>
           <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 2px 0 0 0;">
-            Recovery code generated for <strong>${escapeHtml(data.username || identifier)}</strong>.
+            Account: <strong>${escapeHtml(data.username || identifier)}</strong>
           </p>
         </div>
       </div>
 
       <!-- Security / OTP Verification Banner -->
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
-          <div style="font-size: 0.84rem; color: #166534; font-weight: 600;">
-            <i data-lucide="check-circle" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;"></i>
-            Code active for 15 minutes
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+          <i data-lucide="check-circle" style="width: 18px; height: 18px; color: #166534; flex-shrink: 0; margin-top: 2px;"></i>
+          <div>
+            <div style="font-size: 0.84rem; color: #166534; font-weight: 700;">
+              Dispatched via Firebase Authentication
+            </div>
+            <div style="font-size: 0.78rem; color: #166534; margin-top: 3px; line-height: 1.45;">
+              A secure password reset link has been dispatched to <strong>${escapeHtml(maskedContact)}</strong>. Please check your inbox (and spam folder). Enter the verification code or token below:
+            </div>
           </div>
-          <div style="font-size: 0.95rem; font-weight: 800; font-family: var(--font-mono, monospace); color: #15803d; letter-spacing: 0.1em; background: #dcfce7; padding: 3px 8px; border-radius: 4px; border: 1px solid #86efac;">
-            ${escapeHtml(code)}
-          </div>
-        </div>
-        <div style="font-size: 0.78rem; color: #166534; margin-top: 4px;">
-          Dispatched to registered contact: <strong>${escapeHtml(maskedContact)}</strong>
         </div>
       </div>
 
@@ -702,17 +704,16 @@ function renderPasswordResetStep2(data, identifier) {
       <form id="resetPasswordSubmitForm" onsubmit="submitNewPassword(event, '${escapeHtml(token)}')" style="display: flex; flex-direction: column; gap: 14px;">
         <div class="form-group">
           <label style="font-size: 0.80rem; font-weight: 700; color: var(--text-main); display: block; margin-bottom: 6px;">
-            6-Digit Verification Code <span style="color: #ef4444;">*</span>
+            Verification Code or Email Token <span style="color: #ef4444;">*</span>
           </label>
           <input 
             type="text" 
             id="fpResetCode" 
             class="form-control" 
             required 
-            maxlength="16" 
-            placeholder="Enter 6-digit code" 
-            value="${escapeHtml(code)}" 
-            style="width: 100%; padding: 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.95rem; font-family: var(--font-mono, monospace); letter-spacing: 0.08em;" 
+            placeholder="Enter verification code or paste email token" 
+            value="${escapeHtml(initialCode)}" 
+            style="width: 100%; padding: 10px 12px; border-radius: var(--radius-sm, 6px); border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-main); font-size: 0.95rem; font-family: var(--font-mono, monospace); letter-spacing: 0.04em;" 
           />
         </div>
 
@@ -780,8 +781,27 @@ function renderPasswordResetStep2(data, identifier) {
   openAppModal('Account Access Recovery', content, 'md');
   if (window.lucide) lucide.createIcons();
   setTimeout(() => {
-    document.getElementById('fpNewPassword')?.focus();
+    if (!initialCode) {
+      document.getElementById('fpResetCode')?.focus();
+    } else {
+      document.getElementById('fpNewPassword')?.focus();
+    }
   }, 100);
+}
+
+function checkUrlForPasswordReset() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const oobCode = params.get('oobCode');
+    if ((mode === 'resetPassword' || mode === 'recovery') && oobCode) {
+      renderPasswordResetStep2({
+        username: 'Verified Email User',
+        masked_email: 'Your Verified Account',
+        reset_token: oobCode
+      }, 'email', oobCode);
+    }
+  } catch (_) {}
 }
 
 async function submitNewPassword(e, fallbackToken) {
@@ -2179,6 +2199,8 @@ async function loadShedsList() {
     if (!availableSheds.some(s => s.shed_id === selectedShedId) && availableSheds.length > 0) {
       selectedShedId = availableSheds[0].shed_id;
       select.value = selectedShedId;
+      initRealtimeDataStream();
+      syncLiveTelemetryStream();
     }
 
     // If farmer has only 1 shed, clean up selector appearance

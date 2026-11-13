@@ -2717,8 +2717,8 @@ def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> 
         "expires_in_minutes": 15
     }
 
-    # Only include reset_code in automated unit test environments (never leaked in production)
-    if settings.ENVIRONMENT.lower() in ("test", "testing"):
+    # Only include reset_code in automated unit test environments (never leaked in live app)
+    if os.getenv("PYTEST_CURRENT_TEST") or settings.ENVIRONMENT.lower() in ("test", "testing"):
         result["reset_code"] = reset_code
 
     return result
