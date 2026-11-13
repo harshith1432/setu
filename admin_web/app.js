@@ -2188,6 +2188,7 @@ async function loadShedsList() {
   const isNonShedRole = ['hr', 'sales', 'support', 'ceo'].includes(role) && !currentUser?.permissions?.includes('sheds:write');
   if (isNonShedRole) return;
 
+  try {
     let sheds = [];
     try {
       const res = await fetch(`${API_BASE_URL}/admin/sheds`, {
