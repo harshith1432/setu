@@ -208,6 +208,7 @@ def root_check(request: Request):
         "service": settings.PROJECT_NAME,
         "status": "healthy",
         "firebase_connected": firestore_service.is_available,
+        "firebase_error": firestore_service.init_error,
         "primary_database": "Firebase Cloud Firestore",
         "network": settings.DEFAULT_REGION,
         "mode": "Dynamic / Worldwide Location & Real-Time Weather",

@@ -268,12 +268,28 @@
           throw new Error(data.detail || 'Registration failed. Please check your details.');
         }
 
-        // Store session credentials in this tab's isolated sessionStorage
+        // Store session credentials in both sessionStorage and localStorage
         TAB_STORAGE.setItem('setu_tab_token', data.access_token);
         if (data.session_id) TAB_STORAGE.setItem('setu_tab_session_id', data.session_id);
         TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(data.user));
         TAB_STORAGE.setItem('setu_tab_nav', 'live-monitoring');
         if (data.user.shed_id) TAB_STORAGE.setItem('setu_tab_shed', data.user.shed_id);
+
+        localStorage.setItem('setu_token', data.access_token);
+        if (data.session_id) localStorage.setItem('setu_session_id', data.session_id);
+        localStorage.setItem('setu_user', JSON.stringify(data.user));
+        localStorage.setItem('setu_tab_nav', 'live-monitoring');
+        if (data.user.shed_id) localStorage.setItem('setu_tab_shed', data.user.shed_id);
+
+        // Mirror directly to Cloud Firestore from client for guaranteed persistence
+        if (window.SetuFirebase && SetuFirebase.isAvailable && data.user) {
+          try {
+            await SetuFirebase.db.collection('users').doc(data.user.id).set(data.user, { merge: true });
+            console.log('[Register] User successfully mirrored to Firestore client-side.');
+          } catch (fsErr) {
+            console.warn('[Register] Firestore client mirror notice:', fsErr);
+          }
+        }
 
         const urlParams = new URLSearchParams(window.location.search);
         const redirectParam = urlParams.get('redirect');
@@ -282,8 +298,6 @@
         if (redirectParam === 'checkout' || productIdParam) {
           succBox.textContent = `Welcome, ${data.user.full_name}! Registration successful. Resuming your hardware order...`;
           succBox.classList.remove('hidden');
-          localStorage.setItem('setu_token', data.access_token);
-          localStorage.setItem('setu_user', JSON.stringify(data.user));
           setTimeout(() => {
             window.location.href = `/#products?buy=${encodeURIComponent(productIdParam || '')}`;
           }, 600);
@@ -312,5 +326,10 @@
     }
 
   </script>
+  <!-- Firebase SDK & Cloud Firestore -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="/firebase-db.js?v=6.0"></script>
 </body>
 </html>

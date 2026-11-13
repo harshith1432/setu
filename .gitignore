@@ -23,6 +23,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+backend/data/*.json
+data/*.json
 .pytest_cache/
 .coverage
 htmlcov/

@@ -11198,6 +11198,15 @@ async function submitEditProfile(e) {
     TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
     localStorage.setItem('setu_user', JSON.stringify(currentUser));
 
+    // Mirror profile updates to Cloud Firestore from client
+    if (window.SetuFirebase && SetuFirebase.isAvailable && currentUser && currentUser.id) {
+      try {
+        SetuFirebase.db.collection('users').doc(currentUser.id).set(currentUser, { merge: true });
+      } catch (fsErr) {
+        console.warn('[Profile] Firestore client mirror notice:', fsErr);
+      }
+    }
+
     // Update UI headers and avatar labels immediately
     updateUserBadge();
 
