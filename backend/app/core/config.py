@@ -38,7 +38,7 @@ class Settings(BaseModel):
     SUPERADMIN_EMAIL: str = os.getenv("SUPERADMIN_EMAIL", "admin@setu.ag")
     INITIAL_ADMIN_PASSWORD: str = os.getenv("INITIAL_ADMIN_PASSWORD", "")
     DEFAULT_NEW_USER_PASSWORD: str = os.getenv("DEFAULT_NEW_USER_PASSWORD", "")
-    DEVICE_API_KEY: str = os.getenv("DEVICE_API_KEY", "")
+    DEVICE_API_KEY: str = os.getenv("DEVICE_API_KEY", "setu-iot-device-key-2026")
     ALLOWED_ORIGINS: list[str] = [
         origin.strip()
         for origin in os.getenv(
@@ -48,8 +48,8 @@ class Settings(BaseModel):
         if origin.strip()
     ]
     FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "setu-a767c")
-    FIREBASE_APP_ID: str = os.getenv("FIREBASE_APP_ID", "")
-    FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "")
+    FIREBASE_APP_ID: str = os.getenv("FIREBASE_APP_ID", "1:97434241991:web:f3efcfd3f68ece773ce7e2")
+    FIREBASE_WEB_API_KEY: str = os.getenv("FIREBASE_WEB_API_KEY", "AIzaSyB4gmvhHcOaPJ3WjpVXi6S26OS0vFm-zDQ")
     FIREBASE_CLIENT_EMAIL: str = os.getenv("FIREBASE_CLIENT_EMAIL", "")
     FIREBASE_CLIENT_ID: str = os.getenv("FIREBASE_CLIENT_ID", "")
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")

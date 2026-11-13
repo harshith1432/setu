@@ -715,14 +715,16 @@ def ensure_unique_farmer_sheds():
     """
     try:
         with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+            # Canonical seed farmer ramesh_farmer always owns shed_01
+            cursor.execute("UPDATE users SET shed_id = 'shed_01' WHERE username = 'ramesh_farmer';")
             cursor.execute("""
-                SELECT id, shed_id 
+                SELECT id, username, shed_id 
                 FROM users 
-                WHERE role = 'farmer' 
+                WHERE role = 'farmer' AND username != 'ramesh_farmer'
                 ORDER BY created_at ASC
             """)
             rows = cursor.fetchall()
-            seen_sheds = set()
+            seen_sheds = {"shed_01"}
             for r in rows:
                 u_id = r["id"]
                 current_shed = r.get("shed_id")
