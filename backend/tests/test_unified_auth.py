@@ -322,3 +322,37 @@ async def test_audit_logs_and_metrics_access(async_client: httpx.AsyncClient):
     assert "security_alerts" in metrics
 
 
+@pytest.mark.anyio
+async def test_employee_onboarding_and_firebase_welcome_email(async_client: httpx.AsyncClient):
+    from app.core.security import create_access_token
+    token = create_access_token({"sub": "superadmin", "role": "superadmin"})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    unique_suffix = uuid.uuid4().hex[:6]
+    test_emp_email = f"emp_{unique_suffix}@sericare.internal"
+    test_emp_code = f"EMP-{unique_suffix.upper()}"
+
+    resp = await async_client.post("/api/v1/employees", headers=headers, json={
+        "full_name": f"Test Technician {unique_suffix}",
+        "official_email": test_emp_email,
+        "employee_id": test_emp_code,
+        "role_code": "technician",
+        "designation": "Field Specialist",
+        "access_scope": "ASSIGNED_ONLY",
+        "phone": "+91 99000 11223"
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["success"] is True
+    assert data["official_email"] == test_emp_email
+    assert "reset_password_url" in data
+    assert "delivery_notice" in data
+
+    # Verify employee is listed in directory
+    list_resp = await async_client.get("/api/v1/employees?limit=20", headers=headers)
+    assert list_resp.status_code == 200
+    emp_list_data = list_resp.json()
+    assert "employees" in emp_list_data
+
+
+
