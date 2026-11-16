@@ -4,7 +4,9 @@ import time
 import logging
 import urllib.request
 from typing import Dict, Any, Optional, List
-from jose import jwt, jwk, JWTError
+import jwt
+from jwt import PyJWK
+from jwt.exceptions import PyJWTError as JWTError
 from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
@@ -95,7 +97,7 @@ class OIDCVerifier:
 
         try:
             # Construct public key object
-            public_key = jwk.construct(matching_key)
+            public_key = PyJWK.from_dict(matching_key).key
             
             # Verify and decode
             verify_options = {
@@ -108,7 +110,7 @@ class OIDCVerifier:
 
             payload = jwt.decode(
                 token,
-                public_key.to_pem().decode(),
+                public_key,
                 algorithms=[alg],
                 audience=self.audience if self.audience else None,
                 issuer=self.issuer if self.issuer else None,
