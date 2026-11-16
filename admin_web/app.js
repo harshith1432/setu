@@ -106,28 +106,7 @@ if (typeof window.DOMPurify === 'undefined') {
   window.DOMPurify = {
     sanitize: function(dirty) {
       if (!dirty) return '';
-      try {
-        const doc = new DOMParser().parseFromString(dirty, 'text/html');
-        doc.querySelectorAll('script, iframe, object, embed, base, link[rel="import"]').forEach(el => el.remove());
-        doc.querySelectorAll('*').forEach(el => {
-          for (let i = el.attributes.length - 1; i >= 0; i--) {
-            const attr = el.attributes[i];
-            const attrName = attr.name.toLowerCase();
-            const attrVal = attr.value.trim().toLowerCase();
-            if (
-              attrName.startsWith('on') || 
-              attrVal.startsWith('javascript:') || 
-              attrVal.startsWith('data:') || 
-              attrVal.startsWith('vbscript:')
-            ) {
-              el.removeAttribute(attr.name);
-            }
-          }
-        });
-        return doc.body.innerHTML;
-      } catch (_) {
-        return escapeHtml(dirty);
-      }
+      return escapeHtml(dirty);
     }
   };
 }
