@@ -96,6 +96,9 @@ class UserOut(BaseModel):
     email: Optional[str] = None
     access_scope: Optional[str] = "GLOBAL"
     must_change_password: bool = False
+    allowed_dashboards: Optional[List[str]] = None
+    permissions: Optional[List[str]] = None
+    organization_id: Optional[str] = "default_org"
 
     class Config:
         from_attributes = True
@@ -271,13 +274,20 @@ class CustomRoleCreate(BaseModel):
     code: str = Field(..., min_length=2, max_length=64)
     description: Optional[str] = None
     permissions: List[str] = Field(default_factory=list)
+    allowed_dashboards: List[str] = Field(default_factory=list)
+    organization_id: Optional[str] = "default_org"
     status: Optional[str] = "ACTIVE"
 
 class CustomRoleUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     permissions: Optional[List[str]] = None
+    allowed_dashboards: Optional[List[str]] = None
+    organization_id: Optional[str] = None
     status: Optional[str] = None
+
+class RoleDashboardUpdate(BaseModel):
+    allowed_dashboards: List[str] = Field(default_factory=list)
 
 class EmployeeCreate(BaseModel):
     official_email: str = Field(..., min_length=5, max_length=255)

@@ -208,11 +208,11 @@ let lastActivityTime = Date.now();
 
 // Role Permissions Matrix (Covering all 10 Enterprise Roles)
 const ROLE_PERMISSIONS = {
-  superadmin: ['overview', 'employees', 'roles', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'enquiries', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'users', 'audit', 'integrations', 'settings'],
-  admin: ['overview', 'employees', 'roles', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'enquiries', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'users', 'audit', 'integrations', 'settings'],
-  company_admin: ['overview', 'employees', 'roles', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'audit', 'integrations'],
+  superadmin: ['overview', 'employees', 'roles', 'role-access', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'enquiries', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'users', 'audit', 'integrations', 'settings'],
+  admin: ['overview', 'employees', 'roles', 'role-access', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'enquiries', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'users', 'audit', 'integrations', 'settings'],
+  company_admin: ['overview', 'employees', 'roles', 'role-access', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'audit', 'integrations'],
   ceo: ['overview', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'products', 'orders', 'billing', 'research', 'guidance', 'reports', 'audit', 'integrations'],
-  hr: ['overview', 'employees', 'departments', 'roles', 'audit', 'guidance'],
+  hr: ['overview', 'employees', 'departments', 'roles', 'role-access', 'audit', 'guidance'],
   operations_manager: ['overview', 'live-monitoring', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'installations', 'install-team', 'research', 'guidance', 'reports', 'analytics'],
   technician: ['tasks', 'live-monitoring', 'sheds', 'devices', 'sensor-config', 'installations', 'install-team', 'guidance', 'alerts'],
   sales: ['overview', 'tasks', 'products', 'enquiries', 'orders', 'billing', 'farmers', 'reports'],
@@ -1777,7 +1777,11 @@ function updateUserBadge() {
 
 function enforceRoleNavigation() {
   const role = (currentUser && currentUser.role) ? currentUser.role : 'superadmin';
-  const allowedTabs = ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS['farmer'];
+  // Dynamic Role Dashboard Isolation: Prioritize user's authoritative allowed_dashboards, then role matrix
+  const userDashboards = (currentUser && Array.isArray(currentUser.allowed_dashboards) && currentUser.allowed_dashboards.length > 0)
+    ? currentUser.allowed_dashboards
+    : null;
+  const allowedTabs = userDashboards || ROLE_PERMISSIONS[role] || ROLE_PERMISSIONS['farmer'] || [];
   const isFarmer = (role === 'farmer');
 
   document.querySelectorAll('#sidebarNav .nav-item').forEach(item => {
@@ -1950,6 +1954,7 @@ function switchNavTab(tabName) {
     'overview': { title: 'System Overview & Platform Health', bread: 'Operations & Platform Overview' },
         'employees': { title: 'Employee Directory & User Administration', bread: 'Personnel & Access Control' },
     'roles': { title: 'Roles & Fine-Grained Permissions', bread: 'Role Templates & Delegation Policies' },
+    'role-access': { title: 'Role Dashboard Permissions & Access Control', bread: 'Department Isolation & Visibility Matrix' },
     'departments': { title: 'Departments & Reporting Structures', bread: 'Teams & Organizational Units' },
     'tasks': { title: 'My Work & Priority Queue', bread: 'Operations & Personal Tasks' },
     'live-monitoring': (currentUser && currentUser.role === 'farmer')
@@ -2033,6 +2038,9 @@ function loadTabData(tabName) {
       break;
     case 'roles':
       loadRolesAndPermissions();
+      break;
+    case 'role-access':
+      loadRoleAccessMatrixData();
       break;
     case 'departments':
       loadDepartmentsList();
@@ -5770,6 +5778,548 @@ function deleteCustomRole(roleId) {
   });
 }
 
+
+// ==============================================================================
+// 26B. ROLE DASHBOARD ACCESS & DEPARTMENT ISOLATION MODULE
+// ==============================================================================
+
+const roleAccessState = {
+  matrixData: null,
+  selectedRoleId: null,
+  selectedRoleDashboards: new Set(),
+  viewMode: 'studio',
+  pendingMatrixChanges: {} // roleId -> Set(dashboards)
+};
+
+async function loadRoleAccessMatrixData() {
+  const container = document.getElementById('role-access-departments-container');
+  if (container) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: var(--text-muted);">
+        <i data-lucide="loader-2" class="spin" style="width: 28px; height: 28px; margin-bottom: 12px; display: inline-block;"></i>
+        <p style="font-weight: 600;">Loading role permissions and department matrix...</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/roles/dashboard-matrix`, {
+      headers: {
+        'Authorization': `Bearer ${adminToken}`
+      }
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to fetch role dashboard matrix');
+    }
+
+    const data = await res.json();
+    roleAccessState.matrixData = data;
+    roleAccessState.pendingMatrixChanges = {};
+
+    // 1. Populate Metrics / KPIs
+    const rolesCountEl = document.getElementById('kpi-role-access-roles-count');
+    const dashCountEl = document.getElementById('kpi-role-access-dash-count');
+    const supportCountEl = document.getElementById('kpi-role-access-support-count');
+    const tenantLabelEl = document.getElementById('role-access-tenant-label');
+
+    if (rolesCountEl) rolesCountEl.textContent = (data.roles || []).length;
+    if (dashCountEl) dashCountEl.textContent = (data.dashboards || []).length;
+
+    // Count how many roles have access to Support Tickets & Help Center
+    const helpdeskRolesCount = (data.roles || []).filter(r => (r.allowed_dashboards || []).includes('support')).length;
+    if (supportCountEl) supportCountEl.textContent = `${helpdeskRolesCount} Roles`;
+
+    if (tenantLabelEl && data.tenant_organization_id) {
+      tenantLabelEl.textContent = `Org: ${data.tenant_organization_id}`;
+    }
+
+    // 2. Populate Target Role Dropdown
+    const picker = document.getElementById('role-access-role-picker');
+    if (picker) {
+      picker.innerHTML = (data.roles || []).map(r => {
+        const isSelected = (r.id === roleAccessState.selectedRoleId || (!roleAccessState.selectedRoleId && r.code === 'support'));
+        return `<option value="${escapeHtml(r.id)}" ${isSelected ? 'selected' : ''}>
+          ${escapeHtml(r.name)} (${escapeHtml(r.code)}) - ${r.user_count || 0} Users
+        </option>`;
+      }).join('');
+
+      // Pick default role (prefer 'support' or first available)
+      if (!roleAccessState.selectedRoleId || !data.roles.some(r => r.id === roleAccessState.selectedRoleId)) {
+        const defaultRole = data.roles.find(r => r.code === 'support') || data.roles[0];
+        roleAccessState.selectedRoleId = defaultRole ? defaultRole.id : null;
+      }
+    }
+
+    // 3. Render Studio Card View
+    renderRoleAccessStudio(roleAccessState.selectedRoleId);
+
+    // 4. Render Matrix Table View
+    renderRoleAccessMatrix();
+
+  } catch (err) {
+    console.error('[RoleAccess] load error:', err);
+    if (container) {
+      container.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.2); border-radius: 12px;">
+          <i data-lucide="alert-triangle" style="width: 32px; height: 32px; color: #ef4444; margin-bottom: 8px;"></i>
+          <h4 style="color: #ef4444; font-weight: 700; margin-bottom: 4px;">Unable to Load Access Matrix</h4>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">${escapeHtml(err.message)}</p>
+          <button class="btn btn-outline btn-sm" onclick="loadRoleAccessMatrixData()">
+            <i data-lucide="refresh-cw"></i> Try Again
+          </button>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    }
+    showToast(err.message, 'error');
+  }
+}
+
+function onRoleAccessSelectChange(roleId) {
+  roleAccessState.selectedRoleId = roleId;
+  renderRoleAccessStudio(roleId);
+}
+
+function renderRoleAccessStudio(roleId) {
+  if (!roleAccessState.matrixData) return;
+  const { roles, departments, dashboards, tenant_organization_id } = roleAccessState.matrixData;
+  const role = (roles || []).find(r => r.id === roleId) || roles[0];
+  if (!role) return;
+
+  // Initialize selected set from role's allowed_dashboards
+  roleAccessState.selectedRoleDashboards = new Set(role.allowed_dashboards || []);
+
+  // Update Role Banner info
+  const codeBadge = document.getElementById('role-access-code-badge');
+  const deptName = document.getElementById('role-access-dept-name');
+  const tenantBadge = document.getElementById('role-access-tenant-badge');
+  const totalCountEl = document.getElementById('role-access-total-dash-count');
+
+  if (codeBadge) codeBadge.textContent = (role.code || 'ROLE').toUpperCase();
+  if (deptName) deptName.textContent = `Department: ${role.department_name || role.department_code || 'General Operations'}`;
+  if (tenantBadge) tenantBadge.textContent = `Tenant: ${role.organization_id || tenant_organization_id || 'default_org'}`;
+  if (totalCountEl) totalCountEl.textContent = (dashboards || []).length;
+
+  updateRoleAccessSelectedCounter();
+
+  // Render Department Cards
+  const container = document.getElementById('role-access-departments-container');
+  if (!container) return;
+
+  const deptIcons = {
+    'Overview': 'layout-dashboard',
+    'Operations & Monitoring': 'activity',
+    'Farmers & Infrastructure': 'trees',
+    'Commercial & Sales': 'shopping-cart',
+    'Customer Operations': 'life-buoy',
+    'Access & User Governance': 'shield-check'
+  };
+
+  container.innerHTML = (departments || []).map(dept => {
+    const deptDashboards = dept.dashboards || [];
+    const iconName = deptIcons[dept.name] || 'layers';
+
+    // Calculate how many in this dept are checked
+    const checkedInDept = deptDashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id)).length;
+    const isAllChecked = deptDashboards.length > 0 && checkedInDept === deptDashboards.length;
+
+    return `
+      <div class="role-access-dept-card" data-dept="${escapeHtml(dept.name)}">
+        <div class="role-access-dept-header">
+          <div class="role-access-dept-title">
+            <i data-lucide="${iconName}"></i>
+            <span>${escapeHtml(dept.name)}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="role-access-dept-badge ${checkedInDept > 0 ? 'active' : ''}" id="badge-dept-${escapeHtml(dept.name.replace(/[^a-zA-Z0-9]/g, ''))}">
+              ${checkedInDept} / ${deptDashboards.length}
+            </span>
+            <button type="button" class="btn btn-ghost btn-xs" style="padding: 2px 6px; font-size: 0.72rem; border-radius: 4px;" onclick="toggleDepartmentDashboards('${escapeHtml(dept.name)}')" title="Toggle all dashboards in this department">
+              ${isAllChecked ? 'Uncheck All' : 'Select All'}
+            </button>
+          </div>
+        </div>
+
+        <div class="role-access-dash-list">
+          ${deptDashboards.map(dash => {
+            const isChecked = roleAccessState.selectedRoleDashboards.has(dash.id);
+            return `
+              <label class="dash-checkbox-label ${isChecked ? 'selected' : ''}" id="label-dash-${escapeHtml(dash.id)}">
+                <input type="checkbox" class="dash-checkbox-input" value="${escapeHtml(dash.id)}" ${isChecked ? 'checked' : ''} onchange="onDashboardCheckboxToggle('${escapeHtml(dash.id)}', this.checked)">
+                <div class="dash-checkbox-body">
+                  <div class="dash-checkbox-header">
+                    <span class="dash-checkbox-name">
+                      <i data-lucide="${dash.icon || 'square'}"></i>
+                      ${escapeHtml(dash.name)}
+                    </span>
+                    <span class="dash-checkbox-code">${escapeHtml(dash.id)}</span>
+                  </div>
+                  <div class="dash-checkbox-desc">${escapeHtml(dash.description || '')}</div>
+                </div>
+              </label>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function onDashboardCheckboxToggle(dashId, isChecked) {
+  if (isChecked) {
+    roleAccessState.selectedRoleDashboards.add(dashId);
+  } else {
+    roleAccessState.selectedRoleDashboards.delete(dashId);
+  }
+
+  // Update card label styling
+  const label = document.getElementById(`label-dash-${dashId}`);
+  if (label) {
+    if (isChecked) {
+      label.classList.add('selected');
+    } else {
+      label.classList.remove('selected');
+    }
+  }
+
+  // Update department badge
+  if (roleAccessState.matrixData) {
+    roleAccessState.matrixData.departments.forEach(dept => {
+      const inDept = dept.dashboards.some(d => d.id === dashId);
+      if (inDept) {
+        const badge = document.getElementById(`badge-dept-${dept.name.replace(/[^a-zA-Z0-9]/g, '')}`);
+        if (badge) {
+          const checkedCount = dept.dashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id)).length;
+          badge.textContent = `${checkedCount} / ${dept.dashboards.length}`;
+          badge.className = `role-access-dept-badge ${checkedCount > 0 ? 'active' : ''}`;
+        }
+      }
+    });
+  }
+
+  updateRoleAccessSelectedCounter();
+}
+
+function updateRoleAccessSelectedCounter() {
+  const counter = document.getElementById('role-access-selected-count');
+  if (counter) {
+    counter.textContent = roleAccessState.selectedRoleDashboards.size;
+  }
+}
+
+function toggleDepartmentDashboards(deptName) {
+  if (!roleAccessState.matrixData) return;
+  const dept = roleAccessState.matrixData.departments.find(d => d.name === deptName);
+  if (!dept) return;
+
+  const deptDashIds = dept.dashboards.map(d => d.id);
+  const checkedInDept = deptDashIds.filter(id => roleAccessState.selectedRoleDashboards.has(id)).length;
+  const shouldCheckAll = checkedInDept < deptDashIds.length;
+
+  deptDashIds.forEach(dashId => {
+    if (shouldCheckAll) {
+      roleAccessState.selectedRoleDashboards.add(dashId);
+    } else {
+      roleAccessState.selectedRoleDashboards.delete(dashId);
+    }
+
+    const label = document.getElementById(`label-dash-${dashId}`);
+    if (label) {
+      const input = label.querySelector('input[type="checkbox"]');
+      if (input) input.checked = shouldCheckAll;
+      if (shouldCheckAll) label.classList.add('selected');
+      else label.classList.remove('selected');
+    }
+  });
+
+  const badge = document.getElementById(`badge-dept-${deptName.replace(/[^a-zA-Z0-9]/g, '')}`);
+  if (badge) {
+    const finalCount = shouldCheckAll ? deptDashIds.length : 0;
+    badge.textContent = `${finalCount} / ${deptDashIds.length}`;
+    badge.className = `role-access-dept-badge ${finalCount > 0 ? 'active' : ''}`;
+  }
+
+  updateRoleAccessSelectedCounter();
+}
+
+function applyDashboardPreset(presetType) {
+  if (!roleAccessState.matrixData) return;
+  const allDashIds = roleAccessState.matrixData.dashboards.map(d => d.id);
+
+  let targetIds = [];
+  switch (presetType) {
+    case 'helpdesk':
+      // Support & Help Center: strictly Helpdesk query tickets, farmer guidance, alerts, overview
+      targetIds = ['overview', 'tasks', 'support', 'guidance', 'alerts', 'farmers'];
+      break;
+    case 'sales':
+      // Commercial & Sales operations: hardware store, orders, billing, enquiries
+      targetIds = ['overview', 'tasks', 'products', 'enquiries', 'orders', 'billing', 'reports'];
+      break;
+    case 'operations':
+      // Live IoT telemetry, monitoring, shed climate, alerts
+      targetIds = ['overview', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config'];
+      break;
+    case 'field':
+      // Field technicians & installations
+      targetIds = ['tasks', 'live-monitoring', 'sheds', 'devices', 'sensor-config', 'installations', 'install-team', 'guidance', 'alerts'];
+      break;
+    case 'all':
+      targetIds = [...allDashIds];
+      break;
+    case 'none':
+      targetIds = [];
+      break;
+  }
+
+  roleAccessState.selectedRoleDashboards = new Set(targetIds);
+
+  // Sync all checkboxes in the UI
+  allDashIds.forEach(dashId => {
+    const isSelected = roleAccessState.selectedRoleDashboards.has(dashId);
+    const label = document.getElementById(`label-dash-${dashId}`);
+    if (label) {
+      const input = label.querySelector('input[type="checkbox"]');
+      if (input) input.checked = isSelected;
+      if (isSelected) label.classList.add('selected');
+      else label.classList.remove('selected');
+    }
+  });
+
+  // Sync all department badges
+  roleAccessState.matrixData.departments.forEach(dept => {
+    const badge = document.getElementById(`badge-dept-${dept.name.replace(/[^a-zA-Z0-9]/g, '')}`);
+    if (badge) {
+      const checkedCount = dept.dashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id)).length;
+      badge.textContent = `${checkedCount} / ${dept.dashboards.length}`;
+      badge.className = `role-access-dept-badge ${checkedCount > 0 ? 'active' : ''}`;
+    }
+  });
+
+  updateRoleAccessSelectedCounter();
+  showToast(`Applied '${presetType.toUpperCase()}' dashboard preset`, 'info');
+}
+
+async function saveActiveRoleDashboards() {
+  const roleId = roleAccessState.selectedRoleId;
+  if (!roleId || !roleAccessState.matrixData) return;
+
+  const role = roleAccessState.matrixData.roles.find(r => r.id === roleId);
+  if (!role) return;
+
+  const saveBtn = document.getElementById('btn-save-role-dashboards');
+  const prevBtnHtml = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i data-lucide="loader-2" class="spin"></i> Saving...';
+    if (window.lucide) lucide.createIcons();
+  }
+
+  const allowed_dashboards = Array.from(roleAccessState.selectedRoleDashboards);
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/roles/${roleId}/dashboards`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({ allowed_dashboards })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update role dashboards');
+    }
+
+    const updatedRole = await res.json();
+
+    // 1. Update in-memory matrix data
+    role.allowed_dashboards = updatedRole.allowed_dashboards || allowed_dashboards;
+
+    // 2. Update client-side global ROLE_PERMISSIONS
+    if (role.code) {
+      ROLE_PERMISSIONS[role.code] = [...role.allowed_dashboards];
+    }
+
+    // 3. If currently logged in user has this role, dynamically update active navigation
+    if (currentUser && (currentUser.role === role.code || currentUser.role_id === role.id)) {
+      currentUser.allowed_dashboards = [...role.allowed_dashboards];
+      TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+      enforceRoleNavigation();
+    }
+
+    // 4. Update KPI metrics (Helpdesk count)
+    const helpdeskCount = roleAccessState.matrixData.roles.filter(r => (r.allowed_dashboards || []).includes('support')).length;
+    const supportCountEl = document.getElementById('kpi-role-access-support-count');
+    if (supportCountEl) supportCountEl.textContent = `${helpdeskCount} Roles`;
+
+    // 5. Re-render matrix grid view
+    renderRoleAccessMatrix();
+
+    showToast(`Permissions saved for role "${role.name}" (${allowed_dashboards.length} dashboards granted)`, 'success');
+  } catch (err) {
+    console.error('[RoleAccess] save error:', err);
+    showToast(err.message, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = prevBtnHtml;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+function setRoleAccessViewMode(mode) {
+  roleAccessState.viewMode = mode;
+  const studioView = document.getElementById('role-access-studio-container');
+  const matrixView = document.getElementById('role-access-matrix-container');
+  const btnStudio = document.getElementById('btn-view-role-studio');
+  const btnMatrix = document.getElementById('btn-view-role-matrix');
+
+  if (mode === 'studio') {
+    if (studioView) studioView.classList.remove('hidden');
+    if (matrixView) matrixView.classList.add('hidden');
+    if (btnStudio) { btnStudio.className = 'btn btn-sm btn-primary'; }
+    if (btnMatrix) { btnMatrix.className = 'btn btn-sm btn-ghost'; }
+    renderRoleAccessStudio(roleAccessState.selectedRoleId);
+  } else {
+    if (studioView) studioView.classList.add('hidden');
+    if (matrixView) matrixView.classList.remove('hidden');
+    if (btnStudio) { btnStudio.className = 'btn btn-sm btn-ghost'; }
+    if (btnMatrix) { btnMatrix.className = 'btn btn-sm btn-primary'; }
+    renderRoleAccessMatrix();
+  }
+}
+
+function renderRoleAccessMatrix() {
+  const wrapper = document.getElementById('role-access-matrix-table-wrapper');
+  if (!wrapper || !roleAccessState.matrixData) return;
+
+  const { roles, dashboards } = roleAccessState.matrixData;
+
+  const headerRolesHtml = roles.map(r => `
+    <th title="${escapeHtml(r.description || r.name)}">
+      <div style="font-weight: 700; font-size: 0.8rem;">${escapeHtml(r.name)}</div>
+      <span class="badge" style="font-size: 0.65rem; font-family: monospace; padding: 1px 4px; background: rgba(99,102,241,0.1); color: #818cf8;">${escapeHtml(r.code)}</span>
+    </th>
+  `).join('');
+
+  const rowsHtml = dashboards.map(dash => {
+    const cellsHtml = roles.map(role => {
+      // Check if role has this dashboard in pending changes or original allowed_dashboards
+      const roleDashSet = roleAccessState.pendingMatrixChanges[role.id] !== undefined
+        ? roleAccessState.pendingMatrixChanges[role.id]
+        : new Set(role.allowed_dashboards || []);
+      const isChecked = roleDashSet.has(dash.id);
+
+      return `
+        <td>
+          <input type="checkbox" class="role-matrix-checkbox" data-role-id="${escapeHtml(role.id)}" data-dash-id="${escapeHtml(dash.id)}" ${isChecked ? 'checked' : ''} onchange="onMatrixCellCheckboxChange('${escapeHtml(role.id)}', '${escapeHtml(dash.id)}', this.checked)">
+        </td>
+      `;
+    }).join('');
+
+    return `
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="${dash.icon || 'square'}" style="width: 15px; height: 15px; color: var(--brand-primary);"></i>
+            <div>
+              <div style="font-weight: 700; color: var(--text-main);">${escapeHtml(dash.name)}</div>
+              <div style="font-size: 0.70rem; color: var(--text-muted);">${escapeHtml(dash.department)} &bull; <code>${escapeHtml(dash.id)}</code></div>
+            </div>
+          </div>
+        </td>
+        ${cellsHtml}
+      </tr>
+    `;
+  }).join('');
+
+  wrapper.innerHTML = `
+    <table class="role-matrix-table">
+      <thead>
+        <tr>
+          <th>System Dashboard (${dashboards.length})</th>
+          ${headerRolesHtml}
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function onMatrixCellCheckboxChange(roleId, dashId, isChecked) {
+  if (!roleAccessState.matrixData) return;
+  const role = roleAccessState.matrixData.roles.find(r => r.id === roleId);
+  if (!role) return;
+
+  if (!roleAccessState.pendingMatrixChanges[roleId]) {
+    roleAccessState.pendingMatrixChanges[roleId] = new Set(role.allowed_dashboards || []);
+  }
+
+  if (isChecked) {
+    roleAccessState.pendingMatrixChanges[roleId].add(dashId);
+  } else {
+    roleAccessState.pendingMatrixChanges[roleId].delete(dashId);
+  }
+}
+
+async function saveAllMatrixChanges() {
+  const pendingRoleIds = Object.keys(roleAccessState.pendingMatrixChanges);
+  if (pendingRoleIds.length === 0) {
+    showToast('No pending matrix changes to save', 'info');
+    return;
+  }
+
+  showToast(`Saving matrix changes across ${pendingRoleIds.length} roles...`, 'info');
+
+  try {
+    let successCount = 0;
+    for (const roleId of pendingRoleIds) {
+      const allowed_dashboards = Array.from(roleAccessState.pendingMatrixChanges[roleId]);
+      const res = await fetch(`${API_BASE_URL}/roles/${roleId}/dashboards`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ allowed_dashboards })
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        const role = roleAccessState.matrixData.roles.find(r => r.id === roleId);
+        if (role) {
+          role.allowed_dashboards = updated.allowed_dashboards || allowed_dashboards;
+          if (role.code) ROLE_PERMISSIONS[role.code] = [...role.allowed_dashboards];
+          if (currentUser && (currentUser.role === role.code || currentUser.role_id === role.id)) {
+            currentUser.allowed_dashboards = [...role.allowed_dashboards];
+            TAB_STORAGE.setItem('setu_tab_user', JSON.stringify(currentUser));
+            enforceRoleNavigation();
+          }
+        }
+        successCount++;
+      }
+    }
+
+    roleAccessState.pendingMatrixChanges = {};
+    showToast(`Successfully updated dashboard permissions for ${successCount} roles!`, 'success');
+    loadRoleAccessMatrixData();
+  } catch (err) {
+    console.error('[RoleAccess] saveAll error:', err);
+    showToast(`Matrix save failed: ${err.message}`, 'error');
+  }
+}
 
 // ==============================================================================
 // 27. DEPARTMENTS & TEAMS MODULE

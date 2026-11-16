@@ -204,10 +204,19 @@ async def test_orders_and_invoices(async_client, admin_token, farmer_token):
     create_res = await async_client.post(
         "/api/v1/orders",
         json=order_payload,
-        headers={"Authorization": f"Bearer {farmer_token}"}
+        headers={"Authorization": f"Bearer {farmer_token}", "Idempotency-Key": "test-idemp-key-2026-xyz"}
     )
     assert create_res.status_code == 200, f"Order placement failed: {create_res.text}"
     created_order = create_res.json()
+
+    # Verify Idempotency-Key replay returns the identical order without duplication
+    replay_res = await async_client.post(
+        "/api/v1/orders",
+        json=order_payload,
+        headers={"Authorization": f"Bearer {farmer_token}", "Idempotency-Key": "test-idemp-key-2026-xyz"}
+    )
+    assert replay_res.status_code == 200
+    assert replay_res.json()["id"] == created_order["id"]
     assert created_order["order_number"].startswith("ORD-2026-")
     assert created_order["status"] == "PAID"
     assert len(created_order["items"]) == 1

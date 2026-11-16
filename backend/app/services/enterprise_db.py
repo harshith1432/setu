@@ -1580,8 +1580,11 @@ def list_orders(user_id: Optional[str] = None, status: Optional[str] = None, lim
         """
         params = []
         if user_id:
+            cursor.execute("SELECT id FROM users WHERE id = %s OR username = %s LIMIT 1", (user_id, user_id))
+            u_row = cursor.fetchone()
+            resolved_uid = u_row["id"] if u_row else user_id
             query += " AND o.user_id = %s"
-            params.append(user_id)
+            params.append(resolved_uid)
         if status:
             query += " AND o.status = %s"
             params.append(status)
@@ -1656,10 +1659,11 @@ def create_customer_order(
     pay_ref = f"PAY-{clean_method}-{secrets.randbelow(900000) + 100000}"
 
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT id, username, full_name, phone, farm_name, region FROM users WHERE id = %s", (user_id,))
+        cursor.execute("SELECT id, username, full_name, phone, farm_name, region FROM users WHERE id = %s OR username = %s LIMIT 1", (user_id, user_id))
         u = cursor.fetchone()
         if not u:
             raise ValueError(f"User '{user_id}' does not exist")
+        user_id = u["id"]
 
         subtotal = 0
         order_item_records = []
@@ -1832,7 +1836,7 @@ def list_invoices(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
 def list_support_tickets(status: Optional[str] = None, priority: Optional[str] = None, assigned_to: Optional[str] = None) -> List[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:
         query = """
-        SELECT t.*, u.full_name as farmer_name, u.farm_name, u.phone as farmer_phone,
+        SELECT t.*, u.full_name as farmer_name, u.farm_name, u.phone as farmer_phone, u.username as farmer_username,
                agt.full_name as agent_name,
                (SELECT COUNT(*) FROM support_messages WHERE ticket_id = t.id) as message_count
         FROM support_tickets t
@@ -1860,6 +1864,11 @@ def create_support_ticket(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
     ticket_id = f"tkt_{uuid.uuid4().hex[:12]}"
     tkt_num = f"TKT-2026-{uuid.uuid4().hex[:6].upper()}"
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        uid_input = ticket_data["user_id"]
+        cursor.execute("SELECT id FROM users WHERE id = %s OR username = %s LIMIT 1", (uid_input, uid_input))
+        u_row = cursor.fetchone()
+        resolved_uid = u_row["id"] if u_row else uid_input
+
         cursor.execute("""
         INSERT INTO support_tickets (id, ticket_number, user_id, shed_id, subject, category, priority, status, assigned_to, initial_message, created_at, updated_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, 'OPEN', %s, %s, %s, %s)
@@ -1867,7 +1876,7 @@ def create_support_ticket(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
         """, (
             ticket_id,
             tkt_num,
-            ticket_data["user_id"],
+            resolved_uid,
             ticket_data.get("shed_id", "shed_01"),
             ticket_data["subject"],
             ticket_data.get("category", "HARDWARE"),
@@ -1883,7 +1892,7 @@ def create_support_ticket(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
         cursor.execute("""
         INSERT INTO support_messages (id, ticket_id, sender_id, sender_role, message, is_internal, created_at)
         VALUES (%s, %s, %s, 'farmer', %s, FALSE, %s)
-        """, (f"msg_{uuid.uuid4().hex[:12]}", ticket_id, ticket_data["user_id"], ticket_data["initial_message"], now_dt))
+        """, (f"msg_{uuid.uuid4().hex[:12]}", ticket_id, resolved_uid, ticket_data["initial_message"], now_dt))
 
         return row
 
@@ -1917,11 +1926,15 @@ def add_ticket_message(ticket_id: str, sender_id: str, sender_role: str, message
     now_dt = datetime.now(timezone.utc)
     msg_id = f"msg_{uuid.uuid4().hex[:12]}"
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("SELECT id FROM users WHERE id = %s OR username = %s LIMIT 1", (sender_id, sender_id))
+        u_row = cursor.fetchone()
+        resolved_sender_id = u_row["id"] if u_row else sender_id
+
         cursor.execute("""
         INSERT INTO support_messages (id, ticket_id, sender_id, sender_role, message, is_internal, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING *;
-        """, (msg_id, ticket_id, sender_id, sender_role, message, is_internal, now_dt))
+        """, (msg_id, ticket_id, resolved_sender_id, sender_role, message, is_internal, now_dt))
         row = dict(cursor.fetchone())
 
         # Update ticket timestamp

@@ -274,6 +274,10 @@
 <i data-lucide="key-round"></i>
 <span>Roles &amp; Permissions</span>
 </a>
+<a class="nav-item" data-tab="role-access" onclick="switchNavTab('role-access')">
+<i data-lucide="sliders"></i>
+<span>Role Access Matrix</span>
+</a>
 <a class="nav-item" data-tab="departments" onclick="switchNavTab('departments')">
 <i data-lucide="network"></i>
 <span>Departments &amp; Teams</span>
@@ -2155,9 +2159,12 @@
                 </p>
 </div>
 <div class="table-actions">
+<button class="btn btn-outline btn-sm" onclick="switchNavTab('role-access')" style="margin-right: 8px;">
+<i data-lucide="sliders"></i> Dashboard Visibility Matrix
+</button>
 <button class="btn btn-primary btn-sm" onclick="openCreateCustomRoleModal()">
 <i data-lucide="plus"></i> Create Custom Role
-                </button>
+</button>
 </div>
 </div>
 <div id="roleTemplatesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 18px;">
@@ -2235,6 +2242,155 @@
 </div>
 </div>
 </div>
+</section>
+<!-- ================= NEW MODULE: ROLE DASHBOARD ACCESS CONTROL ================= -->
+<section class="view-section hidden" id="section-role-access">
+  <!-- KPI Metrics Row -->
+  <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 24px;">
+    <div class="kpi-card">
+      <div class="kpi-icon-box" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+        <i data-lucide="shield-check"></i>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Configured Roles</span>
+        <div class="kpi-value" id="kpi-role-access-roles-count">--</div>
+        <span class="kpi-trend positive" style="font-size: 0.75rem;">Across Current Tenant</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-box" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+        <i data-lucide="layout-grid"></i>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">System Dashboards</span>
+        <div class="kpi-value" id="kpi-role-access-dash-count">25</div>
+        <span class="kpi-trend positive" style="font-size: 0.75rem;">6 Functional Departments</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-box" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+        <i data-lucide="life-buoy"></i>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Helpdesk &amp; Support Roles</span>
+        <div class="kpi-value" id="kpi-role-access-support-count">--</div>
+        <span class="kpi-trend" style="font-size: 0.75rem; color: var(--text-muted);">Assigned to Help Center</span>
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon-box" style="background: rgba(14, 165, 233, 0.1); color: #0ea5e9;">
+        <i data-lucide="lock"></i>
+      </div>
+      <div class="kpi-content">
+        <span class="kpi-label">Tenant Isolation</span>
+        <div class="kpi-value" style="font-size: 1.15rem; color: #10b981;">ENFORCED</div>
+        <span class="kpi-trend positive" style="font-size: 0.75rem;" id="role-access-tenant-label">Current Org Scope</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Management Card -->
+  <div class="table-card">
+    <div class="table-toolbar" style="flex-wrap: wrap; gap: 16px;">
+      <div>
+        <div class="table-title">
+          <i data-lucide="sliders"></i>
+          <span>Role Dashboard Permissions &amp; Department Isolation</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">
+          Assign specific dashboard visibility to individual roles. Users inheriting a role can only access checkmarked dashboards; other departmental portals remain completely hidden and restricted.
+        </p>
+      </div>
+      <div class="table-actions" style="gap: 10px; flex-wrap: wrap;">
+        <!-- View Mode Switcher -->
+        <div class="btn-group" style="display: inline-flex; background: var(--bg-surface-soft, rgba(255,255,255,0.05)); border-radius: 8px; padding: 2px;">
+          <button class="btn btn-sm btn-primary" id="btn-view-role-studio" onclick="setRoleAccessViewMode('studio')" style="border-radius: 6px;">
+            <i data-lucide="user-check"></i> Role Studio
+          </button>
+          <button class="btn btn-sm btn-ghost" id="btn-view-role-matrix" onclick="setRoleAccessViewMode('matrix')" style="border-radius: 6px;">
+            <i data-lucide="table"></i> Full Matrix
+          </button>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="loadRoleAccessMatrixData()">
+          <i data-lucide="refresh-cw"></i> Refresh
+        </button>
+        <button class="btn btn-primary btn-sm" id="btn-save-role-dashboards" onclick="saveActiveRoleDashboards()">
+          <i data-lucide="save"></i> Save Permissions
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 1: ROLE STUDIO (CARD & CHECKBOX INTERFACE) -->
+    <div id="role-access-studio-container" style="padding: 20px;">
+      <!-- Role Selector and Quick Presets Toolbar -->
+      <div style="background: var(--bg-surface-raised, rgba(255,255,255,0.02)); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;">
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); white-space: nowrap;">
+              <i data-lucide="shield" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> Select Target Role:
+            </label>
+            <select id="role-access-role-picker" class="form-input" style="max-width: 380px; font-weight: 600;" onchange="onRoleAccessSelectChange(this.value)">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <!-- Quick Access Presets -->
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 700;">Quick Presets:</span>
+            <button class="btn btn-outline btn-sm" style="font-size: 0.75rem; padding: 4px 10px;" onclick="applyDashboardPreset('helpdesk')" title="Grant access strictly to Support Tickets and Knowledge Base">
+              <i data-lucide="life-buoy" style="width: 14px; height: 14px;"></i> Help Center Only
+            </button>
+            <button class="btn btn-outline btn-sm" style="font-size: 0.75rem; padding: 4px 10px;" onclick="applyDashboardPreset('sales')" title="Grant access strictly to Commercial Products, Orders, and Billing">
+              <i data-lucide="shopping-cart" style="width: 14px; height: 14px;"></i> Commercial Only
+            </button>
+            <button class="btn btn-outline btn-sm" style="font-size: 0.75rem; padding: 4px 10px;" onclick="applyDashboardPreset('operations')" title="Grant access strictly to Live Monitoring, Analytics, and Alerts">
+              <i data-lucide="activity" style="width: 14px; height: 14px;"></i> Operations Only
+            </button>
+            <button class="btn btn-ghost btn-sm" style="font-size: 0.75rem; padding: 4px 8px;" onclick="applyDashboardPreset('all')">
+              Select All
+            </button>
+            <button class="btn btn-ghost btn-sm" style="font-size: 0.75rem; padding: 4px 8px; color: var(--danger-color, #ef4444);" onclick="applyDashboardPreset('none')">
+              Clear All
+            </button>
+          </div>
+        </div>
+
+        <!-- Role Summary Strip -->
+        <div id="role-access-info-banner" style="margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border-color); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.85rem;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="badge" id="role-access-code-badge" style="background: rgba(99,102,241,0.15); color: #818cf8; font-family: monospace; font-size: 0.8rem; padding: 3px 8px;">ROLE_CODE</span>
+            <span id="role-access-dept-name" style="color: var(--text-muted); font-weight: 500;">Department: General</span>
+            <span id="role-access-tenant-badge" class="badge" style="background: rgba(16,185,129,0.15); color: #10b981; font-size: 0.75rem;">Org: default_org</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="color: var(--text-muted);">
+              Selected: <strong id="role-access-selected-count" style="color: var(--primary-color, #6366f1);">0</strong> of <span id="role-access-total-dash-count">25</span> dashboards
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Department Cards Grid -->
+      <div id="role-access-departments-container" class="role-access-grid">
+        <!-- Rendered dynamically by renderRoleAccessStudio() -->
+      </div>
+    </div>
+
+    <!-- VIEW 2: FULL MATRIX GRID (DASHBOARDS VS ROLES TABLE) -->
+    <div id="role-access-matrix-container" class="hidden" style="padding: 20px; overflow-x: auto;">
+      <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Cross-cutting matrix view of all 25 dashboards and active roles. Click any cell to toggle permission, then click Save Permissions.
+        </p>
+        <button class="btn btn-primary btn-sm" onclick="saveAllMatrixChanges()">
+          <i data-lucide="save"></i> Save All Matrix Changes
+        </button>
+      </div>
+      <div id="role-access-matrix-table-wrapper" style="border: 1px solid var(--border-color); border-radius: 8px; overflow-x: auto;">
+        <!-- Rendered dynamically by renderRoleAccessMatrix() -->
+      </div>
+    </div>
+  </div>
 </section>
 <!-- ================= NEW MODULE: DEPARTMENTS & TEAMS ================= -->
 <section class="view-section hidden" id="section-departments">

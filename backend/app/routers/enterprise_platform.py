@@ -596,11 +596,18 @@ def get_orders(
     return list_orders(user_id=user_id, status=status, limit=limit)
 
 
+_order_idempotency_cache: Dict[str, Any] = {}
+
 @router.post("/orders")
 def place_order(
     payload: CustomerOrderCreatePayload,
+    request: Request,
     user: dict = Depends(get_current_user_payload)
 ):
+    idempotency_key = request.headers.get("Idempotency-Key") or request.headers.get("idempotency-key")
+    if idempotency_key and idempotency_key in _order_idempotency_cache:
+        return _order_idempotency_cache[idempotency_key]
+
     uid = user.get("user_id") or user.get("sub")
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication required to place an order")
@@ -618,6 +625,8 @@ def place_order(
             payment_method=payload.payment_method,
             notes=payload.notes
         )
+        if idempotency_key:
+            _order_idempotency_cache[idempotency_key] = order
         return order
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -704,7 +713,7 @@ def get_tickets(
         # Farmer sees only their own tickets
         uid = user.get("user_id") or user.get("sub")
         all_t = list_support_tickets(status=status, priority=priority)
-        return [t for t in all_t if t["user_id"] == uid]
+        return [t for t in all_t if t["user_id"] == uid or t.get("farmer_username") == uid]
     return list_support_tickets(status=status, priority=priority)
 
 

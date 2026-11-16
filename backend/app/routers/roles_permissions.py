@@ -11,14 +11,17 @@ from app.core.security import (
     require_roles,
     require_permission,
 )
-from app.models.schemas import CustomRoleCreate, CustomRoleUpdate
+from app.models.schemas import CustomRoleCreate, CustomRoleUpdate, RoleDashboardUpdate
 from app.services.org_employee_db import (
     list_roles,
     get_role_detail,
     create_custom_role,
     update_custom_role,
     delete_custom_role,
-    list_all_permissions
+    list_all_permissions,
+    get_dashboard_matrix,
+    update_role_dashboards,
+    get_role_allowed_dashboards
 )
 
 router = APIRouter(tags=["Roles & Permissions Management"])
@@ -33,14 +36,32 @@ def get_permissions(current_user: dict = Depends(get_current_user_payload)):
     return list_all_permissions()
 
 
+@router.get("/roles/dashboard-matrix")
+def get_dashboard_matrix_endpoint(
+    current_user: dict = Depends(get_current_user_payload)
+):
+    """
+    Returns the comprehensive dashboard access matrix:
+    - 25 dashboards categorized by operational department
+    - 6 operational departments (Customer Operations / Helpdesk, Sales, Ops, etc.)
+    - All roles with their allowed_dashboards and employee user count
+    """
+    role = current_user.get("role")
+    org_id = current_user.get("organization_id") if role not in ["superadmin", "admin"] else None
+    return get_dashboard_matrix(org_id=org_id)
+
+
 @router.get("/roles", response_model=List[Dict[str, Any]])
 def get_roles_list(
     current_user: dict = Depends(require_permission("roles:read"))
 ):
     """
     Lists system role templates (10 standardized profiles) and tenant-specific custom roles.
+    Respects tenant isolation for multi-tenant accounts.
     """
-    return list_roles()
+    role = current_user.get("role")
+    org_id = current_user.get("organization_id") if role not in ["superadmin", "admin"] else None
+    return list_roles(org_id=org_id)
 
 
 @router.post("/roles", status_code=status.HTTP_201_CREATED)
@@ -85,8 +106,56 @@ def get_role_by_id(
         raise HTTPException(status_code=404, detail=f"Role '{role_id}' not found.")
     
 
-        
     return role
+
+
+@router.get("/roles/{role_id}/dashboards")
+def get_role_dashboards_endpoint(
+    role_id: str,
+    current_user: dict = Depends(get_current_user_payload)
+):
+    """
+    Retrieves the allowed dashboards list for a specific role.
+    """
+    role = get_role_detail(role_id)
+    if not role:
+        dashboards = get_role_allowed_dashboards(role_id)
+        return {"role_id": role_id, "allowed_dashboards": dashboards}
+    return {
+        "role_id": role["id"],
+        "role_code": role["code"],
+        "name": role["name"],
+        "allowed_dashboards": role.get("allowed_dashboards") or []
+    }
+
+
+@router.put("/roles/{role_id}/dashboards")
+def update_role_dashboards_endpoint(
+    role_id: str,
+    payload: RoleDashboardUpdate,
+    current_user: dict = Depends(require_permission("roles:write"))
+):
+    """
+    Updates the checkbox dashboard permissions for a particular role.
+    Any employee under this role will immediately see only the permitted dashboards in their left sidebar.
+    Enforces tenant isolation and logs an immutable security audit event.
+    """
+    role = current_user.get("role")
+    actor_is_superadmin = (role in ["superadmin", "admin"])
+    org_id = current_user.get("organization_id")
+    try:
+        updated = update_role_dashboards(
+            role_id=role_id,
+            dashboards=payload.allowed_dashboards,
+            actor=current_user.get("sub", "admin"),
+            actor_is_superadmin=actor_is_superadmin,
+            org_id=org_id
+        )
+        return updated
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/roles/{role_id}")

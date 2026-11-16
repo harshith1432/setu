@@ -10,6 +10,7 @@ Provides PostgreSQL schema migrations, data queries, and security enforcement fo
 
 import os
 import sys
+import json
 import secrets
 import logging
 from datetime import datetime, timezone, timedelta
@@ -82,13 +83,95 @@ SYSTEM_PERMISSIONS = [
 
 ALL_PERMISSION_CODES = [p["code"] for p in SYSTEM_PERMISSIONS]
 
-# 10 Role Templates with exact granular permission mappings
+# ==============================================================================
+# DASHBOARD MASTER DEFINITIONS & ROLE MAPPINGS
+# ==============================================================================
+
+SYSTEM_DASHBOARDS = [
+    # Overview
+    {"id": "overview", "name": "Overview & KPIs", "department": "Overview", "description": "High-level metrics, active sheds, sensor health, and quick actions.", "icon": "layout-dashboard"},
+    {"id": "tasks", "name": "My Work / Tasks", "department": "Overview", "description": "Daily operational to-dos, assigned checklist items, and workflow triage.", "icon": "check-square"},
+    # Operations & Monitoring
+    {"id": "live-monitoring", "name": "Live Monitoring", "department": "Operations & Monitoring", "description": "Real-time shed microclimate, temperature, humidity, and active actuators.", "icon": "activity"},
+    {"id": "analytics", "name": "Analytics & Trends", "department": "Operations & Monitoring", "description": "Microclimate trends, seasonal mortality charts, and telemetry graphs.", "icon": "line-chart"},
+    {"id": "alerts", "name": "Alerts & Incidents", "department": "Operations & Monitoring", "description": "Climate threshold breaches, sensor dropouts, and emergency interlocks.", "icon": "alert-triangle"},
+    # Farmers & Infrastructure
+    {"id": "farmers", "name": "Farmers Directory", "department": "Farmers & Infrastructure", "description": "Registered farmer accounts, geographic distribution, and contact details.", "icon": "users"},
+    {"id": "sheds", "name": "Rearing Sheds", "department": "Farmers & Infrastructure", "description": "Physical rearing sheds, DFL capacity, current batch stage, and setpoints.", "icon": "warehouse"},
+    {"id": "devices", "name": "IoT Devices", "department": "Farmers & Infrastructure", "description": "Controller hardware, gateways, firmware versions, and online telemetry state.", "icon": "cpu"},
+    {"id": "sensor-config", "name": "Sensor Configuration", "department": "Farmers & Infrastructure", "description": "Calibration offsets, polling intervals, and target environmental thresholds.", "icon": "sliders"},
+    {"id": "installations", "name": "Installations", "department": "Farmers & Infrastructure", "description": "Field installation dispatching, hardware checklist signoffs, and milestones.", "icon": "wrench"},
+    {"id": "install-team", "name": "Installation Team", "department": "Farmers & Infrastructure", "description": "Field technician roster, team schedules, and regional coverage.", "icon": "user-check"},
+    # Commercial & Sales
+    {"id": "products", "name": "Product Catalogue", "department": "Commercial & Sales", "description": "Hardware catalogue, sensor kits, pricing, and available inventory.", "icon": "package"},
+    {"id": "orders", "name": "Sales & Orders", "department": "Commercial & Sales", "description": "Customer purchase orders, fulfilment tracking, and dispatch status.", "icon": "shopping-cart"},
+    {"id": "billing", "name": "Billing & Invoices", "department": "Commercial & Sales", "description": "Subscription invoices, payment receipts, accounting history, and GST tax records.", "icon": "credit-card"},
+    # Customer Operations / Help Center
+    {"id": "support", "name": "Support Tickets & Helpdesk", "department": "Customer Operations", "description": "Farmer help desk, query tickets, issue resolution, and support chat queue.", "icon": "headphones"},
+    {"id": "guidance", "name": "Farmer Guidance", "department": "Customer Operations", "description": "AI Agronomist, sericulture best practices, and feed/rearing advisory.", "icon": "book-open"},
+    {"id": "research", "name": "Research & Insights", "department": "Customer Operations", "description": "Disease prevention models, cocoon harvest analysis, and silk grade yield research.", "icon": "microscope"},
+    {"id": "reports", "name": "Reports & Export", "department": "Customer Operations", "description": "Automated PDF/CSV executive audits, seasonal telemetry exports, and compliance logs.", "icon": "file-text"},
+    # Access & User Governance
+    {"id": "employees", "name": "Employees & Users", "department": "Access & User Governance", "description": "Staff directory, invitations, onboarding links, and account status management.", "icon": "user-cog"},
+    {"id": "roles", "name": "Roles & Permissions", "department": "Access & User Governance", "description": "System role templates, custom role profiles, and operational privilege assignment.", "icon": "key-round"},
+    {"id": "role-access", "name": "Role Access Matrix", "department": "Access & User Governance", "description": "Fine-grained checkbox dashboard permission control for all roles and departments.", "icon": "sliders"},
+    {"id": "departments", "name": "Departments & Teams", "department": "Access & User Governance", "description": "Organizational tree, department heads, and reporting hierarchy.", "icon": "network"},
+    {"id": "audit", "name": "Access & Audit Logs", "department": "Access & User Governance", "description": "Security audit trails, authentication logs, and immutable activity records.", "icon": "shield-alert"},
+    {"id": "integrations", "name": "Integrations", "department": "Access & User Governance", "description": "Cloud telemetry webhooks, WhatsApp Business API bridges, and external endpoints.", "icon": "plug"},
+    {"id": "settings", "name": "Platform Settings", "department": "Access & User Governance", "description": "Global environmental thresholds, security policies, and platform branding.", "icon": "settings"},
+]
+
+ALL_DASHBOARD_IDS = [d["id"] for d in SYSTEM_DASHBOARDS]
+
+DEFAULT_ROLE_DASHBOARDS = {
+    "superadmin": list(ALL_DASHBOARD_IDS),
+    "admin": list(ALL_DASHBOARD_IDS),
+    "company_admin": [
+        "overview", "tasks", "live-monitoring", "analytics", "alerts",
+        "farmers", "sheds", "devices", "sensor-config", "installations", "install-team",
+        "products", "orders", "billing", "support", "guidance", "research", "reports",
+        "employees", "roles", "role-access", "departments", "audit", "integrations"
+    ],
+    "ceo": [
+        "overview", "tasks", "live-monitoring", "analytics", "alerts",
+        "farmers", "sheds", "devices", "products", "orders", "billing",
+        "research", "guidance", "reports", "audit", "integrations"
+    ],
+    "hr": [
+        "overview", "tasks", "employees", "roles", "role-access", "departments", "audit", "guidance"
+    ],
+    "operations_manager": [
+        "overview", "tasks", "live-monitoring", "analytics", "alerts",
+        "farmers", "sheds", "devices", "sensor-config", "installations", "install-team",
+        "research", "guidance", "reports"
+    ],
+    "technician": [
+        "tasks", "live-monitoring", "alerts", "sheds", "devices", "sensor-config",
+        "installations", "install-team", "guidance"
+    ],
+    "sales": [
+        "overview", "tasks", "products", "orders", "billing", "farmers", "reports"
+    ],
+    "support": [
+        # Help Center / Query Tickets persona
+        "overview", "tasks", "support", "guidance", "alerts", "farmers", "sheds"
+    ],
+    "analyst": [
+        "overview", "tasks", "live-monitoring", "analytics", "farmers", "sheds", "research", "guidance", "reports"
+    ],
+    "farmer": [
+        "live-monitoring", "guidance", "analytics", "alerts", "products", "orders"
+    ]
+}
+
+# 10 Role Templates with exact granular permission mappings and default dashboard access
 ROLE_TEMPLATES = {
     "superadmin": {
         "name": "Platform Super Admin",
         "code": "superadmin",
         "description": "Master administrative access across all tenant organizations, platform configurations, and security audits.",
         "permissions": ALL_PERMISSION_CODES,
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["superadmin"],
     },
     "company_admin": {
         "name": "Company Admin",
@@ -105,6 +188,7 @@ ROLE_TEMPLATES = {
             "analytics:read", "analytics:export",
             "admin:audit_read"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["company_admin"],
     },
     "ceo": {
         "name": "CEO / Executive",
@@ -119,6 +203,7 @@ ROLE_TEMPLATES = {
             "analytics:read", "analytics:export",
             "admin:audit_read"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["ceo"],
     },
     "hr": {
         "name": "HR / User Administrator",
@@ -130,6 +215,7 @@ ROLE_TEMPLATES = {
             "roles:read",
             "admin:audit_read"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["hr"],
     },
     "operations_manager": {
         "name": "Operations Manager",
@@ -141,6 +227,7 @@ ROLE_TEMPLATES = {
             "ops:incidents_read", "ops:incidents_ack", "ops:incidents_resolve", "ops:installations_read", "ops:installations_write",
             "analytics:read"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["operations_manager"],
     },
     "technician": {
         "name": "Installation Technician",
@@ -151,6 +238,7 @@ ROLE_TEMPLATES = {
             "iot:read", "iot:sensors", "iot:telemetry",
             "ops:incidents_read", "ops:incidents_ack", "ops:installations_read", "ops:installations_write"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["technician"],
     },
     "sales": {
         "name": "Sales & Billing",
@@ -161,6 +249,7 @@ ROLE_TEMPLATES = {
             "commercial:products_read", "commercial:products_write", "commercial:orders_read", "commercial:orders_write", "commercial:billing_read", "commercial:billing_write",
             "analytics:read"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["sales"],
     },
     "support": {
         "name": "Support Agent",
@@ -172,6 +261,7 @@ ROLE_TEMPLATES = {
             "ops:incidents_read", "ops:incidents_ack",
             "commercial:orders_read"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["support"],
     },
     "analyst": {
         "name": "Analyst / Researcher",
@@ -182,6 +272,7 @@ ROLE_TEMPLATES = {
             "iot:read", "iot:telemetry",
             "analytics:read", "analytics:export"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["analyst"],
     },
     "farmer": {
         "name": "Farmer",
@@ -191,6 +282,7 @@ ROLE_TEMPLATES = {
             "sheds:read",
             "iot:read", "iot:telemetry", "iot:control"
         ],
+        "allowed_dashboards": DEFAULT_ROLE_DASHBOARDS["farmer"],
     },
 }
 
@@ -250,6 +342,8 @@ def init_org_employee_tables():
             description TEXT,
             is_system BOOLEAN NOT NULL DEFAULT FALSE,
             status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+            allowed_dashboards JSONB NOT NULL DEFAULT '[]'::jsonb,
+            organization_id VARCHAR(64) DEFAULT 'default_org',
             created_at TIMESTAMPTZ NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL
         );
@@ -324,17 +418,18 @@ def init_org_employee_tables():
         CREATE INDEX IF NOT EXISTS idx_inv_status ON employee_invitations (status);
         """)
 
-        # 8. Enrich users and audit_logs tables dynamically
+        # 8. Enrich users, roles and audit_logs tables dynamically
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS official_email VARCHAR(255);")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE;")
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS access_scope VARCHAR(32) DEFAULT 'GLOBAL';")
+        cursor.execute("ALTER TABLE roles ADD COLUMN IF NOT EXISTS allowed_dashboards JSONB NOT NULL DEFAULT '[]'::jsonb;")
+        cursor.execute("ALTER TABLE roles ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org';")
         cursor.execute("ALTER TABLE employees ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org';")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_emp_org ON employees (organization_id);")
-        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_roles_org ON roles (organization_id);")
 
         cursor.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_resource VARCHAR(128);")
         cursor.execute("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);")
-        
 
         # 9. Seed System Permissions
         for perm in SYSTEM_PERMISSIONS:
@@ -349,17 +444,24 @@ def init_org_employee_tables():
 
         # Organizations seeding removed
 
-        # 11. Seed Roles & Map Permissions
+        # 11. Seed Roles & Map Permissions & Allowed Dashboards
+        import json
         for rcode, rdata in ROLE_TEMPLATES.items():
             role_id = f"role_{rcode}"
+            allowed_dash_json = json.dumps(rdata.get("allowed_dashboards", DEFAULT_ROLE_DASHBOARDS.get(rcode, [])))
             cursor.execute("""
-            INSERT INTO roles (id, code, name, description, is_system, status, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, TRUE, 'ACTIVE', %s, %s)
+            INSERT INTO roles (id, code, name, description, is_system, status, allowed_dashboards, organization_id, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, TRUE, 'ACTIVE', %s::jsonb, 'default_org', %s, %s)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 description = EXCLUDED.description,
-                is_system = TRUE;
-            """, (role_id, rdata["code"], rdata["name"], rdata["description"], now_dt, now_dt))
+                is_system = TRUE,
+                allowed_dashboards = CASE
+                    WHEN roles.allowed_dashboards IS NULL OR roles.allowed_dashboards = '[]'::jsonb
+                    THEN EXCLUDED.allowed_dashboards
+                    ELSE roles.allowed_dashboards
+                END;
+            """, (role_id, rdata["code"], rdata["name"], rdata["description"], allowed_dash_json, now_dt, now_dt))
 
             # Bind permissions
             for pcode in rdata["permissions"]:
@@ -646,6 +748,7 @@ def get_user_access_context(user_id: str) -> Dict[str, Any]:
                     "access_scope": u.get("access_scope", "GLOBAL"),
                     "assigned_resources": {"sheds": [], "devices": []},
                     "permissions": get_user_effective_permissions(user_id, u_role),
+                    "allowed_dashboards": get_role_allowed_dashboards(u_role),
                     "is_active": False if (u.get("is_active") is False or u.get("is_active") == 0 or str(u.get("is_active")).lower() == "false") else True
                 }
             return {
@@ -653,6 +756,7 @@ def get_user_access_context(user_id: str) -> Dict[str, Any]:
                 "access_scope": "GLOBAL",
                 "assigned_resources": {"sheds": [], "devices": []},
                 "permissions": [],
+                "allowed_dashboards": get_role_allowed_dashboards("farmer"),
                 "is_active": True
             }
 
@@ -679,13 +783,13 @@ def get_user_access_context(user_id: str) -> Dict[str, Any]:
             "user_id": row["id"],
             "username": row["username"],
             "role": role,
-            
             "employee_db_id": row.get("employee_db_id"),
             "employee_id": row.get("employee_id"),
             "department_id": row.get("department_id"),
             "access_scope": row.get("access_scope") or ("ASSIGNED_ONLY" if role in ["farmer", "technician"] else "GLOBAL"),
             "assigned_resources": assigned_res,
             "permissions": perms,
+            "allowed_dashboards": get_role_allowed_dashboards(role),
             "is_active": is_active
         }
 
@@ -1128,19 +1232,57 @@ def list_all_permissions() -> List[Dict[str, Any]]:
         return [dict(r) for r in cursor.fetchall()]
 
 
+def get_role_allowed_dashboards(role_code_or_id: str) -> List[str]:
+    """Retrieves the allowed dashboards list for a role, with fallback to default templates."""
+    clean_id = (role_code_or_id or "farmer").strip().lower()
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("SELECT allowed_dashboards, code FROM roles WHERE id = %s OR code = %s", (clean_id, clean_id))
+            row = cursor.fetchone()
+            if row:
+                ad = row.get("allowed_dashboards")
+                if isinstance(ad, str):
+                    try:
+                        parsed = json.loads(ad)
+                        if isinstance(parsed, list) and parsed:
+                            return parsed
+                    except Exception:
+                        pass
+                elif isinstance(ad, list) and ad:
+                    return ad
+                code = row.get("code") or clean_id
+                if code in DEFAULT_ROLE_DASHBOARDS:
+                    return list(DEFAULT_ROLE_DASHBOARDS[code])
+    except Exception:
+        pass
+    return list(DEFAULT_ROLE_DASHBOARDS.get(clean_id, DEFAULT_ROLE_DASHBOARDS.get("farmer", ["live-monitoring", "guidance"])))
+
+
 def list_roles(org_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Lists roles with permissions."""
+    """Lists roles with permissions and allowed dashboards, respecting tenant isolation."""
     with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
-               r.created_at, r.updated_at,
-               (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
-        FROM roles r
-        ORDER BY r.is_system DESC, r.name ASC
-        """)
+        if org_id and org_id != "default_org":
+            cursor.execute("""
+            SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
+                   r.allowed_dashboards, r.organization_id,
+                   r.created_at, r.updated_at,
+                   (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
+            FROM roles r
+            WHERE r.organization_id = %s OR r.organization_id = 'default_org' OR r.is_system = TRUE
+            ORDER BY r.is_system DESC, r.name ASC
+            """, (org_id,))
+        else:
+            cursor.execute("""
+            SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
+                   r.allowed_dashboards, r.organization_id,
+                   r.created_at, r.updated_at,
+                   (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
+            FROM roles r
+            ORDER BY r.is_system DESC, r.name ASC
+            """)
         roles = [dict(r) for r in cursor.fetchall()]
 
-        # Attach permissions list to each role
+        # Attach permissions list and ensure allowed_dashboards is a clean list
         for role in roles:
             cursor.execute("""
             SELECT p.code, p.name, p.category, p.description
@@ -1153,11 +1295,22 @@ def list_roles(org_id: Optional[str] = None) -> List[Dict[str, Any]]:
             role["permissions"] = [p["code"] for p in perms]
             role["permissions_detailed"] = [dict(p) for p in perms]
 
+            ad = role.get("allowed_dashboards")
+            if isinstance(ad, str):
+                try:
+                    role["allowed_dashboards"] = json.loads(ad)
+                except Exception:
+                    role["allowed_dashboards"] = []
+            elif not isinstance(ad, list):
+                role["allowed_dashboards"] = []
+            if not role["allowed_dashboards"]:
+                role["allowed_dashboards"] = list(DEFAULT_ROLE_DASHBOARDS.get(role["code"], ["overview", "tasks", "support"]))
+
         return roles
 
 
 def get_role_detail(role_id: str) -> Optional[Dict[str, Any]]:
-    """Retrieves full role details with permissions."""
+    """Retrieves full role details with permissions and allowed dashboards."""
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
         role = cursor.fetchone()
@@ -1175,6 +1328,18 @@ def get_role_detail(role_id: str) -> Optional[Dict[str, Any]]:
         perms = cursor.fetchall()
         role_dict["permissions"] = [p["code"] for p in perms]
         role_dict["permissions_detailed"] = [dict(p) for p in perms]
+
+        ad = role_dict.get("allowed_dashboards")
+        if isinstance(ad, str):
+            try:
+                role_dict["allowed_dashboards"] = json.loads(ad)
+            except Exception:
+                role_dict["allowed_dashboards"] = []
+        elif not isinstance(ad, list):
+            role_dict["allowed_dashboards"] = []
+        if not role_dict["allowed_dashboards"]:
+            role_dict["allowed_dashboards"] = list(DEFAULT_ROLE_DASHBOARDS.get(role_dict["code"], ["overview", "tasks", "support"]))
+
         return role_dict
 
 
@@ -1185,14 +1350,16 @@ def create_custom_role(
     actor_is_superadmin: bool = False
 ) -> Dict[str, Any]:
     """
-    Creates a new custom role with selected permissions.
-    Enforces privilege escalation checks: administrator cannot grant permissions they do not possess.
+    Creates a new custom role with selected permissions and allowed dashboards.
+    Enforces privilege escalation checks and tenant isolation.
     """
     now_dt = datetime.now(timezone.utc)
     code = data["code"].strip().lower()
     name = data["name"].strip()
     role_id = data.get("id") or f"role_custom_{secrets.token_hex(4)}"
     requested_perms = data.get("permissions") or []
+    allowed_dashboards = data.get("allowed_dashboards") or ["overview", "tasks", "support"]
+    org_id = data.get("organization_id") or "default_org"
 
     # System code collision check
     if code in ROLE_TEMPLATES:
@@ -1206,12 +1373,12 @@ def create_custom_role(
 
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
-        INSERT INTO roles (id, code, name, description, is_system, status, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, FALSE, %s, %s, %s)
+        INSERT INTO roles (id, code, name, description, is_system, status, allowed_dashboards, organization_id, created_at, updated_at)
+        VALUES (%s, %s, %s, %s, FALSE, %s, %s::jsonb, %s, %s, %s)
         RETURNING *
         """, (
             role_id, code, name, data.get("description", "Custom operational role"),
-            data.get("status", "ACTIVE").upper(), now_dt, now_dt
+            data.get("status", "ACTIVE").upper(), json.dumps(allowed_dashboards), org_id, now_dt, now_dt
         ))
         created = cursor.fetchone()
 
@@ -1226,11 +1393,12 @@ def create_custom_role(
     log_security_audit(
         actor=actor,
         action="CREATE_CUSTOM_ROLE",
-        details=f"Created custom role '{name}' with {len(requested_perms)} permissions",
+        details=f"Created custom role '{name}' with {len(requested_perms)} permissions and {len(allowed_dashboards)} dashboards",
         target_resource=role_id
     )
     result = dict(created)
     result["permissions"] = requested_perms
+    result["allowed_dashboards"] = allowed_dashboards
     return result
 
 
@@ -1241,23 +1409,27 @@ def update_custom_role(
     actor: str,
     actor_is_superadmin: bool = False
 ) -> Optional[Dict[str, Any]]:
-    """Updates custom role name, description, status, and permissions. System roles protected."""
+    """Updates custom role name, description, status, permissions, and allowed dashboards."""
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("SELECT * FROM roles WHERE id = %s", (role_id,))
         role = cursor.fetchone()
         if not role:
             return None
-        if role["is_system"]:
-            raise ValueError("System-critical role templates are protected and cannot be modified or deleted.")
+        if role["is_system"] and not actor_is_superadmin:
+            raise ValueError("System-critical role templates are protected and cannot be modified by non-superadmins.")
 
         now_dt = datetime.now(timezone.utc)
         set_clauses = ["updated_at = %s"]
         params = [now_dt]
 
-        for f in ["name", "description", "status"]:
+        for f in ["name", "description", "status", "organization_id"]:
             if f in updates and updates[f] is not None:
                 set_clauses.append(f"{f} = %s")
                 params.append(updates[f])
+
+        if "allowed_dashboards" in updates and isinstance(updates["allowed_dashboards"], list):
+            set_clauses.append("allowed_dashboards = %s::jsonb")
+            params.append(json.dumps(updates["allowed_dashboards"]))
 
         params.append(role_id)
         cursor.execute(f"""
@@ -1289,9 +1461,82 @@ def update_custom_role(
         action="UPDATE_ROLE",
         details=f"Updated role {role_id}",
         target_resource=role_id,
-        
     )
     return get_role_detail(role_id)
+
+
+def update_role_dashboards(
+    role_id: str,
+    dashboards: List[str],
+    actor: str,
+    actor_is_superadmin: bool = False,
+    org_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Updates the checkbox dashboard permissions for a particular role.
+    Mind tenant isolation: non-superadmins can only modify roles within their tenant.
+    Any user assigned to this role automatically inherits these dashboard permissions.
+    """
+    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+        cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
+        role = cursor.fetchone()
+        if not role:
+            raise ValueError(f"Role '{role_id}' not found.")
+        
+        role_dict = dict(role)
+        # Tenant isolation validation:
+        # Non-superadmins can only modify roles within their own tenant organization.
+        # Roles belonging to another tenant or root system roles cannot be modified across tenant boundaries.
+        if not actor_is_superadmin:
+            role_org = role_dict.get("organization_id") or "default_org"
+            user_org = org_id or "default_org"
+            if role_org != user_org:
+                raise PermissionError(f"Tenant isolation violation: Access denied. Cannot modify role of tenant '{role_org}'.")
+
+        now_dt = datetime.now(timezone.utc)
+        clean_dashboards = [d for d in dashboards if isinstance(d, str) and d.strip()]
+        dashboards_json = json.dumps(clean_dashboards)
+
+        cursor.execute("""
+        UPDATE roles
+        SET allowed_dashboards = %s::jsonb, updated_at = %s
+        WHERE id = %s OR code = %s
+        RETURNING *
+        """, (dashboards_json, now_dt, role_dict["id"], role_dict["code"]))
+        updated = cursor.fetchone()
+
+    log_security_audit(
+        actor=actor,
+        action="UPDATE_ROLE_DASHBOARDS",
+        details=f"Updated dashboard access for role '{role_dict['name']}' ({role_dict['code']}): {len(clean_dashboards)} dashboards permitted: {clean_dashboards}",
+        target_resource=role_dict["id"]
+    )
+    res = get_role_detail(role_dict["id"]) or dict(updated)
+    res["allowed_dashboards"] = clean_dashboards
+    return res
+
+
+def get_dashboard_matrix(org_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Returns the comprehensive dashboard access matrix for the UI:
+    - departments: Operational departments grouping all dashboards
+    - dashboards: All 25 system dashboards with metadata
+    - roles: All roles with their allowed_dashboards and user counts
+    """
+    roles = list_roles(org_id=org_id)
+    departments = [
+        {"id": "Overview", "name": "Overview & Workflow", "icon": "layout-dashboard", "description": "High-level metrics, daily tasks, and triage."},
+        {"id": "Operations & Monitoring", "name": "Operations & Monitoring", "icon": "activity", "description": "Shed microclimate telemetry, analytics, and incident interlocks."},
+        {"id": "Farmers & Infrastructure", "name": "Farmers & Infrastructure", "icon": "warehouse", "description": "Farmers directory, rearing sheds, IoT hardware controllers, and field installations."},
+        {"id": "Commercial & Sales", "name": "Commercial & Sales", "icon": "shopping-cart", "description": "Product catalogue, hardware purchase orders, and billing invoices."},
+        {"id": "Customer Operations", "name": "Customer Operations / Help Center", "icon": "headphones", "description": "Support tickets, farmer agronomic guidance, research insights, and compliance reports."},
+        {"id": "Access & User Governance", "name": "Access & User Governance", "icon": "shield-alert", "description": "Employee management, roles, permissions, audit logs, and platform settings."}
+    ]
+    return {
+        "departments": departments,
+        "dashboards": SYSTEM_DASHBOARDS,
+        "roles": roles
+    }
 
 
 def delete_custom_role(role_id: str, actor: str) -> bool:

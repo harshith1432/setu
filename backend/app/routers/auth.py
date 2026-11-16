@@ -30,6 +30,15 @@ def _build_user_out(user_data: Optional[Dict[str, Any]]) -> UserOut:
     """Safe constructor for UserOut model that guarantees default fallbacks and avoids KeyError."""
     if not isinstance(user_data, dict):
         user_data = {}
+    user_role = str(user_data.get("role") or "farmer")
+    try:
+        from app.services.org_employee_db import get_role_allowed_dashboards, get_user_effective_permissions
+        dashboards = user_data.get("allowed_dashboards") or get_role_allowed_dashboards(user_role)
+        perms = user_data.get("permissions") or get_user_effective_permissions(str(user_data.get("id") or ""), user_role)
+    except Exception:
+        dashboards = ["live-monitoring", "guidance"] if user_role == "farmer" else ["overview", "tasks", "support"]
+        perms = []
+
     return UserOut(
         id=str(user_data.get("id") or ""),
         username=str(user_data.get("username") or "user"),
@@ -41,7 +50,7 @@ def _build_user_out(user_data: Optional[Dict[str, Any]]) -> UserOut:
         whatsapp_number=user_data.get("whatsapp_number"),
         whatsapp_verified=bool(user_data.get("whatsapp_verified", False)),
         preferred_language=str(user_data.get("preferred_language") or "en"),
-        role=str(user_data.get("role") or "farmer"),
+        role=user_role,
         farm_name=str(user_data.get("farm_name") or "Green Valley Sericulture Farm"),
         region=str(user_data.get("region") or "Local Rearing Shed"),
         latitude=user_data.get("latitude"),
@@ -52,6 +61,9 @@ def _build_user_out(user_data: Optional[Dict[str, Any]]) -> UserOut:
         breed=str(user_data.get("breed") or "Double Hybrid (FC1 x FC2)"),
         is_active=bool(user_data.get("is_active", True)),
         must_change_password=bool(user_data.get("must_change_password", False)),
+        allowed_dashboards=dashboards,
+        permissions=perms,
+        organization_id=str(user_data.get("organization_id") or "default_org"),
         created_at=user_data.get("created_at"),
         current_stage=user_data.get("current_stage", 3)
     )
