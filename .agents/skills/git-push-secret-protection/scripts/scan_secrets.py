@@ -200,6 +200,16 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 
+def mask_snippet(snippet: str) -> str:
+    """Masks secret values in snippets to avoid clear-text logging of sensitive data."""
+    if not snippet:
+        return "[EMPTY]"
+    clean = snippet.strip()
+    if len(clean) <= 8:
+        return "[REDACTED_SECRET]"
+    return f"{clean[:4]}...[REDACTED_SECRET]...{clean[-4:]}"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Scan for secrets before pushing to GitHub.")
     parser.add_argument("--path", default=".", help="Root path to scan (default: current directory)")
@@ -240,7 +250,7 @@ def main():
         tracked_flag = "[GIT TRACKED]" if f["is_tracked"] else "[LOCAL ONLY]"
         print(f"[{idx}] {f['file']}:{f['line']}  {tracked_flag}")
         print(f"    Type: {f['type']}")
-        print(f"    Code: {f['snippet']}")
+        print(f"    Code: {mask_snippet(f['snippet'])}")
         print("-" * 75)
 
     print("\n[!] ACTION REQUIRED BEFORE PUSHING:")

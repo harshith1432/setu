@@ -1668,7 +1668,7 @@ def list_employees(
 
             return total_count, results
     except Exception as e:
-        logger.warning(f"Error querying employees database in list_employees: {e}")
+        logger.warning("Error querying employees database in list_employees: %s", type(e).__name__)
         try:
             from app.services.firestore_service import firestore_service
             if firestore_service.is_available:
@@ -1749,7 +1749,7 @@ def get_employee_detail(employee_id: str) -> Optional[Dict[str, Any]]:
 
             return emp_dict
     except Exception as e:
-        logger.warning(f"Error fetching employee detail for {employee_id}: {e}")
+        logger.warning("Error fetching employee detail: %s", type(e).__name__)
         return None
 
 

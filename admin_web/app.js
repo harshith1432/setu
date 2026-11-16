@@ -112,7 +112,14 @@ if (typeof window.DOMPurify === 'undefined') {
         doc.querySelectorAll('*').forEach(el => {
           for (let i = el.attributes.length - 1; i >= 0; i--) {
             const attr = el.attributes[i];
-            if (attr.name.toLowerCase().startsWith('on') || attr.value.trim().toLowerCase().startsWith('javascript:')) {
+            const attrName = attr.name.toLowerCase();
+            const attrVal = attr.value.trim().toLowerCase();
+            if (
+              attrName.startsWith('on') || 
+              attrVal.startsWith('javascript:') || 
+              attrVal.startsWith('data:') || 
+              attrVal.startsWith('vbscript:')
+            ) {
               el.removeAttribute(attr.name);
             }
           }
@@ -3624,7 +3631,7 @@ function openAppModal(title, htmlContent, size = '') {
   if (modalTitle) modalTitle.textContent = title;
   const modalBody = document.getElementById('modalBody');
   if (modalBody) {
-    modalBody.innerHTML = htmlContent;
+    modalBody.innerHTML = window.DOMPurify.sanitize(htmlContent);
   }
   const card = document.querySelector('#appModalBackdrop .modal-card');
   if (card) {

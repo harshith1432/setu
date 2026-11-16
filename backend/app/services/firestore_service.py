@@ -86,9 +86,9 @@ class FirestoreService:
             if not cred and sa_path and os.path.exists(sa_path):
                 try:
                     cred = credentials.Certificate(sa_path)
-                    logger.info("Loaded Firebase credentials from disk: %s", sa_path)
+                    logger.info("Loaded Firebase credentials from configured disk path")
                 except Exception as e:
-                    logger.warning("Could not load credentials from %s: %s", sa_path, e)
+                    logger.warning("Could not load credentials from configured disk path: %s", type(e).__name__)
 
             options = {"projectId": FIRESTORE_PROJECT_ID}
             if not firebase_admin._apps:
@@ -1076,10 +1076,10 @@ class FirestoreService:
                 data_to_store["created_at"] = datetime.now(timezone.utc).isoformat()
             data_to_store["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._db.collection("employees").document(emp_id).set(data_to_store, merge=True)
-            logger.info("Created employee %s (%s) in Cloud Firestore", emp_id, emp_data.get("official_email"))
+            logger.info("Created employee record in Cloud Firestore")
             return data_to_store
         except Exception as e:
-            logger.error("Error creating employee in Cloud Firestore: %s", e)
+            logger.error("Error creating employee in Cloud Firestore: %s", type(e).__name__)
             return None
 
     def get_employee(self, employee_id: str) -> Optional[Dict[str, Any]]:
@@ -1102,7 +1102,7 @@ class FirestoreService:
                     return d
             return None
         except Exception as e:
-            logger.warning("Error fetching employee %s from Firestore: %s", employee_id, e)
+            logger.warning("Error fetching employee from Firestore: %s", type(e).__name__)
             return None
 
     def list_employees(self, limit: int = 50, offset: int = 0) -> Tuple[int, List[Dict[str, Any]]]:
@@ -1120,7 +1120,7 @@ class FirestoreService:
             total = len(all_emps)
             return total, all_emps[offset:offset + limit]
         except Exception as e:
-            logger.warning("Error listing employees from Firestore: %s", e)
+            logger.warning("Error listing employees from Firestore: %s", type(e).__name__)
             return 0, []
 
     def update_employee(self, employee_id: str, updates: Dict[str, Any]) -> bool:
@@ -1137,7 +1137,7 @@ class FirestoreService:
             self._db.collection("employees").document(actual_id).update(updates_copy)
             return True
         except Exception as e:
-            logger.warning("Error updating employee %s in Firestore: %s", employee_id, e)
+            logger.warning("Error updating employee in Firestore: %s", type(e).__name__)
             return False
 
     def delete_employee(self, employee_id: str) -> bool:
@@ -1152,7 +1152,7 @@ class FirestoreService:
             self._db.collection("employees").document(actual_id).delete()
             return True
         except Exception as e:
-            logger.warning("Error deleting employee %s from Firestore: %s", employee_id, e)
+            logger.warning("Error deleting employee from Firestore: %s", type(e).__name__)
             return False
 
     def create_employee_invitation(self, inv_data: Dict[str, Any]) -> bool:
@@ -1164,7 +1164,7 @@ class FirestoreService:
             self._db.collection("employee_invitations").document(inv_id).set(inv_data, merge=True)
             return True
         except Exception as e:
-            logger.warning("Error saving employee invitation in Firestore: %s", e)
+            logger.warning("Error saving employee invitation in Firestore: %s", type(e).__name__)
             return False
 
     def get_employee_invitation(self, token: str) -> Optional[Dict[str, Any]]:
@@ -1179,7 +1179,7 @@ class FirestoreService:
                 return d
             return None
         except Exception as e:
-            logger.warning("Error querying employee invitation in Firestore: %s", e)
+            logger.warning("Error querying employee invitation in Firestore: %s", type(e).__name__)
             return None
 
 

@@ -340,40 +340,46 @@ def get_google_config():
         "scope": "openid email profile"
     }
 
+ALLOWED_REDIRECT_URIS = {
+    "https://setu-adminweb.vercel.app/admin/",
+    "https://setu-adminweb.vercel.app/admin.html",
+    "https://setu-adminweb.vercel.app/",
+    "https://setu-8vh9.onrender.com/admin/",
+    "https://setu-8vh9.onrender.com/admin.html",
+    "http://localhost:3000/admin/",
+    "http://localhost:3000/admin.html",
+    "http://localhost:8000/admin/",
+    "http://localhost:8000/admin.html",
+    "http://127.0.0.1:8000/admin/",
+    "http://127.0.0.1:8000/admin.html",
+    "http://localhost:5173/admin/",
+    "http://localhost:5173/admin.html",
+}
+
+SAFE_RELATIVE_REDIRECT_PATHS = {
+    "/admin/",
+    "/admin.html",
+    "/admin/index.html",
+    "/admin/login.html",
+}
+
+
 def _get_safe_redirect_uri(redirect_url: Optional[str], request: Request) -> str:
     base_url = str(request.base_url).rstrip("/")
     default_redirect = f"{base_url}/admin/"
     if not redirect_url:
         return default_redirect
 
-    try:
-        parsed = urllib.parse.urlsplit(redirect_url)
-    except Exception:
-        return default_redirect
+    # Strict allowlist check against known static endpoints
+    for allowed in ALLOWED_REDIRECT_URIS:
+        if redirect_url.rstrip("/") == allowed.rstrip("/"):
+            return allowed
 
-    # Block dangerous schemes (e.g. javascript:, data:)
-    if parsed.scheme and parsed.scheme not in ("http", "https"):
-        return default_redirect
-
-    # Handle safe relative path on same host (must start with single '/')
-    if not parsed.netloc:
-        if redirect_url.startswith("/") and not redirect_url.startswith("//"):
-            return f"{base_url}{redirect_url}"
-        return default_redirect
-
-    # Whitelist check against configured allowed origins and request host
-    allowed_hosts = {
-        urllib.parse.urlsplit(origin).netloc.lower()
-        for origin in settings.ALLOWED_ORIGINS
-        if origin
-    }
-    if request.url.netloc:
-        allowed_hosts.add(request.url.netloc.lower())
-
-    if parsed.netloc.lower() in allowed_hosts:
-        clean_path = parsed.path or "/"
-        clean_query = f"?{parsed.query}" if parsed.query else ""
-        return f"{parsed.scheme}://{parsed.netloc}{clean_path}{clean_query}"
+    # Allow relative paths strictly matching fixed safe whitelist
+    if redirect_url in SAFE_RELATIVE_REDIRECT_PATHS:
+        for path in SAFE_RELATIVE_REDIRECT_PATHS:
+            if redirect_url == path:
+                return f"{base_url}{path}"
 
     return default_redirect
 
@@ -387,15 +393,15 @@ def google_oauth_login(request: Request, redirect_url: str = None):
     target_redirect = _get_safe_redirect_uri(redirect_url, request)
     client_id = settings.GOOGLE_CLIENT_ID
     
-    oauth_url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={urllib.parse.quote(client_id)}&"
-        f"redirect_uri={urllib.parse.quote(target_redirect, safe='')}&"
-        f"response_type=token%20id_token&"
-        f"scope={urllib.parse.quote('openid email profile')}&"
-        f"prompt=select_account&"
-        f"nonce={uuid.uuid4().hex}"
-    )
+    query = urllib.parse.urlencode({
+        "client_id": client_id,
+        "redirect_uri": target_redirect,
+        "response_type": "token id_token",
+        "scope": "openid email profile",
+        "prompt": "select_account",
+        "nonce": uuid.uuid4().hex,
+    })
+    oauth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{query}"
     return RedirectResponse(url=oauth_url)
 
 @router.post("/google-sync", response_model=Token)
