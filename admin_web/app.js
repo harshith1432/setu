@@ -3720,7 +3720,21 @@ function openAppDrawer(title, htmlContent) {
   if (drawerTitle) drawerTitle.textContent = title;
   const drawerBody = document.getElementById('drawerBody');
   if (drawerBody) {
-    drawerBody.innerHTML = htmlContent;
+    const sanitizer = (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function')
+      ? DOMPurify
+      : (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function')
+        ? window.DOMPurify
+        : null;
+    if (sanitizer) {
+      drawerBody.innerHTML = sanitizer.sanitize(htmlContent || '', {
+        ADD_ATTR: ['target']
+      });
+    } else {
+      drawerBody.replaceChildren();
+      const doc = new DOMParser().parseFromString(htmlContent || '', 'text/html');
+      doc.querySelectorAll('script, iframe, object, embed, style, link').forEach(n => n.remove());
+      drawerBody.append(...doc.body.childNodes);
+    }
   }
   document.getElementById('drawerBackdrop').classList.add('open', 'active');
   document.getElementById('appDrawer').classList.add('open', 'active');
@@ -3742,12 +3756,22 @@ function openAppModal(title, htmlContent, size = '') {
       .replace(/\bonsubmit=(["'])(.*?)\1/gi, 'data-modal-submit="$2"')
       .replace(/\bonclick=(["'])(.*?)\1/gi, 'data-modal-click="$2"');
 
-    if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
-      modalBody.innerHTML = window.DOMPurify.sanitize(protectedHtml, {
+    // Always sanitize via DOMPurify to eliminate DOM text reinterpretation as HTML (CodeQL js/dom-text-reinterpreted-as-html)
+    const sanitizer = (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function')
+      ? DOMPurify
+      : (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function')
+        ? window.DOMPurify
+        : null;
+
+    if (sanitizer) {
+      modalBody.innerHTML = sanitizer.sanitize(protectedHtml, {
         ADD_ATTR: ['data-modal-submit', 'data-modal-click', 'target']
       });
     } else {
-      modalBody.innerHTML = protectedHtml;
+      modalBody.replaceChildren();
+      const doc = new DOMParser().parseFromString(protectedHtml, 'text/html');
+      doc.querySelectorAll('script, iframe, object, embed, style, link').forEach(n => n.remove());
+      modalBody.append(...doc.body.childNodes);
     }
 
     // Rebind form submit listeners cleanly

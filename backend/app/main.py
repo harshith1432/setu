@@ -180,6 +180,13 @@ def serve_firebase_db_script():
         return FileResponse(fb_path, media_type="application/javascript")
     raise HTTPException(status_code=404, detail="firebase-db.js not found")
 
+@app.get("/purify.min.js")
+def serve_purify_script():
+    purify_path = os.path.join(admin_web_dir, "purify.min.js")
+    if os.path.exists(purify_path):
+        return FileResponse(purify_path, media_type="application/javascript; charset=utf-8")
+    raise HTTPException(status_code=404, detail="purify.min.js not found")
+
 admin_assets_dir = os.path.join(admin_web_dir, "assets")
 if os.path.exists(admin_assets_dir):
     app.mount("/assets", StaticFiles(directory=admin_assets_dir), name="admin_assets")
