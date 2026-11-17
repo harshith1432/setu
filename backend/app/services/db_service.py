@@ -890,7 +890,7 @@ def save_shed_settings(
 CANONICAL_FARMERS_FALLBACK: List[Dict[str, Any]] = [
     {
         "id": "farmer_01",
-        "username": "ramesh_gowda",
+        "username": "ramesh_farmer",
         "full_name": "Ramesh Gowda",
         "phone": "+91 94481 23456",
         "whatsapp_number": "+91 94481 23456",
@@ -983,6 +983,18 @@ def get_all_farmers() -> List[Dict[str, Any]]:
                 return f_farmers
         except Exception as e:
             logger.debug("Firestore get_all_farmers fallback error: %s", e)
+
+    # Persistent JSON store fallback
+    try:
+        fb_users = _load_fallback_users()
+        if fb_users:
+            farmers = [u for u in fb_users.values() if u.get("role") == "farmer"]
+            if farmers:
+                for f in farmers:
+                    f["is_active"] = (f.get("is_active") is not False)
+                return farmers
+    except Exception as e:
+        logger.debug("Fallback users get_all_farmers error: %s", e)
     
     fallback = []
     for x in CANONICAL_FARMERS_FALLBACK:
