@@ -10,6 +10,7 @@ from app.core.security import (
     get_current_user_payload,
     require_roles,
     require_permission,
+    require_any_permission,
 )
 from app.models.schemas import DepartmentCreate, DepartmentUpdate
 from app.services.org_employee_db import (
@@ -37,7 +38,7 @@ def get_departments(
 @router.post("", status_code=status.HTTP_201_CREATED)
 def add_department(
     payload: DepartmentCreate,
-    current_user: dict = Depends(require_permission("users:write"))
+    current_user: dict = Depends(require_any_permission(["users:write", "org:write", "roles:write"]))
 ):
     """
     Creates a new operational department within the organization.
@@ -70,7 +71,7 @@ def get_department_by_id(
 def update_department_by_id(
     dept_id: str,
     payload: DepartmentUpdate,
-    current_user: dict = Depends(require_permission("users:write"))
+    current_user: dict = Depends(require_any_permission(["users:write", "org:write", "roles:write"]))
 ):
     """
     Updates department name, description, assigned head, or status.
@@ -93,7 +94,7 @@ def update_department_by_id(
 @router.delete("/{dept_id}")
 def remove_department(
     dept_id: str,
-    current_user: dict = Depends(require_permission("users:write"))
+    current_user: dict = Depends(require_any_permission(["users:write", "org:write", "roles:write"]))
 ):
     """
     Deletes department if no employee members remain assigned.
