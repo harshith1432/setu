@@ -1214,15 +1214,129 @@
           </div>
 
           <!-- Delivery Address Section -->
-          <div class="checkout-section-box">
+          <div class="checkout-section-box" id="checkoutAddressSection">
             <h4 class="checkout-box-title">
               <i data-lucide="map-pin"></i>
-              <span>Rearing Shed &amp; Delivery Address</span>
+              <span>Delivery Address</span>
             </h4>
-            <div class="form-field" style="margin-bottom: 0; width: 100%;">
-              <label for="checkoutShippingAddress" class="form-label" style="display: block; margin-bottom: 6px;">Shed Location / Full Farm Address *</label>
-              <textarea id="checkoutShippingAddress" class="form-textarea" rows="2" style="width: 100%; box-sizing: border-box; min-height: 76px; resize: vertical;" placeholder="e.g. Shed No. 2, Green Valley Farm, Post Ramanagara, Karnataka - 562159" required></textarea>
-              <span style="font-size: 0.74rem; color: var(--slate-500); margin-top: 6px; display: block;">Hardware dispatch will coordinate directly with your taluk sericulture field technician.</span>
+            
+            <div class="checkout-address-form-grid" style="display: flex; flex-direction: column; gap: 14px;">
+              <!-- Country/Region -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutCountry" class="form-label">Country/Region</label>
+                <select id="checkoutCountry" class="form-select">
+                  <option value="India" selected>India</option>
+                </select>
+              </div>
+
+              <!-- Full name (First and Last name) -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutFullName" class="form-label">Full name (First and Last name)</label>
+                <input type="text" id="checkoutFullName" class="form-input" placeholder="" required autocomplete="name">
+              </div>
+
+              <!-- Mobile number -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutMobile" class="form-label">Mobile number</label>
+                <input type="tel" id="checkoutMobile" class="form-input" placeholder="" maxlength="10" required autocomplete="tel">
+                <span class="form-helper-text" style="font-size: 0.76rem; color: var(--slate-500); margin-top: 4px;">May be used to assist delivery</span>
+              </div>
+
+              <!-- Pincode -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutPincode" class="form-label">Pincode</label>
+                <input type="text" id="checkoutPincode" class="form-input" placeholder="6 digits [0-9] PIN code" maxlength="6" pattern="[0-9]{6}" required autocomplete="postal-code">
+              </div>
+
+              <!-- Flat, House no., Building, Company, Apartment -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutFlat" class="form-label">Flat, House no., Building, Company, Apartment</label>
+                <input type="text" id="checkoutFlat" class="form-input" placeholder="" required>
+              </div>
+
+              <!-- Area, Street, Sector, Village -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutArea" class="form-label">Area, Street, Sector, Village</label>
+                <input type="text" id="checkoutArea" class="form-input" placeholder="" required>
+              </div>
+
+              <!-- Landmark -->
+              <div class="form-field" style="margin-bottom: 0;">
+                <label for="checkoutLandmark" class="form-label">Landmark</label>
+                <input type="text" id="checkoutLandmark" class="form-input" placeholder="E.g. near apollo hospital">
+              </div>
+
+              <!-- Town/City and State side-by-side -->
+              <div class="city-state-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-field" style="margin-bottom: 0;">
+                  <label for="checkoutCity" class="form-label">Town/City</label>
+                  <input type="text" id="checkoutCity" class="form-input" placeholder="" required autocomplete="address-level2">
+                </div>
+                <div class="form-field" style="margin-bottom: 0;">
+                  <label for="checkoutState" class="form-label">State</label>
+                  <select id="checkoutState" class="form-select" required autocomplete="address-level1">
+                    <option value="" disabled selected>Choose a state</option>
+                    <option value="Andhra Pradesh">Andhra Pradesh</option>
+                    <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                    <option value="Assam">Assam</option>
+                    <option value="Bihar">Bihar</option>
+                    <option value="Chhattisgarh">Chhattisgarh</option>
+                    <option value="Goa">Goa</option>
+                    <option value="Gujarat">Gujarat</option>
+                    <option value="Haryana">Haryana</option>
+                    <option value="Himachal Pradesh">Himachal Pradesh</option>
+                    <option value="Jharkhand">Jharkhand</option>
+                    <option value="Karnataka">Karnataka</option>
+                    <option value="Kerala">Kerala</option>
+                    <option value="Madhya Pradesh">Madhya Pradesh</option>
+                    <option value="Maharashtra">Maharashtra</option>
+                    <option value="Manipur">Manipur</option>
+                    <option value="Meghalaya">Meghalaya</option>
+                    <option value="Mizoram">Mizoram</option>
+                    <option value="Nagaland">Nagaland</option>
+                    <option value="Odisha">Odisha</option>
+                    <option value="Punjab">Punjab</option>
+                    <option value="Rajasthan">Rajasthan</option>
+                    <option value="Sikkim">Sikkim</option>
+                    <option value="Tamil Nadu">Tamil Nadu</option>
+                    <option value="Telangana">Telangana</option>
+                    <option value="Tripura">Tripura</option>
+                    <option value="Uttar Pradesh">Uttar Pradesh</option>
+                    <option value="Uttarakhand">Uttarakhand</option>
+                    <option value="West Bengal">West Bengal</option>
+                    <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+                    <option value="Chandigarh">Chandigarh</option>
+                    <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                    <option value="Delhi">Delhi</option>
+                    <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                    <option value="Ladakh">Ladakh</option>
+                    <option value="Lakshadweep">Lakshadweep</option>
+                    <option value="Puducherry">Puducherry</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Default Address Checkbox -->
+              <label class="address-default-checkbox-wrap" style="display: flex; align-items: center; gap: 8px; margin: 4px 0 2px 0; font-size: 0.88rem; color: var(--slate-800); cursor: pointer; user-select: none;">
+                <input type="checkbox" id="checkoutDefaultAddress" checked style="width: 17px; height: 17px; cursor: pointer; accent-color: var(--emerald-600);">
+                <span>Make this my default address</span>
+              </label>
+
+              <!-- Delivery instructions (optional) -->
+              <details class="delivery-instructions-details" style="border-top: 1px dashed var(--slate-200); margin-top: 6px; padding-top: 10px;">
+                <summary style="list-style: none; display: flex; flex-direction: column; gap: 2px; cursor: pointer; user-select: none;">
+                  <span class="delivery-instructions-title" style="font-size: 0.88rem; font-weight: 700; color: var(--slate-900);">Delivery instructions (optional)</span>
+                  <span class="delivery-instructions-link" style="font-size: 0.82rem; color: #0284c7; display: inline-flex; align-items: center; gap: 4px;">
+                    Add preferences, notes, access codes and more <i data-lucide="chevron-down" style="width: 14px; height: 14px; display: inline-block;"></i>
+                  </span>
+                </summary>
+                <div class="delivery-instructions-body" style="margin-top: 10px;">
+                  <textarea id="checkoutDeliveryInstructions" class="form-textarea" rows="2" style="min-height: 64px; width: 100%; box-sizing: border-box;" placeholder="Add drop-off preferences, shed gate code, directions or dispatch notes..."></textarea>
+                </div>
+              </details>
+
+              <!-- Backwards-compatible shipping address hidden input -->
+              <input type="hidden" id="checkoutShippingAddress" value="">
             </div>
           </div>
 
@@ -1372,7 +1486,8 @@
     </div>
   </div>
 
-  <!-- Application Controller Script -->
+  <!-- Firebase and Application Controller Scripts -->
+  <script src="/firebase-db.js?v=6.0"></script>
   <script src="/landing/app.js?v=3.2" charset="UTF-8"></script>
 </body>
 </html>

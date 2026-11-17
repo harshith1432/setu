@@ -303,6 +303,89 @@ class FirestoreService:
             logger.debug("Firestore get_orders failed: %s", e)
             return []
 
+    def get_order(self, order_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve single order by ID or order_number from Firestore."""
+        if not self.is_available or not order_id:
+            return None
+        try:
+            doc = self._db.collection("orders").document(order_id).get()
+            if doc.exists:
+                return {"id": doc.id, **doc.to_dict()}
+            docs = self._db.collection("orders").where("order_number", "==", order_id).limit(1).get()
+            if docs:
+                d = docs[0]
+                return {"id": d.id, **d.to_dict()}
+        except Exception as e:
+            logger.debug("Firestore get_order error: %s", e)
+        return None
+
+    def update_order(self, order_id: str, update_data: Dict[str, Any]) -> bool:
+        """Update existing order fields in Firestore."""
+        if not self.is_available or not order_id:
+            return False
+        try:
+            update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("orders").document(order_id).set(update_data, merge=True)
+            return True
+        except Exception as e:
+            logger.debug("Firestore update_order error: %s", e)
+            return False
+
+    def record_payment(self, payment_data: Dict[str, Any]) -> Optional[str]:
+        """Record a payment document in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            pid = payment_data.get("id") or f"pay_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            payment_data["id"] = pid
+            payment_data["created_at"] = payment_data.get("created_at") or datetime.now(timezone.utc).isoformat()
+            self._db.collection("payments").document(pid).set(payment_data, merge=True)
+            return pid
+        except Exception as e:
+            logger.error("Firestore record_payment error: %s", e)
+            return None
+
+    def get_payments(self, order_id: Optional[str] = None, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve payments optionally filtered by order_id or user_id."""
+        if not self.is_available:
+            return []
+        try:
+            q = self._db.collection("payments")
+            if order_id:
+                q = q.where("order_id", "==", order_id)
+            elif user_id:
+                q = q.where("user_id", "==", user_id)
+            docs = q.order_by("created_at", direction="DESCENDING").get()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.debug("Firestore get_payments error: %s", e)
+            return []
+
+    def create_invoice(self, invoice_data: Dict[str, Any]) -> Optional[str]:
+        """Record an invoice document in Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            iid = invoice_data.get("id") or f"inv_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            invoice_data["id"] = iid
+            invoice_data["issued_at"] = invoice_data.get("issued_at") or datetime.now(timezone.utc).isoformat()
+            self._db.collection("invoices").document(iid).set(invoice_data, merge=True)
+            return iid
+        except Exception as e:
+            logger.error("Firestore create_invoice error: %s", e)
+            return None
+
+    def update_invoice(self, invoice_id: str, update_data: Dict[str, Any]) -> bool:
+        """Update existing invoice in Firestore."""
+        if not self.is_available or not invoice_id:
+            return False
+        try:
+            self._db.collection("invoices").document(invoice_id).set(update_data, merge=True)
+            return True
+        except Exception as e:
+            logger.debug("Firestore update_invoice error: %s", e)
+            return False
+
     # =========================================================================
     # 4. AUDIT LOGS & DEVICE COMMANDS
     # =========================================================================

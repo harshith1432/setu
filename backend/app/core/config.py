@@ -77,6 +77,11 @@ class Settings(BaseModel):
     WHATSAPP_ALERT_COOLDOWN_SECONDS: int = int(os.getenv("WHATSAPP_ALERT_COOLDOWN_SECONDS", "300"))
     WHATSAPP_CRITICAL_COOLDOWN_SECONDS: int = int(os.getenv("WHATSAPP_CRITICAL_COOLDOWN_SECONDS", "900"))
 
+    # Razorpay Payment Gateway Integration
+    RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
+    RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+    RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
     # Regional defaults (Global Worldwide Dynamic Geocoding)
     DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "Global Sericulture Network")
     DEFAULT_LATITUDE: float = float(os.getenv("DEFAULT_LATITUDE", "0.0"))

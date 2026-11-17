@@ -2363,3 +2363,60 @@ button, input, select, textarea {
   border: 1px solid var(--slate-300) !important;
   border-radius: var(--radius-sm) !important;
 }
+
+/* E-Commerce Structured Delivery Address Form */
+.checkout-address-form-grid .form-label {
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  color: #0f172a !important;
+  margin-bottom: 4px !important;
+}
+
+.checkout-address-form-grid .form-input,
+.checkout-address-form-grid .form-select {
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 9px 12px !important;
+  font-size: 0.88rem !important;
+  line-height: 1.4 !important;
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.checkout-address-form-grid .form-input:focus,
+.checkout-address-form-grid .form-select:focus {
+  outline: none !important;
+  border-color: var(--emerald-600) !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+}
+
+.checkout-address-form-grid .form-helper-text {
+  display: block;
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.delivery-instructions-details summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.delivery-instructions-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.delivery-instructions-details[open] .delivery-instructions-link i {
+  transform: rotate(180deg);
+}
+
+@media (max-width: 540px) {
+  .city-state-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

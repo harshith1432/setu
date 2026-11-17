@@ -513,11 +513,12 @@ function showDashboardView() {
   updateUserBadge();
   enforceRoleNavigation();
 
-  // Restore current tab from storage if allowed for this role, else fallback to default tab
+  // Restore current tab from storage or URL if allowed for this role, else fallback to default tab
   const role = currentUser?.role || 'farmer';
   const defaultTab = ROLE_DEFAULT_TABS[role] || 'overview';
   const allowedTabs = ROLE_PERMISSIONS[role] || [];
-  const savedTab = TAB_STORAGE.getItem('setu_tab_nav') || localStorage.getItem('setu_tab_nav');
+  const urlTab = new URLSearchParams(window.location.search).get('tab');
+  const savedTab = urlTab || TAB_STORAGE.getItem('setu_tab_nav') || localStorage.getItem('setu_tab_nav');
   if (savedTab && allowedTabs.includes(savedTab)) {
     currentTab = savedTab;
   } else {
@@ -1087,8 +1088,123 @@ async function submitFirstLoginPasswordReset(e) {
   }
 }
 
+async function processPendingCheckoutAfterLogin(user, token) {
+  try {
+    const rawPending = localStorage.getItem('setu_pending_order') || sessionStorage.getItem('setu_pending_order') || localStorage.getItem('setu_pending_checkout') || sessionStorage.getItem('setu_pending_checkout');
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectParam = urlParams.get('redirect');
+    const prodIdParam = urlParams.get('product_id');
+
+    if (!rawPending && !prodIdParam && redirectParam !== 'orders') return false;
+
+    let pOrder = {};
+    if (rawPending) {
+      try { pOrder = JSON.parse(rawPending); } catch (_) {}
+    }
+
+    const prodId = pOrder.product_id || prodIdParam || (pOrder.items && pOrder.items[0] && pOrder.items[0].product_id);
+    if (!prodId) return false;
+
+    const prodName = pOrder.product_name || (pOrder.items && pOrder.items[0] && pOrder.items[0].product_name) || 'Sericulture Hardware Node';
+    const sku = pOrder.sku || (pOrder.items && pOrder.items[0] && pOrder.items[0].sku) || 'SKU-SERI-HW';
+    const category = pOrder.category || 'Hardware';
+    const qty = parseInt(pOrder.quantity, 10) || parseInt(urlParams.get('qty'), 10) || 1;
+    const unitPriceMinor = parseInt(pOrder.unit_price_minor_units, 10) || 199900;
+    const totalMinor = unitPriceMinor * qty;
+    const grandTotalMinor = totalMinor + Math.round(totalMinor * 0.18);
+    const shipAddr = pOrder.shipping_address || (user.farm_name ? `Shed: ${user.farm_name}, Region: ${user.region || 'Karnataka'}` : 'Rearing Shed, Karnataka');
+    const payMethod = pOrder.payment_method || 'Cash on Delivery (Pay at Shed)';
+
+    const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const orderNum = `ORD-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    const invNum = `INV-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    const nowIso = new Date().toISOString();
+
+    const orderRecord = {
+      id: orderId,
+      order_number: orderNum,
+      invoice_number: invNum,
+      user_id: user.id || user.username,
+      customer_name: user.full_name || user.username,
+      customer_phone: user.phone || user.whatsapp_number || '',
+      farm_name: user.farm_name || 'My Sericulture Farm',
+      status: 'PAID',
+      total_amount_minor_units: grandTotalMinor,
+      currency: 'INR',
+      shipping_address: shipAddr,
+      payment_method: payMethod,
+      notes: `Hardware order verified for ${user.full_name || user.username} (${payMethod})`,
+      items: [
+        {
+          id: `oi_${Date.now()}`,
+          order_id: orderId,
+          product_id: prodId,
+          product_name: prodName,
+          sku: sku,
+          category: category,
+          quantity: qty,
+          unit_price_minor_units: unitPriceMinor,
+          total_price_minor_units: totalMinor,
+          image_url: (pOrder.images && pOrder.images[0]) || ''
+        }
+      ],
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    // 1. Direct Cloud Firestore write
+    if (window.SetuFirebase && SetuFirebase.isAvailable && SetuFirebase.db) {
+      try {
+        await SetuFirebase.db.collection('orders').doc(orderId).set(orderRecord, { merge: true });
+      } catch (fsErr) {
+        console.warn('Firestore direct order save notice:', fsErr);
+      }
+    }
+
+    // 2. Backend API call
+    try {
+      await fetch(`${API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: [{ product_id: prodId, quantity: qty }],
+          shipping_address: shipAddr,
+          payment_method: payMethod,
+          notes: orderRecord.notes
+        })
+      });
+    } catch (apiErr) {
+      console.warn('Backend API order save notice:', apiErr);
+    }
+
+    // Clear pending keys
+    try {
+      localStorage.removeItem('setu_pending_order');
+      sessionStorage.removeItem('setu_pending_order');
+      localStorage.removeItem('setu_pending_checkout');
+      sessionStorage.removeItem('setu_pending_checkout');
+      sessionStorage.removeItem('setu_checkout_product_id');
+    } catch (_) {}
+
+    // Navigate user directly to 'orders' tab in their dashboard
+    currentTab = 'orders';
+    TAB_STORAGE.setItem('setu_tab_nav', 'orders');
+    localStorage.setItem('setu_tab_nav', 'orders');
+
+    showToast(`Order confirmed! ${prodName} is now in your dashboard.`, 'success');
+    return true;
+  } catch (err) {
+    console.warn('processPendingCheckoutAfterLogin error:', err);
+    return false;
+  }
+}
+
 window.showFirstLoginResetModal = showFirstLoginResetModal;
 window.submitFirstLoginPasswordReset = submitFirstLoginPasswordReset;
+window.processPendingCheckoutAfterLogin = processPendingCheckoutAfterLogin;
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -1136,16 +1252,15 @@ async function handleLogin(e) {
       return;
     }
 
-    // Check if redirected from landing page direct checkout
-    const urlParams = new URLSearchParams(window.location.search);
-    const redirectParam = urlParams.get('redirect');
-    const productIdParam = urlParams.get('product_id') || sessionStorage.getItem('setu_checkout_product_id');
-
-    if (redirectParam === 'checkout' || productIdParam) {
-      showToast(`Welcome back, ${currentUser.full_name || currentUser.username}! Resuming your order...`, 'success');
-      setTimeout(() => {
-        window.location.href = `/#products?buy=${encodeURIComponent(productIdParam || '')}`;
-      }, 400);
+    // Check if user came from order placement / checkout
+    const hadPendingOrder = await processPendingCheckoutAfterLogin(currentUser, adminToken);
+    if (hadPendingOrder) {
+      if (window.location.pathname === '/login' || window.location.pathname.endsWith('/login.html')) {
+        window.location.replace('/admin?tab=orders');
+        return;
+      }
+      showDashboardView();
+      switchNavTab('orders');
       return;
     }
 
@@ -1242,6 +1357,18 @@ async function completeGoogleLogin(googleUserData) {
     localStorage.setItem('setu_token', adminToken);
     localStorage.setItem('setu_user', JSON.stringify(currentUser));
     if (currentSessionId) localStorage.setItem('setu_session_id', currentSessionId);
+
+    // Check if user came from order placement / checkout
+    const hadPendingOrder = await processPendingCheckoutAfterLogin(currentUser, adminToken);
+    if (hadPendingOrder) {
+      if (window.location.pathname === '/login' || window.location.pathname.endsWith('/login.html')) {
+        window.location.replace('/admin?tab=orders');
+        return;
+      }
+      showDashboardView();
+      switchNavTab('orders');
+      return;
+    }
 
     const defTab = (ROLE_DEFAULT_TABS && ROLE_DEFAULT_TABS[currentUser.role]) || 'live-monitoring';
     currentTab = defTab;
@@ -8407,6 +8534,16 @@ function handlePaymentMethodChange(method) {
   }
 }
 
+const INDIAN_STATES_LIST = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa",
+  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala",
+  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland",
+  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
+  "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi",
+  "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
+
 function openFarmerOrderModal(productId) {
   let p = allProductsList.find(x => x.id === productId);
   if (!p) return;
@@ -8422,9 +8559,24 @@ function openFarmerOrderModal(productId) {
   const rawImgUrl = (p.images && p.images.length > 0) ? p.images[0] : null;
   const imgUrl = resolveProductImageUrl(rawImgUrl);
   const farmerUser = currentUser || {};
-  const defaultAddress = farmerUser.farm_name 
-    ? `${farmerUser.farm_name}, ${farmerUser.region || 'Karnataka'}`
-    : 'Shed No. 1, Main Road, Sericulture Cluster';
+
+  let savedAddr = {};
+  try {
+    const raw = localStorage.getItem('setu_saved_shipping_address');
+    if (raw) savedAddr = JSON.parse(raw);
+  } catch (_) {}
+
+  const defaultCountry = savedAddr.country || 'India';
+  const defaultFullName = savedAddr.full_name || farmerUser.full_name || farmerUser.username || '';
+  const defaultMobile = savedAddr.mobile || farmerUser.phone || farmerUser.whatsapp_number || '';
+  const defaultPincode = savedAddr.pincode || '';
+  const defaultFlat = savedAddr.flat || (farmerUser.farm_name ? `Shed: ${farmerUser.farm_name}` : '');
+  const defaultArea = savedAddr.area || '';
+  const defaultLandmark = savedAddr.landmark || '';
+  const defaultCity = savedAddr.city || farmerUser.region || farmerUser.city || '';
+  const defaultState = savedAddr.state || farmerUser.state || (farmerUser.region === 'Karnataka' ? 'Karnataka' : 'Karnataka');
+  const defaultInstructions = savedAddr.delivery_instructions || '';
+  const isDefaultChecked = savedAddr ? (savedAddr.is_default !== false) : true;
 
   const modalHtml = `
     <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -8472,11 +8624,96 @@ function openFarmerOrderModal(productId) {
         </div>
       </div>
 
-      <!-- Shed Delivery Address -->
-      <div>
-        <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Rearing Shed Delivery Address *</label>
-        <textarea id="farmerOrderAddress" rows="2" class="form-control" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.84rem;">${escapeHtml(defaultAddress)}</textarea>
-        <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 3px;">Hardware dispatch will coordinate directly with your taluk sericulture field technician.</div>
+      <!-- Structured Delivery Address Section -->
+      <div style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="map-pin" style="width: 16px; height: 16px; color: var(--brand-primary, #059669);"></i>
+          <span>Delivery Address</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Country/Region -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Country/Region</label>
+            <select id="farmerOrderCountry" class="form-control" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--bg-surface);">
+              <option value="India" selected>India</option>
+            </select>
+          </div>
+
+          <!-- Full name (First and Last name) -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Full name (First and Last name)</label>
+            <input type="text" id="farmerOrderFullName" class="form-control" value="${escapeHtml(defaultFullName)}" placeholder="" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+          </div>
+
+          <!-- Mobile number -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Mobile number</label>
+            <input type="tel" id="farmerOrderMobile" class="form-control" maxlength="10" value="${escapeHtml(defaultMobile)}" placeholder="" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+            <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 3px;">May be used to assist delivery</div>
+          </div>
+
+          <!-- Pincode -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Pincode</label>
+            <input type="text" id="farmerOrderPincode" class="form-control" maxlength="6" pattern="[0-9]{6}" value="${escapeHtml(defaultPincode)}" placeholder="6 digits [0-9] PIN code" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+          </div>
+
+          <!-- Flat, House no., Building, Company, Apartment -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Flat, House no., Building, Company, Apartment</label>
+            <input type="text" id="farmerOrderFlat" class="form-control" value="${escapeHtml(defaultFlat)}" placeholder="" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+          </div>
+
+          <!-- Area, Street, Sector, Village -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Area, Street, Sector, Village</label>
+            <input type="text" id="farmerOrderArea" class="form-control" value="${escapeHtml(defaultArea)}" placeholder="" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+          </div>
+
+          <!-- Landmark -->
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Landmark</label>
+            <input type="text" id="farmerOrderLandmark" class="form-control" value="${escapeHtml(defaultLandmark)}" placeholder="E.g. near apollo hospital" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+          </div>
+
+          <!-- Town/City and State side-by-side -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">Town/City</label>
+              <input type="text" id="farmerOrderCity" class="form-control" value="${escapeHtml(defaultCity)}" placeholder="" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+            </div>
+            <div>
+              <label style="display: block; font-weight: 700; font-size: 0.82rem; margin-bottom: 4px; color: var(--text-main);">State</label>
+              <select id="farmerOrderState" class="form-control" style="width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; background: var(--bg-surface);">
+                <option value="" disabled ${!defaultState ? 'selected' : ''}>Choose a state</option>
+                ${INDIAN_STATES_LIST.map(s => `<option value="${s}" ${defaultState === s ? 'selected' : ''}>${s}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Default Address Checkbox -->
+          <label style="display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 0.85rem; color: var(--text-main); cursor: pointer; user-select: none;">
+            <input type="checkbox" id="farmerOrderDefaultAddress" ${isDefaultChecked ? 'checked' : ''} style="width: 16px; height: 16px; cursor: pointer; accent-color: var(--brand-primary, #059669);">
+            <span>Make this my default address</span>
+          </label>
+
+          <!-- Delivery instructions (optional) -->
+          <details style="border-top: 1px dashed var(--border-color); margin-top: 4px; padding-top: 8px;">
+            <summary style="list-style: none; display: flex; flex-direction: column; gap: 2px; cursor: pointer; user-select: none;">
+              <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-main);">Delivery instructions (optional)</span>
+              <span style="font-size: 0.80rem; color: #0284c7; display: inline-flex; align-items: center; gap: 4px;">
+                Add preferences, notes, access codes and more <i data-lucide="chevron-down" style="width: 13px; height: 13px;"></i>
+              </span>
+            </summary>
+            <div style="margin-top: 8px;">
+              <textarea id="farmerOrderDeliveryInstructions" class="form-control" rows="2" style="width: 100%; min-height: 56px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.84rem;" placeholder="Add drop-off preferences, shed gate code, directions or dispatch notes...">${escapeHtml(defaultInstructions)}</textarea>
+            </div>
+          </details>
+
+          <!-- Backwards-compatible shipping address hidden input -->
+          <input type="hidden" id="farmerOrderAddress" value="">
+        </div>
       </div>
 
       <!-- Payment Method -->
@@ -8507,22 +8744,104 @@ function openFarmerOrderModal(productId) {
     </div>
   `;
 
-  openAppModal('Complete Hardware Purchase', modalHtml, 'md');
+  openAppModal('Complete Hardware Purchase', modalHtml, 'lg');
 }
 
 async function submitFarmerHardwareOrder(productId) {
   const p = allProductsList.find(x => x.id === productId);
   if (!p) return;
 
-  const address = document.getElementById('farmerOrderAddress')?.value?.trim();
-  if (!address) {
-    const errBox = document.getElementById('farmerOrderError');
+  const errBox = document.getElementById('farmerOrderError');
+  if (errBox) {
+    errBox.classList.add('hidden');
+    errBox.textContent = '';
+  }
+
+  // 1. Read & Validate Structured Delivery Address
+  const country = document.getElementById('farmerOrderCountry')?.value?.trim() || 'India';
+  const fullName = document.getElementById('farmerOrderFullName')?.value?.trim();
+  const mobile = document.getElementById('farmerOrderMobile')?.value?.trim().replace(/\D/g, '');
+  const pincode = document.getElementById('farmerOrderPincode')?.value?.trim();
+  const flat = document.getElementById('farmerOrderFlat')?.value?.trim();
+  const area = document.getElementById('farmerOrderArea')?.value?.trim();
+  const landmark = document.getElementById('farmerOrderLandmark')?.value?.trim() || '';
+  const city = document.getElementById('farmerOrderCity')?.value?.trim();
+  const state = document.getElementById('farmerOrderState')?.value?.trim();
+  const isDefault = document.getElementById('farmerOrderDefaultAddress')?.checked !== false;
+  const instructions = document.getElementById('farmerOrderDeliveryInstructions')?.value?.trim() || '';
+
+  const showValidationError = (msg, elementId) => {
     if (errBox) {
-      errBox.textContent = 'Please enter your rearing shed delivery address.';
+      errBox.textContent = msg;
       errBox.classList.remove('hidden');
     }
+    const el = document.getElementById(elementId);
+    if (el) el.focus();
+  };
+
+  if (!fullName) {
+    showValidationError('Please enter your Full name (First and Last name).', 'farmerOrderFullName');
     return;
   }
+  if (!mobile || mobile.length < 10) {
+    showValidationError('Please enter a valid 10-digit mobile number.', 'farmerOrderMobile');
+    return;
+  }
+  if (!pincode || !/^\d{6}$/.test(pincode)) {
+    showValidationError('Please enter a valid 6-digit PIN code.', 'farmerOrderPincode');
+    return;
+  }
+  if (!flat) {
+    showValidationError('Please enter Flat, House no., Building, Company, Apartment.', 'farmerOrderFlat');
+    return;
+  }
+  if (!area) {
+    showValidationError('Please enter Area, Street, Sector, Village.', 'farmerOrderArea');
+    return;
+  }
+  if (!city) {
+    showValidationError('Please enter Town/City.', 'farmerOrderCity');
+    return;
+  }
+  if (!state || state === 'Choose a state') {
+    showValidationError('Please choose a state.', 'farmerOrderState');
+    return;
+  }
+
+  // Format full address
+  const addressParts = [
+    `${flat}, ${area}`,
+    landmark ? `Landmark: ${landmark}` : '',
+    `${city}, ${state} - ${pincode}`,
+    country,
+    `Contact: ${fullName} (Ph: ${mobile})`,
+    instructions ? `Delivery instructions: ${instructions}` : ''
+  ].filter(Boolean);
+  const formattedAddress = addressParts.join(', ');
+
+  const addressData = {
+    country,
+    full_name: fullName,
+    mobile,
+    pincode,
+    flat,
+    area,
+    landmark,
+    city,
+    state,
+    is_default: isDefault,
+    delivery_instructions: instructions,
+    formatted_address: formattedAddress
+  };
+
+  if (isDefault) {
+    try {
+      localStorage.setItem('setu_saved_shipping_address', JSON.stringify(addressData));
+    } catch (_) {}
+  }
+
+  const hiddenAddr = document.getElementById('farmerOrderAddress');
+  if (hiddenAddr) hiddenAddr.value = formattedAddress;
 
   const payMethod = document.querySelector('input[name="farmerPaymentMethod"]:checked')?.value || 'UPI';
   const qty = window.farmerCurrentOrderQty || 1;
@@ -8542,7 +8861,7 @@ async function submitFarmerHardwareOrder(productId) {
       },
       body: JSON.stringify({
         items: [{ product_id: p.id, quantity: qty }],
-        shipping_address: address,
+        shipping_address: formattedAddress,
         payment_method: payMethod,
         notes: `Direct purchase from Setu Farmer Hub (${payMethod})`
       })
@@ -9238,12 +9557,23 @@ async function loadOrders(statusFilter = '') {
       }
     } catch (_) {}
 
-    // Firestore direct fallback for orders
-    if ((!ordersList || ordersList.length === 0) && window.SetuFirebase && SetuFirebase.isAvailable) {
+    // Firestore direct synchronization & fallback for orders
+    if (window.SetuFirebase && SetuFirebase.isAvailable && SetuFirebase.db) {
       try {
         const snap = await SetuFirebase.db.collection('orders').orderBy('created_at', 'desc').get();
         if (!snap.empty) {
-          ordersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          if (isFarmer && currentUser) {
+            docs = docs.filter(d => d.user_id === currentUser.id || d.user_id === currentUser.username || d.customer_name === currentUser.full_name);
+          }
+          const existingIds = new Set(ordersList.map(o => o.id));
+          for (const d of docs) {
+            if (!existingIds.has(d.id)) {
+              ordersList.push(d);
+              existingIds.add(d.id);
+            }
+          }
+          ordersList.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
         }
       } catch (fe) {
         console.warn('Firestore loadOrders fallback notice:', fe);
