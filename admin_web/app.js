@@ -3720,21 +3720,13 @@ function openAppDrawer(title, htmlContent) {
   if (drawerTitle) drawerTitle.textContent = title;
   const drawerBody = document.getElementById('drawerBody');
   if (drawerBody) {
-    const sanitizer = (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function')
-      ? DOMPurify
+    const raw = String(htmlContent || '');
+    const clean = (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function')
+      ? DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] })
       : (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function')
-        ? window.DOMPurify
-        : null;
-    if (sanitizer) {
-      drawerBody.innerHTML = sanitizer.sanitize(htmlContent || '', {
-        ADD_ATTR: ['target']
-      });
-    } else {
-      drawerBody.replaceChildren();
-      const doc = new DOMParser().parseFromString(htmlContent || '', 'text/html');
-      doc.querySelectorAll('script, iframe, object, embed, style, link').forEach(n => n.remove());
-      drawerBody.append(...doc.body.childNodes);
-    }
+        ? window.DOMPurify.sanitize(raw, { ADD_ATTR: ['target'] })
+        : '';
+    drawerBody.innerHTML = clean;
   }
   document.getElementById('drawerBackdrop').classList.add('open', 'active');
   document.getElementById('appDrawer').classList.add('open', 'active');
@@ -3757,22 +3749,13 @@ function openAppModal(title, htmlContent, size = '') {
       .replace(/\bonclick=(["'])(.*?)\1/gi, 'data-modal-click="$2"');
 
     // Always sanitize via DOMPurify to eliminate DOM text reinterpretation as HTML (CodeQL js/dom-text-reinterpreted-as-html)
-    const sanitizer = (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function')
-      ? DOMPurify
+    const raw = String(protectedHtml || '');
+    const clean = (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function')
+      ? DOMPurify.sanitize(raw, { ADD_ATTR: ['data-modal-submit', 'data-modal-click', 'target'] })
       : (typeof window !== 'undefined' && window.DOMPurify && typeof window.DOMPurify.sanitize === 'function')
-        ? window.DOMPurify
-        : null;
-
-    if (sanitizer) {
-      modalBody.innerHTML = sanitizer.sanitize(protectedHtml, {
-        ADD_ATTR: ['data-modal-submit', 'data-modal-click', 'target']
-      });
-    } else {
-      modalBody.replaceChildren();
-      const doc = new DOMParser().parseFromString(protectedHtml, 'text/html');
-      doc.querySelectorAll('script, iframe, object, embed, style, link').forEach(n => n.remove());
-      modalBody.append(...doc.body.childNodes);
-    }
+        ? window.DOMPurify.sanitize(raw, { ADD_ATTR: ['data-modal-submit', 'data-modal-click', 'target'] })
+        : '';
+    modalBody.innerHTML = clean;
 
     // Rebind form submit listeners cleanly
     modalBody.querySelectorAll('[data-modal-submit]').forEach(form => {
