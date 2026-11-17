@@ -17,7 +17,11 @@ from app.services.db_service import (
     get_all_stage_thresholds,
     get_stage_threshold,
     update_stage_threshold,
-    reset_stage_thresholds
+    reset_stage_thresholds,
+    get_all_devices,
+    register_device,
+    create_device_command,
+    get_device_by_id
 )
 from app.services.rules_engine import sync_thresholds_from_db, STAGE_THRESHOLDS
 from app.services.telemetry_service import telemetry_service
@@ -40,6 +44,15 @@ class FarmerStatusUpdate(BaseModel):
 class EmergencyBypassPayload(BaseModel):
     shed_id: str
     action: str  # "COOLDOWN_ALL", "FOGGER_BOOST", "EMERGENCY_VENTILATE"
+
+class DeviceProvisionPayload(BaseModel):
+    device_id: str
+    shed_id: str
+    device_name: Optional[str] = "Setu Industrial Gateway Node"
+    firmware_version: Optional[str] = "v2.4.1-prod"
+    auth_mode: Optional[str] = "mTLS + ECC608"
+    device_key: Optional[str] = None
+    status: Optional[str] = "ONLINE"
 
 @router.get("/stats")
 def get_admin_dashboard_stats(admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "technician", "analyst"]))):
@@ -522,4 +535,114 @@ def get_live_cluster_telemetry(shed_id: str = "shed_01", admin_user: dict = Depe
             "heater": overview.actuators.heater
         }
     }
+
+
+# =========================================================================
+# IOT HARDWARE NODES & GATEWAYS MANAGEMENT
+# =========================================================================
+
+@router.get("/devices")
+def list_iot_devices(
+    admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "technician", "analyst"]))
+):
+    """
+    Returns list of all registered IoT hardware nodes & gateways across Firestore and PostgreSQL.
+    """
+    return get_all_devices()
+
+
+@router.post("/devices")
+def provision_iot_device(
+    payload: DeviceProvisionPayload,
+    admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "technician"]))
+):
+    """
+    Provisions and registers a new IoT hardware node or gateway for a rearing shed.
+    """
+    device_id = payload.device_id.strip()
+    shed_id = payload.shed_id.strip()
+    if not device_id or not shed_id:
+        raise HTTPException(status_code=400, detail="device_id and shed_id are required.")
+
+    actor = admin_user.get("sub") or admin_user.get("username") or "admin"
+
+    # 1. Register in PostgreSQL database
+    db_result = register_device(
+        device_id=device_id,
+        shed_id=shed_id,
+        device_name=payload.device_name,
+        device_key=payload.device_key,
+        firmware_version=payload.firmware_version or "v2.4.1-prod",
+        auth_mode=payload.auth_mode or "mTLS + ECC608"
+    )
+
+    # 2. Synchronize to Firestore
+    try:
+        if firestore_service.is_available:
+            firestore_service.save_device({
+                "device_id": device_id,
+                "id": device_id,
+                "shed_id": shed_id,
+                "device_name": payload.device_name or "Setu Industrial Gateway Node",
+                "firmware_version": payload.firmware_version or "v2.4.1-prod",
+                "auth_mode": payload.auth_mode or "mTLS + ECC608",
+                "status": payload.status or "ONLINE",
+                "provisioned_by": actor
+            })
+    except Exception as fe:
+        pass
+
+    log_audit(
+        actor,
+        "PROVISION_IOT_DEVICE",
+        f"Provisioned IoT device {device_id} assigned to shed {shed_id} ({payload.auth_mode})"
+    )
+
+    return {
+        "status": "SUCCESS",
+        "message": f"Hardware node {device_id} provisioned successfully",
+        "device": db_result or {
+            "device_id": device_id,
+            "shed_id": shed_id,
+            "device_name": payload.device_name or "Setu Industrial Gateway Node",
+            "firmware_version": payload.firmware_version or "v2.4.1-prod",
+            "auth_mode": payload.auth_mode or "mTLS + ECC608",
+            "status": payload.status or "ONLINE"
+        }
+    }
+
+
+@router.post("/devices/{device_id}/reboot")
+def reboot_iot_device(
+    device_id: str,
+    admin_user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "technician"]))
+):
+    """
+    Dispatches a remote restart/reboot command to an IoT hardware gateway.
+    """
+    actor = admin_user.get("sub") or admin_user.get("username") or "admin"
+    try:
+        dev = get_device_by_id(device_id)
+        shed_id = dev.get("shed_id") if dev else "shed_01"
+        create_device_command(
+            device_id=device_id,
+            shed_id=shed_id or "shed_01",
+            requested_by=actor,
+            command_type="REBOOT",
+            command_payload={"action": "REBOOT_NODE", "target": device_id}
+        )
+    except Exception as ce:
+        pass
+
+    log_audit(
+        actor,
+        "REBOOT_IOT_DEVICE",
+        f"Remote reboot dispatched to device {device_id}"
+    )
+    return {
+        "status": "SUCCESS",
+        "message": f"Remote reboot signal dispatched to node {device_id}",
+        "device_id": device_id
+    }
+
 

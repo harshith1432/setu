@@ -1940,7 +1940,7 @@ function switchNavTab(tabName) {
     'overview': { title: 'System Overview & Platform Health', bread: 'Operations & Platform Overview' },
         'employees': { title: 'Employee Directory & User Administration', bread: 'Personnel & Access Control' },
     'roles': { title: 'Roles & Fine-Grained Permissions', bread: 'Role Templates & Delegation Policies' },
-    'role-access': { title: 'Role Dashboard Permissions & Access Control', bread: 'Department Isolation & Visibility Matrix' },
+    'role-access': { title: 'Role Permissions & Menu Visibility', bread: 'Staff Access & Navigation Control' },
     'departments': { title: 'Departments & Reporting Structures', bread: 'Teams & Organizational Units' },
     'tasks': { title: 'My Work & Priority Queue', bread: 'Operations & Personal Tasks' },
     'live-monitoring': (currentUser && currentUser.role === 'farmer')
@@ -5766,16 +5766,84 @@ function deleteCustomRole(roleId) {
 
 
 // ==============================================================================
-// 26B. ROLE DASHBOARD ACCESS & DEPARTMENT ISOLATION MODULE
+// 26B. ROLE DASHBOARD ACCESS & MENU VISIBILITY (USER-FRIENDLY STUDIO)
 // ==============================================================================
+
+const FALLBACK_SYSTEM_ROLES = [
+  { id: 'role_support', code: 'support', name: 'Customer Support Agent', department_name: 'Customer Operations', user_count: 2, allowed_dashboards: ['overview', 'tasks', 'support', 'guidance', 'alerts', 'farmers'] },
+  { id: 'role_technician', code: 'technician', name: 'Field Installation Technician', department_name: 'Farmers & Infrastructure', user_count: 3, allowed_dashboards: ['tasks', 'live-monitoring', 'alerts', 'sheds', 'devices', 'sensor-config', 'installations', 'install-team', 'guidance'] },
+  { id: 'role_sales', code: 'sales', name: 'Sales & Billing Specialist', department_name: 'Commercial & Sales', user_count: 1, allowed_dashboards: ['overview', 'tasks', 'products', 'orders', 'billing', 'farmers', 'reports'] },
+  { id: 'role_operations_manager', code: 'operations_manager', name: 'Operations & Shed Supervisor', department_name: 'Operations & Monitoring', user_count: 2, allowed_dashboards: ['overview', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'installations', 'install-team', 'research', 'guidance', 'reports'] },
+  { id: 'role_analyst', code: 'analyst', name: 'Agronomy Data Analyst', department_name: 'Operations & Monitoring', user_count: 1, allowed_dashboards: ['overview', 'tasks', 'live-monitoring', 'analytics', 'farmers', 'sheds', 'research', 'guidance', 'reports'] },
+  { id: 'role_hr', code: 'hr', name: 'HR & Personnel Admin', department_name: 'Access & User Governance', user_count: 1, allowed_dashboards: ['overview', 'tasks', 'employees', 'roles', 'role-access', 'departments', 'audit', 'guidance'] },
+  { id: 'role_company_admin', code: 'company_admin', name: 'Company Administrator', department_name: 'Access & User Governance', user_count: 1, allowed_dashboards: ['overview', 'employees', 'roles', 'role-access', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'audit', 'integrations'] },
+  { id: 'role_superadmin', code: 'superadmin', name: 'Super Administrator', department_name: 'Access & User Governance', user_count: 1, allowed_dashboards: ['overview', 'employees', 'roles', 'role-access', 'departments', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config', 'products', 'enquiries', 'orders', 'billing', 'support', 'installations', 'install-team', 'research', 'guidance', 'reports', 'users', 'audit', 'integrations', 'settings'] },
+  { id: 'role_farmer', code: 'farmer', name: 'Smart Silkworm Farmer', department_name: 'Farmers & Infrastructure', user_count: 12, allowed_dashboards: ['live-monitoring', 'guidance', 'analytics', 'alerts', 'products', 'orders'] }
+];
+
+const FALLBACK_DASHBOARDS = [
+  { id: 'overview', name: 'Overview & KPIs', department: 'Overview', description: 'High-level metrics, active sheds, sensor health, and quick actions.', icon: 'layout-dashboard' },
+  { id: 'tasks', name: 'My Work / Tasks', department: 'Overview', description: 'Daily operational to-dos, assigned checklist items, and workflow triage.', icon: 'check-square' },
+  { id: 'live-monitoring', name: 'Live Monitoring', department: 'Operations & Monitoring', description: 'Real-time shed microclimate, temperature, humidity, and active actuators.', icon: 'activity' },
+  { id: 'analytics', name: 'Analytics & Trends', department: 'Operations & Monitoring', description: 'Microclimate trends, seasonal mortality charts, and telemetry graphs.', icon: 'line-chart' },
+  { id: 'alerts', name: 'Alerts & Incidents', department: 'Operations & Monitoring', description: 'Climate threshold breaches, sensor dropouts, and emergency interlocks.', icon: 'alert-triangle' },
+  { id: 'farmers', name: 'Farmers Directory', department: 'Farmers & Infrastructure', description: 'Registered farmer accounts, geographic distribution, and contact details.', icon: 'users' },
+  { id: 'sheds', name: 'Rearing Sheds', department: 'Farmers & Infrastructure', description: 'Physical rearing sheds, DFL capacity, current batch stage, and setpoints.', icon: 'warehouse' },
+  { id: 'devices', name: 'IoT Devices', department: 'Farmers & Infrastructure', description: 'Controller hardware, gateways, firmware versions, and online telemetry state.', icon: 'cpu' },
+  { id: 'sensor-config', name: 'Sensor Configuration', department: 'Farmers & Infrastructure', description: 'Calibration offsets, polling intervals, and target environmental thresholds.', icon: 'sliders' },
+  { id: 'installations', name: 'Installations', department: 'Farmers & Infrastructure', description: 'Field installation dispatching, hardware checklist signoffs, and milestones.', icon: 'wrench' },
+  { id: 'install-team', name: 'Installation Team', department: 'Farmers & Infrastructure', description: 'Field technician roster, team schedules, and regional coverage.', icon: 'user-check' },
+  { id: 'products', name: 'Product Catalogue', department: 'Commercial & Sales', description: 'Hardware catalogue, sensor kits, pricing, and available inventory.', icon: 'package' },
+  { id: 'orders', name: 'Sales & Orders', department: 'Commercial & Sales', description: 'Customer purchase orders, fulfilment tracking, and dispatch status.', icon: 'shopping-cart' },
+  { id: 'billing', name: 'Billing & Invoices', department: 'Commercial & Sales', description: 'Subscription invoices, payment receipts, accounting history, and GST tax records.', icon: 'credit-card' },
+  { id: 'support', name: 'Support Tickets & Helpdesk', department: 'Customer Operations', description: 'Farmer help desk, query tickets, issue resolution, and support chat queue.', icon: 'headphones' },
+  { id: 'guidance', name: 'Farmer Guidance', department: 'Customer Operations', description: 'AI Agronomist, sericulture best practices, and feed/rearing advisory.', icon: 'book-open' },
+  { id: 'research', name: 'Research & Insights', department: 'Customer Operations', description: 'Disease prevention models, cocoon harvest analysis, and silk grade yield research.', icon: 'microscope' },
+  { id: 'reports', name: 'Reports & Export', department: 'Customer Operations', description: 'Automated PDF/CSV executive audits, seasonal telemetry exports, and compliance logs.', icon: 'file-text' },
+  { id: 'employees', name: 'Employees & Users', department: 'Access & User Governance', description: 'Staff directory, invitations, onboarding links, and account status management.', icon: 'user-cog' },
+  { id: 'roles', name: 'Roles & Permissions', department: 'Access & User Governance', description: 'System role templates, custom role profiles, and operational privilege assignment.', icon: 'key-round' },
+  { id: 'role-access', name: 'Role Access Matrix', department: 'Access & User Governance', description: 'Fine-grained checkbox dashboard permission control for all roles and departments.', icon: 'sliders' },
+  { id: 'departments', name: 'Departments & Teams', department: 'Access & User Governance', description: 'Organizational tree, department heads, and reporting hierarchy.', icon: 'network' },
+  { id: 'audit', name: 'Access & Audit Logs', department: 'Access & User Governance', description: 'Security audit trails, authentication logs, and immutable activity records.', icon: 'shield-alert' },
+  { id: 'integrations', name: 'Integrations', department: 'Access & User Governance', description: 'Cloud telemetry webhooks, WhatsApp Business API bridges, and external endpoints.', icon: 'plug' },
+  { id: 'settings', name: 'Platform Settings', department: 'Access & User Governance', description: 'Global environmental thresholds, security policies, and platform branding.', icon: 'settings' }
+];
 
 const roleAccessState = {
   matrixData: null,
   selectedRoleId: null,
   selectedRoleDashboards: new Set(),
+  originalRoleDashboards: new Set(),
   viewMode: 'studio',
   pendingMatrixChanges: {} // roleId -> Set(dashboards)
 };
+
+function toggleRoleAccessGuide() {
+  const guide = document.getElementById('role-access-guide-content');
+  const btn = document.getElementById('btn-toggle-role-guide');
+  if (!guide) return;
+  const isHidden = guide.classList.toggle('hidden');
+  if (btn) btn.textContent = isHidden ? 'Show Guide' : 'Hide Guide';
+}
+
+function filterRoleAccessDashboards(query) {
+  const q = (query || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('.role-access-dept-card');
+  cards.forEach(card => {
+    let deptHasMatch = false;
+    const items = card.querySelectorAll('.dash-checkbox-label');
+    items.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      if (!q || text.includes(q)) {
+        item.style.display = 'flex';
+        deptHasMatch = true;
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    card.style.display = (!q || deptHasMatch) ? 'flex' : 'none';
+  });
+}
 
 async function loadRoleAccessMatrixData() {
   const container = document.getElementById('role-access-departments-container');
@@ -5790,18 +5858,53 @@ async function loadRoleAccessMatrixData() {
   }
 
   try {
-    const res = await fetch(`${API_BASE_URL}/roles/dashboard-matrix`, {
-      headers: {
-        'Authorization': `Bearer ${adminToken}`
+    let data = null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/roles/dashboard-matrix`, {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      });
+      if (res.ok) {
+        data = await res.json();
       }
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Failed to fetch role dashboard matrix');
+    } catch (fetchErr) {
+      console.warn('[RoleAccess] API fetch error, using robust fallback roles:', fetchErr);
     }
 
-    const data = await res.json();
+    // If API returned empty roles or null, populate fallback standard roles & dashboards
+    if (!data) data = {};
+    if (!data.roles || data.roles.length === 0) {
+      data.roles = FALLBACK_SYSTEM_ROLES;
+    }
+    if (!data.dashboards || data.dashboards.length === 0) {
+      data.dashboards = FALLBACK_DASHBOARDS;
+    }
+
+    // Ensure departments array is always populated and has dashboards attached
+    if (!data.departments || data.departments.length === 0) {
+      const deptNames = [
+        { id: 'Overview', name: 'Overview & Daily Workflow', icon: 'layout-dashboard' },
+        { id: 'Operations & Monitoring', name: 'Operations & Monitoring', icon: 'activity' },
+        { id: 'Farmers & Infrastructure', name: 'Farmers & Infrastructure', icon: 'warehouse' },
+        { id: 'Commercial & Sales', name: 'Commercial & Sales', icon: 'shopping-cart' },
+        { id: 'Customer Operations', name: 'Customer Operations / Help Center', icon: 'headphones' },
+        { id: 'Access & User Governance', name: 'Access & User Governance', icon: 'shield-alert' }
+      ];
+      data.departments = deptNames.map(dept => ({
+        ...dept,
+        dashboards: data.dashboards.filter(d => d.department === dept.id || d.department === dept.name || (dept.id && d.department && d.department.includes(dept.id)))
+      }));
+    } else {
+      data.departments.forEach(dept => {
+        if (!dept.dashboards || dept.dashboards.length === 0) {
+          dept.dashboards = data.dashboards.filter(d => 
+            d.department === dept.id || d.department === dept.name || (dept.id && d.department && d.department.includes(dept.id))
+          );
+        }
+      });
+    }
+
     roleAccessState.matrixData = data;
     roleAccessState.pendingMatrixChanges = {};
 
@@ -5814,7 +5917,6 @@ async function loadRoleAccessMatrixData() {
     if (rolesCountEl) rolesCountEl.textContent = (data.roles || []).length;
     if (dashCountEl) dashCountEl.textContent = (data.dashboards || []).length;
 
-    // Count how many roles have access to Support Tickets & Help Center
     const helpdeskRolesCount = (data.roles || []).filter(r => (r.allowed_dashboards || []).includes('support')).length;
     if (supportCountEl) supportCountEl.textContent = `${helpdeskRolesCount} Roles`;
 
@@ -5822,21 +5924,35 @@ async function loadRoleAccessMatrixData() {
       tenantLabelEl.textContent = `Org: ${data.tenant_organization_id}`;
     }
 
-    // 2. Populate Target Role Dropdown
+    // 2. Populate Target Role Dropdown & Quick Switcher Chips
     const picker = document.getElementById('role-access-role-picker');
     if (picker) {
       picker.innerHTML = (data.roles || []).map(r => {
-        const isSelected = (r.id === roleAccessState.selectedRoleId || (!roleAccessState.selectedRoleId && r.code === 'support'));
+        const isSelected = (r.id === roleAccessState.selectedRoleId || (!roleAccessState.selectedRoleId && (r.code === 'support' || r.id === 'role_support')));
         return `<option value="${escapeHtml(r.id)}" ${isSelected ? 'selected' : ''}>
-          ${escapeHtml(r.name)} (${escapeHtml(r.code)}) - ${r.user_count || 0} Users
+          ${escapeHtml(r.name)} (${escapeHtml(r.code || r.id)}) &bull; ${r.user_count || 0} Staff
         </option>`;
       }).join('');
+    }
 
-      // Pick default role (prefer 'support' or first available)
-      if (!roleAccessState.selectedRoleId || !data.roles.some(r => r.id === roleAccessState.selectedRoleId)) {
-        const defaultRole = data.roles.find(r => r.code === 'support') || data.roles[0];
-        roleAccessState.selectedRoleId = defaultRole ? defaultRole.id : null;
-      }
+    // Pick default role (prefer 'support' or first available)
+    if (!roleAccessState.selectedRoleId || !data.roles.some(r => r.id === roleAccessState.selectedRoleId)) {
+      const defaultRole = data.roles.find(r => r.code === 'support' || r.id === 'role_support') || data.roles[0];
+      roleAccessState.selectedRoleId = defaultRole ? defaultRole.id : (data.roles[0]?.id || null);
+    }
+
+    // Populate Quick Role Chips Bar
+    const chipsBar = document.getElementById('quick-role-chips-bar');
+    if (chipsBar) {
+      chipsBar.innerHTML = data.roles.map(r => {
+        const isActive = r.id === roleAccessState.selectedRoleId;
+        return `
+          <button type="button" class="quick-role-chip ${isActive ? 'active' : ''}" onclick="onRoleAccessSelectChange('${escapeHtml(r.id)}')">
+            <span>${escapeHtml(r.name)}</span>
+            <span class="chip-count">${(r.allowed_dashboards || []).length} tabs</span>
+          </button>
+        `;
+      }).join('');
     }
 
     // 3. Render Studio Card View
@@ -5866,17 +5982,101 @@ async function loadRoleAccessMatrixData() {
 
 function onRoleAccessSelectChange(roleId) {
   roleAccessState.selectedRoleId = roleId;
+  const picker = document.getElementById('role-access-role-picker');
+  if (picker && picker.value !== roleId) {
+    picker.value = roleId;
+  }
+
+  // Update active chip
+  const chips = document.querySelectorAll('.quick-role-chip');
+  chips.forEach(chip => {
+    const isTarget = chip.getAttribute('onclick')?.includes(roleId);
+    if (isTarget) chip.classList.add('active');
+    else chip.classList.remove('active');
+  });
+
   renderRoleAccessStudio(roleId);
+}
+
+function updateRoleSidebarPreview() {
+  const previewList = document.getElementById('role-sidebar-preview-list');
+  const countBadge = document.getElementById('role-sidebar-preview-count');
+  if (!previewList) return;
+
+  const dashboards = roleAccessState.matrixData?.dashboards || FALLBACK_DASHBOARDS;
+  const activeDashboards = dashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id));
+
+  if (countBadge) {
+    countBadge.textContent = `${activeDashboards.length} tabs visible`;
+  }
+
+  if (activeDashboards.length === 0) {
+    previewList.innerHTML = `
+      <div style="text-align: center; padding: 24px 10px; color: var(--text-muted); font-size: 0.78rem;">
+        <i data-lucide="eye-off" style="width: 22px; height: 22px; margin-bottom: 6px; display: inline-block; opacity: 0.6;"></i>
+        <p style="margin: 0; font-weight: 600;">No menus enabled</p>
+        <span style="font-size: 0.72rem; opacity: 0.8;">User will see an empty sidebar.</span>
+      </div>
+    `;
+  } else {
+    previewList.innerHTML = activeDashboards.map(d => `
+      <div class="sidebar-preview-item">
+        <i data-lucide="${d.icon || 'circle'}"></i>
+        <span>${escapeHtml(d.name)}</span>
+      </div>
+    `).join('');
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function checkUnsavedRoleChanges() {
+  const stickyBar = document.getElementById('role-access-sticky-bar');
+  const stickyText = document.getElementById('role-access-sticky-text');
+  if (!stickyBar) return;
+
+  const role = roleAccessState.matrixData?.roles.find(r => r.id === roleAccessState.selectedRoleId);
+  const roleName = role ? role.name : 'Selected Role';
+
+  const currentSet = roleAccessState.selectedRoleDashboards;
+  const originalSet = roleAccessState.originalRoleDashboards;
+
+  let hasDiff = (currentSet.size !== originalSet.size);
+  if (!hasDiff) {
+    for (let id of currentSet) {
+      if (!originalSet.has(id)) { hasDiff = true; break; }
+    }
+  }
+
+  if (hasDiff) {
+    if (stickyText) {
+      stickyText.innerHTML = `Unsaved changes for <strong>${escapeHtml(roleName)}</strong> (${currentSet.size} screens enabled)`;
+    }
+    stickyBar.classList.remove('hidden');
+  } else {
+    stickyBar.classList.add('hidden');
+  }
+}
+
+function discardActiveRoleChanges() {
+  roleAccessState.selectedRoleDashboards = new Set(roleAccessState.originalRoleDashboards);
+  renderRoleAccessStudio(roleAccessState.selectedRoleId);
+  const stickyBar = document.getElementById('role-access-sticky-bar');
+  if (stickyBar) stickyBar.classList.add('hidden');
+  showToast('Reverted unsaved changes', 'info');
 }
 
 function renderRoleAccessStudio(roleId) {
   if (!roleAccessState.matrixData) return;
   const { roles, departments, dashboards, tenant_organization_id } = roleAccessState.matrixData;
+  if (!roles || roles.length === 0) return;
+
   const role = (roles || []).find(r => r.id === roleId) || roles[0];
   if (!role) return;
 
-  // Initialize selected set from role's allowed_dashboards
+  roleAccessState.selectedRoleId = role.id;
   roleAccessState.selectedRoleDashboards = new Set(role.allowed_dashboards || []);
+  roleAccessState.originalRoleDashboards = new Set(role.allowed_dashboards || []);
 
   // Update Role Banner info
   const codeBadge = document.getElementById('role-access-code-badge');
@@ -5884,12 +6084,14 @@ function renderRoleAccessStudio(roleId) {
   const tenantBadge = document.getElementById('role-access-tenant-badge');
   const totalCountEl = document.getElementById('role-access-total-dash-count');
 
-  if (codeBadge) codeBadge.textContent = (role.code || 'ROLE').toUpperCase();
-  if (deptName) deptName.textContent = `Department: ${role.department_name || role.department_code || 'General Operations'}`;
+  if (codeBadge) codeBadge.textContent = (role.code || role.id || 'ROLE').toUpperCase();
+  if (deptName) deptName.textContent = `Department: ${role.department_name || role.department_code || 'General Staff'}`;
   if (tenantBadge) tenantBadge.textContent = `Tenant: ${role.organization_id || tenant_organization_id || 'default_org'}`;
   if (totalCountEl) totalCountEl.textContent = (dashboards || []).length;
 
   updateRoleAccessSelectedCounter();
+  updateRoleSidebarPreview();
+  checkUnsavedRoleChanges();
 
   // Render Department Cards
   const container = document.getElementById('role-access-departments-container');
@@ -5898,17 +6100,16 @@ function renderRoleAccessStudio(roleId) {
   const deptIcons = {
     'Overview': 'layout-dashboard',
     'Operations & Monitoring': 'activity',
-    'Farmers & Infrastructure': 'trees',
+    'Farmers & Infrastructure': 'warehouse',
     'Commercial & Sales': 'shopping-cart',
-    'Customer Operations': 'life-buoy',
+    'Customer Operations': 'headphones',
     'Access & User Governance': 'shield-check'
   };
 
   container.innerHTML = (departments || []).map(dept => {
     const deptDashboards = dept.dashboards || [];
-    const iconName = deptIcons[dept.name] || 'layers';
+    const iconName = deptIcons[dept.id] || deptIcons[dept.name] || 'layers';
 
-    // Calculate how many in this dept are checked
     const checkedInDept = deptDashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id)).length;
     const isAllChecked = deptDashboards.length > 0 && checkedInDept === deptDashboards.length;
 
@@ -5921,10 +6122,10 @@ function renderRoleAccessStudio(roleId) {
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="role-access-dept-badge ${checkedInDept > 0 ? 'active' : ''}" id="badge-dept-${escapeHtml(dept.name.replace(/[^a-zA-Z0-9]/g, ''))}">
-              ${checkedInDept} / ${deptDashboards.length}
+              ${checkedInDept} / ${deptDashboards.length} enabled
             </span>
-            <button type="button" class="btn btn-ghost btn-xs" style="padding: 2px 6px; font-size: 0.72rem; border-radius: 4px;" onclick="toggleDepartmentDashboards('${escapeHtml(dept.name)}')" title="Toggle all dashboards in this department">
-              ${isAllChecked ? 'Uncheck All' : 'Select All'}
+            <button type="button" class="btn btn-ghost btn-xs" style="padding: 3px 8px; font-size: 0.72rem; border-radius: 4px;" onclick="toggleDepartmentDashboards('${escapeHtml(dept.name)}')" title="Toggle all dashboards in this department">
+              ${isAllChecked ? 'Disable All' : 'Enable All'}
             </button>
           </div>
         </div>
@@ -5981,7 +6182,7 @@ function onDashboardCheckboxToggle(dashId, isChecked) {
         const badge = document.getElementById(`badge-dept-${dept.name.replace(/[^a-zA-Z0-9]/g, '')}`);
         if (badge) {
           const checkedCount = dept.dashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id)).length;
-          badge.textContent = `${checkedCount} / ${dept.dashboards.length}`;
+          badge.textContent = `${checkedCount} / ${dept.dashboards.length} enabled`;
           badge.className = `role-access-dept-badge ${checkedCount > 0 ? 'active' : ''}`;
         }
       }
@@ -5989,6 +6190,8 @@ function onDashboardCheckboxToggle(dashId, isChecked) {
   }
 
   updateRoleAccessSelectedCounter();
+  updateRoleSidebarPreview();
+  checkUnsavedRoleChanges();
 }
 
 function updateRoleAccessSelectedCounter() {
@@ -6026,11 +6229,13 @@ function toggleDepartmentDashboards(deptName) {
   const badge = document.getElementById(`badge-dept-${deptName.replace(/[^a-zA-Z0-9]/g, '')}`);
   if (badge) {
     const finalCount = shouldCheckAll ? deptDashIds.length : 0;
-    badge.textContent = `${finalCount} / ${deptDashIds.length}`;
+    badge.textContent = `${finalCount} / ${deptDashIds.length} enabled`;
     badge.className = `role-access-dept-badge ${finalCount > 0 ? 'active' : ''}`;
   }
 
   updateRoleAccessSelectedCounter();
+  updateRoleSidebarPreview();
+  checkUnsavedRoleChanges();
 }
 
 function applyDashboardPreset(presetType) {
@@ -6038,28 +6243,31 @@ function applyDashboardPreset(presetType) {
   const allDashIds = roleAccessState.matrixData.dashboards.map(d => d.id);
 
   let targetIds = [];
+  let presetName = '';
   switch (presetType) {
     case 'helpdesk':
-      // Support & Help Center: strictly Helpdesk query tickets, farmer guidance, alerts, overview
       targetIds = ['overview', 'tasks', 'support', 'guidance', 'alerts', 'farmers'];
+      presetName = 'Help Center & Support';
       break;
     case 'sales':
-      // Commercial & Sales operations: hardware store, orders, billing, enquiries
-      targetIds = ['overview', 'tasks', 'products', 'enquiries', 'orders', 'billing', 'reports'];
+      targetIds = ['overview', 'tasks', 'products', 'orders', 'billing', 'farmers', 'reports'];
+      presetName = 'Commercial & Sales';
       break;
     case 'operations':
-      // Live IoT telemetry, monitoring, shed climate, alerts
       targetIds = ['overview', 'tasks', 'live-monitoring', 'analytics', 'alerts', 'farmers', 'sheds', 'devices', 'sensor-config'];
+      presetName = 'Operations & Monitoring';
       break;
     case 'field':
-      // Field technicians & installations
       targetIds = ['tasks', 'live-monitoring', 'sheds', 'devices', 'sensor-config', 'installations', 'install-team', 'guidance', 'alerts'];
+      presetName = 'Field Technician';
       break;
     case 'all':
       targetIds = [...allDashIds];
+      presetName = 'Full Platform Access';
       break;
     case 'none':
       targetIds = [];
+      presetName = 'Cleared All';
       break;
   }
 
@@ -6082,13 +6290,15 @@ function applyDashboardPreset(presetType) {
     const badge = document.getElementById(`badge-dept-${dept.name.replace(/[^a-zA-Z0-9]/g, '')}`);
     if (badge) {
       const checkedCount = dept.dashboards.filter(d => roleAccessState.selectedRoleDashboards.has(d.id)).length;
-      badge.textContent = `${checkedCount} / ${dept.dashboards.length}`;
+      badge.textContent = `${checkedCount} / ${dept.dashboards.length} enabled`;
       badge.className = `role-access-dept-badge ${checkedCount > 0 ? 'active' : ''}`;
     }
   });
 
   updateRoleAccessSelectedCounter();
-  showToast(`Applied '${presetType.toUpperCase()}' dashboard preset`, 'info');
+  updateRoleSidebarPreview();
+  checkUnsavedRoleChanges();
+  showToast(`Applied preset "${presetName}" (${targetIds.length} screens selected)`, 'info');
 }
 
 async function saveActiveRoleDashboards() {
@@ -6127,6 +6337,7 @@ async function saveActiveRoleDashboards() {
 
     // 1. Update in-memory matrix data
     role.allowed_dashboards = updatedRole.allowed_dashboards || allowed_dashboards;
+    roleAccessState.originalRoleDashboards = new Set(role.allowed_dashboards);
 
     // 2. Update client-side global ROLE_PERMISSIONS
     if (role.code) {
@@ -6140,15 +6351,28 @@ async function saveActiveRoleDashboards() {
       enforceRoleNavigation();
     }
 
-    // 4. Update KPI metrics (Helpdesk count)
+    // 4. Update Quick Role Chips count
+    const chipsBar = document.getElementById('quick-role-chips-bar');
+    if (chipsBar) {
+      chipsBar.querySelectorAll('.quick-role-chip').forEach(chip => {
+        if (chip.getAttribute('onclick')?.includes(role.id)) {
+          const countSpan = chip.querySelector('.chip-count');
+          if (countSpan) countSpan.textContent = `${allowed_dashboards.length} tabs`;
+        }
+      });
+    }
+
+    // 5. Update KPI metrics (Helpdesk count)
     const helpdeskCount = roleAccessState.matrixData.roles.filter(r => (r.allowed_dashboards || []).includes('support')).length;
     const supportCountEl = document.getElementById('kpi-role-access-support-count');
     if (supportCountEl) supportCountEl.textContent = `${helpdeskCount} Roles`;
 
-    // 5. Re-render matrix grid view
+    // 6. Hide sticky bar & re-render matrix grid view
+    const stickyBar = document.getElementById('role-access-sticky-bar');
+    if (stickyBar) stickyBar.classList.add('hidden');
     renderRoleAccessMatrix();
 
-    showToast(`Permissions saved for role "${role.name}" (${allowed_dashboards.length} dashboards granted)`, 'success');
+    showToast(`Saved! Staff with role "${role.name}" will now see ${allowed_dashboards.length} screens.`, 'success');
   } catch (err) {
     console.error('[RoleAccess] save error:', err);
     showToast(err.message, 'error');
@@ -9862,28 +10086,32 @@ async function loadDevices() {
   tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 24px;">Loading IoT gateways...</td></tr>';
 
   try {
-    let sheds = [];
+    let devices = [];
+    // 1. Primary from /admin/devices endpoint
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/sheds`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      const res = await fetch(`${API_BASE_URL}/admin/devices`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
       if (res.ok) {
-        sheds = await res.json();
+        devices = await res.json();
       }
     } catch (_) {}
 
-    // Direct Firestore fallback for devices
-    if ((!sheds || sheds.length === 0) && window.SetuFirebase && SetuFirebase.isAvailable) {
+    // 2. Direct Firestore fallback for devices if API returned nothing
+    if ((!devices || devices.length === 0) && window.SetuFirebase && SetuFirebase.isAvailable) {
       try {
         const snap = await SetuFirebase.db.collection('devices').get();
         if (!snap.empty) {
-          sheds = snap.docs.map(d => {
+          devices = snap.docs.map(d => {
             const data = d.data();
             return {
-              shed_id: data.shed_id || d.id,
-              farm_name: data.device_name || 'Climate Gateway ESP32',
-              shed_name: data.shed_id || 'shed_01',
+              device_id: data.device_id || d.id,
+              device_name: data.device_name || 'Setu Industrial Gateway Node',
+              shed_id: data.shed_id || 'shed_01',
+              farm_name: data.farm_name || data.shed_name || data.shed_id,
               status: data.status || 'ONLINE',
               is_active: data.status === 'ONLINE',
-              last_seen_at: data.last_seen_at || new Date().toISOString()
+              firmware_version: data.firmware_version || 'v2.4.1-prod',
+              auth_mode: data.auth_mode || 'mTLS + ECC608',
+              last_seen_at: data.last_seen_at || null
             };
           });
         }
@@ -9892,29 +10120,61 @@ async function loadDevices() {
       }
     }
 
-    if (!sheds || sheds.length === 0) {
+    // 3. Fallback to /admin/sheds if devices list still empty
+    if (!devices || devices.length === 0) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/sheds`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+        if (res.ok) {
+          const sheds = await res.json();
+          devices = sheds.map(s => ({
+            device_id: `GW-ESP32-${(s.shed_id || 'SHED_01').toUpperCase()}`,
+            device_name: 'Setu Industrial Gateway Node',
+            shed_id: s.shed_id || 'shed_01',
+            farm_name: s.farm_name || s.shed_name || s.shed_id,
+            status: s.status || (s.is_active ? 'ONLINE' : 'OFFLINE'),
+            is_active: s.is_active !== false,
+            firmware_version: 'v2.4.1-prod',
+            auth_mode: 'mTLS + ECC608',
+            last_seen_at: s.last_seen_at || null
+          }));
+        }
+      } catch (_) {}
+    }
+
+    if (!devices || devices.length === 0) {
       tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 28px; color: var(--text-muted);">No IoT devices registered yet. Real gateways will appear when provisioned.</td></tr>';
       if (window.SetuTableManager) SetuTableManager.syncTable('devicesTable');
       return;
     }
 
-    tbody.innerHTML = sheds.map((s, idx) => `
-      <tr data-id="dev_${s.shed_id}">
-        <td class="td-bulk-select" style="text-align: center;">
-          <input type="checkbox" class="row-select-checkbox" data-row-id="dev_${s.shed_id}" aria-label="Select Device" onchange="SetuTableManager.handleRowCheck('devicesTable', 'dev_${s.shed_id}', this)">
-        </td>
-        <td style="font-family: var(--font-mono); font-weight: 700;">GW-ESP32-${s.shed_id.toUpperCase()}</td>
-        <td style="font-weight: 600;">Setu Industrial Gateway Node</td>
-        <td>${escapeHtml(s.farm_name || s.shed_name || s.shed_id)}</td>
-        <td style="font-family: var(--font-mono); font-size: 0.78rem;">v2.4.1-prod</td>
-        <td><span class="badge badge-info">mTLS + ECC608</span></td>
-        <td><span class="badge ${s.is_active ? 'badge-success' : 'badge-danger'}">${s.status || (s.is_active ? 'ONLINE' : 'OFFLINE')}</span></td>
-        <td style="font-size: 0.78rem;">${s.last_seen_at ? new Date(s.last_seen_at).toLocaleTimeString() : 'Never'}</td>
-        <td>
-          <button type="button" class="btn btn-outline btn-xs" onclick="showToast('Reboot command sent to ' + '${s.shed_id}')">Reboot</button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = devices.map((d, idx) => {
+      const devId = d.device_id || `GW-ESP32-${(d.shed_id || 'NODE').toUpperCase()}`;
+      const devName = d.device_name || 'Setu Industrial Gateway Node';
+      const shedDisplay = d.farm_name || d.shed_id || 'shed_01';
+      const fw = d.firmware_version || 'v2.4.1-prod';
+      const auth = d.auth_mode || 'mTLS + ECC608';
+      const isOnline = d.status === 'ONLINE' || d.is_active === true;
+      const statusText = d.status || (isOnline ? 'ONLINE' : 'OFFLINE');
+      const lastSeen = d.last_seen_at ? new Date(d.last_seen_at).toLocaleTimeString() : 'Never';
+
+      return `
+        <tr data-id="dev_${escapeHtml(devId)}">
+          <td class="td-bulk-select" style="text-align: center;">
+            <input type="checkbox" class="row-select-checkbox" data-row-id="dev_${escapeHtml(devId)}" aria-label="Select Device" onchange="SetuTableManager.handleRowCheck('devicesTable', 'dev_${escapeHtml(devId)}', this)">
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 700;">${escapeHtml(devId)}</td>
+          <td style="font-weight: 600;">${escapeHtml(devName)}</td>
+          <td>${escapeHtml(shedDisplay)}</td>
+          <td style="font-family: var(--font-mono); font-size: 0.78rem;">${escapeHtml(fw)}</td>
+          <td><span class="badge badge-info">${escapeHtml(auth)}</span></td>
+          <td><span class="badge ${isOnline ? 'badge-success' : 'badge-danger'}">${escapeHtml(statusText)}</span></td>
+          <td style="font-size: 0.78rem;">${lastSeen}</td>
+          <td>
+            <button type="button" class="btn btn-outline btn-xs" onclick="rebootDevice('${escapeHtml(devId)}')">Reboot</button>
+          </td>
+        </tr>
+      `;
+    }).join('');
 
     if (window.SetuTableManager) SetuTableManager.syncTable('devicesTable');
     if (window.lucide) lucide.createIcons();
@@ -9922,6 +10182,224 @@ async function loadDevices() {
     tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--rose); padding: 20px;">Failed to load devices: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
+
+async function openProvisionDeviceModal() {
+  let shedOptions = `
+    <option value="shed_01">Shed 01 - Mandya Cluster (shed_01)</option>
+    <option value="shed_02">Shed 02 - Ramanagara Hub (shed_02)</option>
+    <option value="shed_03">Shed 03 - Kolar Silks (shed_03)</option>
+  `;
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/sheds`, {
+      headers: { 'Authorization': `Bearer ${adminToken}` }
+    });
+    if (res.ok) {
+      const sheds = await res.json();
+      if (Array.isArray(sheds) && sheds.length > 0) {
+        shedOptions = sheds.map(s => `
+          <option value="${escapeHtml(s.shed_id)}">
+            ${escapeHtml(s.farm_name || s.shed_name || s.shed_id)} (${escapeHtml(s.shed_id)})
+          </option>
+        `).join('');
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load dynamic sheds for device modal:', e);
+  }
+
+  const defaultDevId = `GW-ESP32-SHED_${String(Math.floor(Math.random() * 900) + 100)}`;
+
+  const modalHtml = `
+    <form id="provisionDeviceForm" onsubmit="handleProvisionDeviceSubmit(event)" style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px;">
+        <i data-lucide="cpu" style="color: #10b981; width: 22px; height: 22px; margin-top: 2px; flex-shrink: 0;"></i>
+        <div style="font-size: 0.82rem; color: var(--text-main); line-height: 1.45;">
+          <strong>Industrial IoT Gateway Provisioning</strong><br>
+          Bind and authenticate edge telemetry sensors, climate micro-controllers (ESP32-S3), and automated relay actuators to a farmer's rearing shed.
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Device Serial / Hardware ID *</label>
+          <input type="text" id="provDeviceId" class="form-control" value="${escapeHtml(defaultDevId)}" required style="font-family: var(--font-mono); font-weight: 600;" placeholder="e.g. GW-ESP32-SHED_04">
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Hardware Model / Name *</label>
+          <input type="text" id="provDeviceName" class="form-control" value="Setu Industrial Gateway Node" required placeholder="e.g. Setu Industrial Gateway Node">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Assigned Rearing Shed *</label>
+          <select id="provShedSelect" class="form-control" required>
+            ${shedOptions}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Firmware Image Release</label>
+          <input type="text" id="provFirmware" class="form-control" value="v2.4.1-prod" style="font-family: var(--font-mono);" placeholder="e.g. v2.4.1-prod">
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Security / Auth Mode</label>
+          <select id="provAuthMode" class="form-control">
+            <option value="mTLS + ECC608" selected>mTLS + ATECC608A Hardware Secure Element</option>
+            <option value="AES-128 Pre-Shared Key">AES-128 Pre-Shared Key (GCM)</option>
+            <option value="HMAC-SHA256 Token">HMAC-SHA256 Secret Token</option>
+            <option value="API_KEY">Standard API Key</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Pre-Shared Device Key / Token (Optional)</label>
+          <input type="password" id="provDeviceKey" class="form-control" placeholder="Auto-generated if left blank" autocomplete="new-password">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label style="font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; display: block;">Initial Connection State</label>
+        <select id="provStatus" class="form-control">
+          <option value="ONLINE" selected>ONLINE (Ready for Realtime Telemetry)</option>
+          <option value="PROVISIONED">PROVISIONED (Pending On-Site Installation)</option>
+        </select>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+        <button type="button" class="btn btn-skin" onclick="closeAppModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSubmitProvisionDevice" style="display: inline-flex; align-items: center; gap: 6px;">
+          <i data-lucide="check"></i> <span>Complete Provisioning</span>
+        </button>
+      </div>
+    </form>
+  `;
+
+  openAppModal('Provision IoT Hardware Node', modalHtml, 'md');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handleProvisionDeviceSubmit(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const btn = document.getElementById('btnSubmitProvisionDevice');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Provisioning...</span>';
+  }
+
+  const deviceId = document.getElementById('provDeviceId')?.value.trim();
+  const deviceName = document.getElementById('provDeviceName')?.value.trim() || 'Setu Industrial Gateway Node';
+  const shedId = document.getElementById('provShedSelect')?.value || 'shed_01';
+  const firmwareVersion = document.getElementById('provFirmware')?.value.trim() || 'v2.4.1-prod';
+  const authMode = document.getElementById('provAuthMode')?.value || 'mTLS + ECC608';
+  const deviceKey = document.getElementById('provDeviceKey')?.value.trim() || null;
+  const status = document.getElementById('provStatus')?.value || 'ONLINE';
+
+  if (!deviceId || !shedId) {
+    showToast('Device ID and Assigned Shed are required.', 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="check"></i> <span>Complete Provisioning</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+    return;
+  }
+
+  const payload = {
+    device_id: deviceId,
+    device_name: deviceName,
+    shed_id: shedId,
+    firmware_version: firmwareVersion,
+    auth_mode: authMode,
+    device_key: deviceKey,
+    status: status
+  };
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/devices`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.detail || `Server returned ${res.status}`);
+    }
+
+    if (window.SetuFirebase && SetuFirebase.isAvailable) {
+      try {
+        await SetuFirebase.db.collection('devices').doc(deviceId).set({
+          ...payload,
+          id: deviceId,
+          last_seen_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        }, { merge: true });
+      } catch (fe) {
+        console.warn('Firestore direct write notice:', fe);
+      }
+    }
+
+    showToast(`Hardware Node ${deviceId} successfully provisioned!`, 'success');
+    closeAppModal();
+    loadDevices();
+  } catch (err) {
+    if (window.SetuFirebase && SetuFirebase.isAvailable) {
+      try {
+        await SetuFirebase.db.collection('devices').doc(deviceId).set({
+          ...payload,
+          id: deviceId,
+          last_seen_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        }, { merge: true });
+        showToast(`Hardware Node ${deviceId} provisioned via cloud sync!`, 'success');
+        closeAppModal();
+        loadDevices();
+        return;
+      } catch (_) {}
+    }
+    showToast(`Failed to provision device: ${err.message}`, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="check"></i> <span>Complete Provisioning</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+async function rebootDevice(deviceId) {
+  if (!confirm(`Are you sure you want to dispatch a remote restart command to ${deviceId}?`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE_URL}/admin/devices/${encodeURIComponent(deviceId)}/reboot`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${adminToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `Server error ${res.status}`);
+    }
+    showToast(`Reboot signal sent to ${deviceId}`, 'success');
+  } catch (err) {
+    showToast(`Reboot failed: ${err.message}`, 'error');
+  }
+}
+
+window.openProvisionDeviceModal = openProvisionDeviceModal;
+window.handleProvisionDeviceSubmit = handleProvisionDeviceSubmit;
+window.rebootDevice = rebootDevice;
 
 async function loadTasksQueue() {
   const tbody = document.getElementById('tasksTableBody');

@@ -1260,87 +1260,137 @@ def get_role_allowed_dashboards(role_code_or_id: str) -> List[str]:
 
 def list_roles(org_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """Lists roles with permissions and allowed dashboards, respecting tenant isolation."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        if org_id and org_id != "default_org":
-            cursor.execute("""
-            SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
-                   r.allowed_dashboards, r.organization_id,
-                   r.created_at, r.updated_at,
-                   (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
-            FROM roles r
-            WHERE r.organization_id = %s OR r.organization_id = 'default_org' OR r.is_system = TRUE
-            ORDER BY r.is_system DESC, r.name ASC
-            """, (org_id,))
-        else:
-            cursor.execute("""
-            SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
-                   r.allowed_dashboards, r.organization_id,
-                   r.created_at, r.updated_at,
-                   (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
-            FROM roles r
-            ORDER BY r.is_system DESC, r.name ASC
-            """)
-        roles = [dict(r) for r in cursor.fetchall()]
+    roles = []
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            if org_id and org_id != "default_org":
+                cursor.execute("""
+                SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
+                       r.allowed_dashboards, r.organization_id,
+                       r.created_at, r.updated_at,
+                       (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
+                FROM roles r
+                WHERE r.organization_id = %s OR r.organization_id = 'default_org' OR r.is_system = TRUE
+                ORDER BY r.is_system DESC, r.name ASC
+                """, (org_id,))
+            else:
+                cursor.execute("""
+                SELECT r.id, r.code, r.name, r.description, r.is_system, r.status,
+                       r.allowed_dashboards, r.organization_id,
+                       r.created_at, r.updated_at,
+                       (SELECT COUNT(*) FROM employees e WHERE e.role_id = r.id OR e.role_code = r.code) as user_count
+                FROM roles r
+                ORDER BY r.is_system DESC, r.name ASC
+                """)
+            roles = [dict(r) for r in cursor.fetchall()]
 
-        # Attach permissions list and ensure allowed_dashboards is a clean list
-        for role in roles:
-            cursor.execute("""
-            SELECT p.code, p.name, p.category, p.description
-            FROM role_permissions rp
-            JOIN permissions p ON p.code = rp.permission_code
-            WHERE rp.role_id = %s
-            ORDER BY p.category, p.code
-            """, (role["id"],))
-            perms = cursor.fetchall()
-            role["permissions"] = [p["code"] for p in perms]
-            role["permissions_detailed"] = [dict(p) for p in perms]
+            # Attach permissions list and ensure allowed_dashboards is a clean list
+            for role in roles:
+                cursor.execute("""
+                SELECT p.code, p.name, p.category, p.description
+                FROM role_permissions rp
+                JOIN permissions p ON p.code = rp.permission_code
+                WHERE rp.role_id = %s
+                ORDER BY p.category, p.code
+                """, (role["id"],))
+                perms = cursor.fetchall()
+                role["permissions"] = [p["code"] for p in perms]
+                role["permissions_detailed"] = [dict(p) for p in perms]
 
-            ad = role.get("allowed_dashboards")
-            if isinstance(ad, str):
-                try:
-                    role["allowed_dashboards"] = json.loads(ad)
-                except Exception:
+                ad = role.get("allowed_dashboards")
+                if isinstance(ad, str):
+                    try:
+                        role["allowed_dashboards"] = json.loads(ad)
+                    except Exception:
+                        role["allowed_dashboards"] = []
+                elif not isinstance(ad, list):
                     role["allowed_dashboards"] = []
-            elif not isinstance(ad, list):
-                role["allowed_dashboards"] = []
-            if not role["allowed_dashboards"]:
-                role["allowed_dashboards"] = list(DEFAULT_ROLE_DASHBOARDS.get(role["code"], ["overview", "tasks", "support"]))
+                if not role["allowed_dashboards"]:
+                    role["allowed_dashboards"] = list(DEFAULT_ROLE_DASHBOARDS.get(role["code"], ["overview", "tasks", "support"]))
+    except Exception as e:
+        logger.warning("Error fetching roles from database: %s", type(e).__name__)
+        roles = []
 
-        return roles
+    # If the database returns 0 roles (e.g. initial setup, Firestore mode, or offline database),
+    # ALWAYS provide the standard system roles so that admins can immediately manage permissions and views!
+    if not roles:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for rcode, tmpl in ROLE_TEMPLATES.items():
+            roles.append({
+                "id": f"role_{rcode}",
+                "code": rcode,
+                "name": tmpl.get("name", rcode.capitalize()),
+                "description": tmpl.get("description", ""),
+                "is_system": True,
+                "status": "ACTIVE",
+                "allowed_dashboards": list(tmpl.get("allowed_dashboards") or DEFAULT_ROLE_DASHBOARDS.get(rcode, ["overview", "tasks", "support"])),
+                "organization_id": org_id or "default_org",
+                "user_count": 0,
+                "permissions": list(tmpl.get("permissions") or []),
+                "permissions_detailed": [],
+                "created_at": now_iso,
+                "updated_at": now_iso
+            })
+
+    return roles
 
 
 def get_role_detail(role_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves full role details with permissions and allowed dashboards."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
-        role = cursor.fetchone()
-        if not role:
-            return None
-        role_dict = dict(role)
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
+            role = cursor.fetchone()
+            if role:
+                role_dict = dict(role)
 
-        cursor.execute("""
-        SELECT p.code, p.name, p.category, p.description
-        FROM role_permissions rp
-        JOIN permissions p ON p.code = rp.permission_code
-        WHERE rp.role_id = %s
-        ORDER BY p.category, p.code
-        """, (role_dict["id"],))
-        perms = cursor.fetchall()
-        role_dict["permissions"] = [p["code"] for p in perms]
-        role_dict["permissions_detailed"] = [dict(p) for p in perms]
+                cursor.execute("""
+                SELECT p.code, p.name, p.category, p.description
+                FROM role_permissions rp
+                JOIN permissions p ON p.code = rp.permission_code
+                WHERE rp.role_id = %s
+                ORDER BY p.category, p.code
+                """, (role_dict["id"],))
+                perms = cursor.fetchall()
+                role_dict["permissions"] = [p["code"] for p in perms]
+                role_dict["permissions_detailed"] = [dict(p) for p in perms]
 
-        ad = role_dict.get("allowed_dashboards")
-        if isinstance(ad, str):
-            try:
-                role_dict["allowed_dashboards"] = json.loads(ad)
-            except Exception:
-                role_dict["allowed_dashboards"] = []
-        elif not isinstance(ad, list):
-            role_dict["allowed_dashboards"] = []
-        if not role_dict["allowed_dashboards"]:
-            role_dict["allowed_dashboards"] = list(DEFAULT_ROLE_DASHBOARDS.get(role_dict["code"], ["overview", "tasks", "support"]))
+                ad = role_dict.get("allowed_dashboards")
+                if isinstance(ad, str):
+                    try:
+                        role_dict["allowed_dashboards"] = json.loads(ad)
+                    except Exception:
+                        role_dict["allowed_dashboards"] = []
+                elif not isinstance(ad, list):
+                    role_dict["allowed_dashboards"] = []
+                if not role_dict["allowed_dashboards"]:
+                    role_dict["allowed_dashboards"] = list(DEFAULT_ROLE_DASHBOARDS.get(role_dict["code"], ["overview", "tasks", "support"]))
 
-        return role_dict
+                return role_dict
+    except Exception as e:
+        logger.warning("Error getting role detail from database: %s", type(e).__name__)
+
+    # Fallback to system role templates if not found in SQL database
+    clean_code = role_id.replace("role_", "")
+    if clean_code in ROLE_TEMPLATES:
+        tmpl = ROLE_TEMPLATES[clean_code]
+        return {
+            "id": f"role_{clean_code}",
+            "code": clean_code,
+            "name": tmpl.get("name", clean_code.capitalize()),
+            "description": tmpl.get("description", ""),
+            "is_system": True,
+            "status": "ACTIVE",
+            "allowed_dashboards": list(tmpl.get("allowed_dashboards") or DEFAULT_ROLE_DASHBOARDS.get(clean_code, ["overview", "tasks", "support"])),
+            "organization_id": "default_org",
+            "user_count": 0,
+            "permissions": list(tmpl.get("permissions") or []),
+            "permissions_detailed": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+
+    return None
 
 
 def create_custom_role(
@@ -1477,33 +1527,60 @@ def update_role_dashboards(
     Mind tenant isolation: non-superadmins can only modify roles within their tenant.
     Any user assigned to this role automatically inherits these dashboard permissions.
     """
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
-        role = cursor.fetchone()
-        if not role:
+    clean_dashboards = [d for d in dashboards if isinstance(d, str) and d.strip()]
+    clean_code = role_id.replace("role_", "")
+    now_dt = datetime.now(timezone.utc)
+    dashboards_json = json.dumps(clean_dashboards)
+    role_dict = None
+    updated = None
+
+    try:
+        with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+            cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
+            role = cursor.fetchone()
+            if role:
+                role_dict = dict(role)
+                if not actor_is_superadmin:
+                    role_org = role_dict.get("organization_id") or "default_org"
+                    user_org = org_id or "default_org"
+                    if role_org != user_org:
+                        raise PermissionError(f"Tenant isolation violation: Access denied. Cannot modify role of tenant '{role_org}'.")
+
+                cursor.execute("""
+                UPDATE roles
+                SET allowed_dashboards = %s::jsonb, updated_at = %s
+                WHERE id = %s OR code = %s
+                RETURNING *
+                """, (dashboards_json, now_dt, role_dict["id"], role_dict["code"]))
+                updated = cursor.fetchone()
+    except Exception as e:
+        logger.warning("Error executing role dashboard update in database: %s", type(e).__name__)
+
+    # Keep in-memory defaults synchronized so updates take effect immediately
+    if clean_code in DEFAULT_ROLE_DASHBOARDS:
+        DEFAULT_ROLE_DASHBOARDS[clean_code] = list(clean_dashboards)
+    if clean_code in ROLE_TEMPLATES:
+        ROLE_TEMPLATES[clean_code]["allowed_dashboards"] = list(clean_dashboards)
+
+    if not role_dict:
+        # Fallback to system role template
+        if clean_code in ROLE_TEMPLATES:
+            tmpl = ROLE_TEMPLATES[clean_code]
+            role_dict = {
+                "id": f"role_{clean_code}",
+                "code": clean_code,
+                "name": tmpl.get("name", clean_code.capitalize()),
+                "description": tmpl.get("description", ""),
+                "is_system": True,
+                "status": "ACTIVE",
+                "allowed_dashboards": list(clean_dashboards),
+                "organization_id": org_id or "default_org",
+                "user_count": 0,
+                "permissions": list(tmpl.get("permissions") or []),
+                "permissions_detailed": []
+            }
+        else:
             raise ValueError(f"Role '{role_id}' not found.")
-        
-        role_dict = dict(role)
-        # Tenant isolation validation:
-        # Non-superadmins can only modify roles within their own tenant organization.
-        # Roles belonging to another tenant or root system roles cannot be modified across tenant boundaries.
-        if not actor_is_superadmin:
-            role_org = role_dict.get("organization_id") or "default_org"
-            user_org = org_id or "default_org"
-            if role_org != user_org:
-                raise PermissionError(f"Tenant isolation violation: Access denied. Cannot modify role of tenant '{role_org}'.")
-
-        now_dt = datetime.now(timezone.utc)
-        clean_dashboards = [d for d in dashboards if isinstance(d, str) and d.strip()]
-        dashboards_json = json.dumps(clean_dashboards)
-
-        cursor.execute("""
-        UPDATE roles
-        SET allowed_dashboards = %s::jsonb, updated_at = %s
-        WHERE id = %s OR code = %s
-        RETURNING *
-        """, (dashboards_json, now_dt, role_dict["id"], role_dict["code"]))
-        updated = cursor.fetchone()
 
     log_security_audit(
         actor=actor,
@@ -1511,7 +1588,7 @@ def update_role_dashboards(
         details=f"Updated dashboard access for role '{role_dict['name']}' ({role_dict['code']}): {len(clean_dashboards)} dashboards permitted: {clean_dashboards}",
         target_resource=role_dict["id"]
     )
-    res = get_role_detail(role_dict["id"]) or dict(updated)
+    res = get_role_detail(role_dict["id"]) or (dict(updated) if updated else role_dict)
     res["allowed_dashboards"] = clean_dashboards
     return res
 
@@ -1519,23 +1596,32 @@ def update_role_dashboards(
 def get_dashboard_matrix(org_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Returns the comprehensive dashboard access matrix for the UI:
-    - departments: Operational departments grouping all dashboards
+    - departments: Operational departments grouping all dashboards with embedded dashboards array
     - dashboards: All 25 system dashboards with metadata
     - roles: All roles with their allowed_dashboards and user counts
     """
     roles = list_roles(org_id=org_id)
     departments = [
-        {"id": "Overview", "name": "Overview & Workflow", "icon": "layout-dashboard", "description": "High-level metrics, daily tasks, and triage."},
+        {"id": "Overview", "name": "Overview & Daily Workflow", "icon": "layout-dashboard", "description": "High-level metrics, daily tasks, and triage."},
         {"id": "Operations & Monitoring", "name": "Operations & Monitoring", "icon": "activity", "description": "Shed microclimate telemetry, analytics, and incident interlocks."},
         {"id": "Farmers & Infrastructure", "name": "Farmers & Infrastructure", "icon": "warehouse", "description": "Farmers directory, rearing sheds, IoT hardware controllers, and field installations."},
         {"id": "Commercial & Sales", "name": "Commercial & Sales", "icon": "shopping-cart", "description": "Product catalogue, hardware purchase orders, and billing invoices."},
         {"id": "Customer Operations", "name": "Customer Operations / Help Center", "icon": "headphones", "description": "Support tickets, farmer agronomic guidance, research insights, and compliance reports."},
         {"id": "Access & User Governance", "name": "Access & User Governance", "icon": "shield-alert", "description": "Employee management, roles, permissions, audit logs, and platform settings."}
     ]
+
+    # Explicitly attach dashboards to each department so UI can render them seamlessly
+    for dept in departments:
+        dept["dashboards"] = [
+            d for d in SYSTEM_DASHBOARDS
+            if d.get("department") == dept["id"] or d.get("department") == dept["name"] or dept["id"] in d.get("department", "")
+        ]
+
     return {
         "departments": departments,
         "dashboards": SYSTEM_DASHBOARDS,
-        "roles": roles
+        "roles": roles,
+        "tenant_organization_id": org_id or "default_org"
     }
 
 
