@@ -417,15 +417,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       items: const [
                         DropdownMenuItem(
                           value: 'UPI',
-                          child: Text('UPI (GPay / PhonePe / Paytm)', overflow: TextOverflow.ellipsis),
+                          child: Text('UPI · Razorpay (GPay / PhonePe / Paytm)', overflow: TextOverflow.ellipsis),
                         ),
                         DropdownMenuItem(
                           value: 'CASH_ON_DELIVERY',
-                          child: Text('Cash on Delivery (COD)', overflow: TextOverflow.ellipsis),
+                          child: Text('Cash on Delivery (Pay at Shed)', overflow: TextOverflow.ellipsis),
                         ),
                         DropdownMenuItem(
                           value: 'CARD',
-                          child: Text('Debit / Credit Card', overflow: TextOverflow.ellipsis),
+                          child: Text('Debit / Credit Card · Razorpay', overflow: TextOverflow.ellipsis),
                         ),
                         DropdownMenuItem(
                           value: 'SUBSIDY_DIRECT_CREDIT',

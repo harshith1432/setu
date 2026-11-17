@@ -218,6 +218,76 @@ async def test_razorpay_firebase_only_mode():
 
 
 @pytest.mark.anyio
+async def test_razorpay_invoice_payment_flow():
+    """Verify invoice-specific Razorpay order creation and verification."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        phone = f"96{uuid.uuid4().int % 100000000:08d}"
+        password = "SecurePassword@123"
+        await client.post("/api/v1/auth/register", json={
+            "username": phone,
+            "phone": phone,
+            "password": password,
+            "confirm_password": password,
+            "full_name": "Vijay Kumar",
+            "role": "farmer",
+            "farm_name": "Kumar Farms",
+            "region": "Mandya"
+        })
+
+        login_res = await client.post("/api/v1/auth/login", json={
+            "username": phone,
+            "password": password
+        })
+        token = login_res.json()["access_token"]
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        # Create order to generate an invoice
+        prods = list_public_products()
+        create_res = await client.post("/api/v1/payments/razorpay/create-order", headers=auth_headers, json={
+            "items": [{"product_id": prods[0]["id"], "quantity": 1}],
+            "shipping_address": "Mandya Silk Center",
+            "payment_method": "UPI"
+        })
+        assert create_res.status_code == 200
+        order_data = create_res.json()
+        order_id = order_data["order_id"]
+
+        from app.services.enterprise_db import get_order_detail
+        ord_rec = get_order_detail(order_id)
+        assert ord_rec is not None
+        assert "invoices" in ord_rec and len(ord_rec["invoices"]) > 0
+        inv_id = ord_rec["invoices"][0]["id"]
+
+        # Now initiate Razorpay payment directly for this invoice
+        inv_order_res = await client.post("/api/v1/payments/razorpay/create-order", headers=auth_headers, json={
+            "invoice_id": inv_id
+        })
+        assert inv_order_res.status_code == 200
+        inv_rzp = inv_order_res.json()
+        assert "razorpay_order_id" in inv_rzp
+        assert inv_rzp["invoice_id"] == inv_id
+
+        # Verify payment
+        fake_pay_id = f"pay_{uuid.uuid4().hex[:14]}"
+        verify_res = await client.post("/api/v1/payments/razorpay/verify", headers=auth_headers, json={
+            "invoice_id": inv_id,
+            "order_id": order_id,
+            "razorpay_order_id": inv_rzp["razorpay_order_id"],
+            "razorpay_payment_id": fake_pay_id,
+            "razorpay_signature": "rzp_mock_sig_invoice",
+            "method": "ONLINE"
+        })
+        assert verify_res.status_code == 200
+        assert verify_res.json()["status"] == "success"
+
+        # Check invoice is marked PAID
+        updated_ord = get_order_detail(order_id)
+        assert updated_ord["status"] == "PAID"
+        assert updated_ord["invoices"][0]["status"] == "PAID"
+
+
+@pytest.mark.anyio
 async def test_razorpay_webhook_event_handling():
     """Verify webhook endpoint accepts and processes Razorpay captured payment events."""
     transport = ASGITransport(app=app)

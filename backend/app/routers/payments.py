@@ -26,6 +26,7 @@ logger = logging.getLogger("payments_router")
 
 class RazorpayCreateOrderPayload(BaseModel):
     order_id: Optional[str] = None
+    invoice_id: Optional[str] = None
     items: Optional[List[Dict[str, Any]]] = None
     shipping_address: Optional[str] = None
     payment_method: Optional[str] = "UPI"
@@ -33,7 +34,8 @@ class RazorpayCreateOrderPayload(BaseModel):
 
 
 class RazorpayVerifyPaymentPayload(BaseModel):
-    order_id: str
+    order_id: Optional[str] = None
+    invoice_id: Optional[str] = None
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
@@ -64,6 +66,35 @@ def initiate_razorpay_order(
     customer_phone = target_user.get("phone", "") if target_user else ""
 
     order = None
+    if payload.invoice_id:
+        from app.services.enterprise_db import get_invoice
+        invoice = get_invoice(payload.invoice_id)
+        if not invoice:
+            raise HTTPException(status_code=404, detail=f"Invoice '{payload.invoice_id}' not found.")
+        total_minor_units = int(invoice.get("total_amount_minor_units") or 0)
+        if total_minor_units < 100:
+            raise HTTPException(status_code=400, detail="Invoice amount must be at least ₹1.00 (100 paise).")
+
+        rzp_order = create_razorpay_order(
+            amount_paise=total_minor_units,
+            currency="INR",
+            receipt=invoice.get("invoice_number"),
+            notes={"invoice_id": invoice.get("id"), "order_id": invoice.get("order_id", ""), "user_id": str(uid)}
+        )
+        public_cfg = get_razorpay_public_config()
+        return {
+            "invoice_id": invoice.get("id"),
+            "order_id": invoice.get("order_id"),
+            "invoice_number": invoice.get("invoice_number"),
+            "razorpay_order_id": rzp_order.get("id"),
+            "amount_minor_units": rzp_order.get("amount", total_minor_units),
+            "currency": rzp_order.get("currency", "INR"),
+            "key_id": public_cfg.get("key_id"),
+            "is_mock": rzp_order.get("is_mock", False),
+            "customer_name": invoice.get("customer_name") or customer_name,
+            "customer_phone": invoice.get("customer_phone") or customer_phone
+        }
+
     if payload.order_id:
         order = get_order_detail(payload.order_id)
         if not order:
@@ -154,17 +185,30 @@ def verify_razorpay_payment(
         )
 
     actor = user.get("sub") or user.get("username", "customer")
+    target_order_id = payload.order_id
+    if not target_order_id and payload.invoice_id:
+        from app.services.enterprise_db import get_invoice
+        inv = get_invoice(payload.invoice_id)
+        if inv:
+            target_order_id = inv.get("order_id")
+
     try:
-        updated_order = record_razorpay_payment(
-            order_id=payload.order_id,
-            razorpay_order_id=payload.razorpay_order_id,
-            razorpay_payment_id=payload.razorpay_payment_id,
-            razorpay_signature=payload.razorpay_signature,
-            method=payload.method or "RAZORPAY",
-            actor=actor
-        )
+        if target_order_id:
+            updated_order = record_razorpay_payment(
+                order_id=target_order_id,
+                razorpay_order_id=payload.razorpay_order_id,
+                razorpay_payment_id=payload.razorpay_payment_id,
+                razorpay_signature=payload.razorpay_signature,
+                method=payload.method or "RAZORPAY",
+                actor=actor
+            )
+        else:
+            from app.services.enterprise_db import update_invoice_status
+            if payload.invoice_id:
+                update_invoice_status(payload.invoice_id, "PAID")
+            updated_order = {"id": payload.invoice_id, "status": "PAID"}
     except Exception as e:
-        logger.error("Failed to record Razorpay payment for order %s: %s", payload.order_id, e)
+        logger.error("Failed to record Razorpay payment: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to record payment: {str(e)}")
 
     return {

@@ -2672,6 +2672,39 @@ def list_invoices(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         return [dict(r) for r in cursor.fetchall()]
 
 
+def get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves an invoice by ID or invoice_number with fallback."""
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT i.*, u.full_name as customer_name, u.farm_name, u.phone as customer_phone
+                FROM invoices i
+                LEFT JOIN users u ON i.user_id = u.id
+                WHERE i.id = %s OR i.invoice_number = %s
+                LIMIT 1
+                """, (invoice_id, invoice_id))
+                row = cursor.fetchone()
+                if row:
+                    inv = dict(row)
+                    for k, v in list(inv.items()):
+                        if isinstance(v, datetime):
+                            inv[k] = v.isoformat()
+                    return inv
+        except Exception as e:
+            logger.debug("PostgreSQL get_invoice error: %s", e)
+
+    # Search in fallback orders
+    for o in _load_fallback_orders():
+        for inv in o.get("invoices", []):
+            if inv.get("id") == invoice_id or inv.get("invoice_number") == invoice_id:
+                inv_copy = dict(inv)
+                inv_copy["customer_name"] = o.get("customer_name")
+                inv_copy["customer_phone"] = o.get("customer_phone")
+                return inv_copy
+    return None
+
+
 # --- Support Tickets Repository ---
 def list_support_tickets(status: Optional[str] = None, priority: Optional[str] = None, assigned_to: Optional[str] = None) -> List[Dict[str, Any]]:
     with get_db_cursor(dict_cursor=True) as cursor:

@@ -9881,6 +9881,7 @@ async function openOrderDetailsModal(orderId) {
           <div style="color: var(--text-muted); font-size: 0.72rem; font-weight: 600;">DATE & PAYMENT METHOD</div>
           <div style="font-weight: 700; margin-top: 2px;">${createdDate}</div>
           <div style="color: var(--text-secondary);">Mode: ${escapeHtml(ord.payment_method || 'UPI / Pay at Shed')}</div>
+          ${ord.razorpay_payment_id ? `<div style="font-size: 0.72rem; color: #0284c7; font-family: var(--font-mono); margin-top: 3px;">Razorpay: ${escapeHtml(ord.razorpay_payment_id)}</div>` : ''}
         </div>
       </div>
 
@@ -9902,6 +9903,11 @@ async function openOrderDetailsModal(orderId) {
       </div>
 
       <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+        ${ord.status === 'PAYMENT_PENDING' || ord.status === 'PENDING' ? `
+          <button type="button" class="btn btn-primary btn-sm" onclick="retryOrderRazorpayPayment('${ord.id}')" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700;">
+            <i data-lucide="credit-card" style="width: 14px; height: 14px;"></i> Pay Now via Razorpay
+          </button>
+        ` : ''}
         <button type="button" class="btn btn-skin btn-sm" onclick="closeAppModal()">Close</button>
       </div>
     </div>
@@ -10032,7 +10038,12 @@ function renderInvoicesTable(invs) {
     const due = inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '--';
     const statBadge = inv.status === 'PAID'
       ? '<span class="badge badge-success">PAID</span>'
-      : '<span class="badge badge-warning">PENDING</span>';
+      : `<div style="display: flex; align-items: center; gap: 6px;">
+           <span class="badge badge-warning">PENDING</span>
+           <button type="button" class="btn btn-primary btn-xs" onclick="payPendingInvoice('${inv.id}')" style="padding: 2px 8px; font-size: 0.72rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+             <i data-lucide="credit-card" style="width: 12px; height: 12px;"></i> Pay
+           </button>
+         </div>`;
 
     return `
       <tr data-id="${inv.id}">
@@ -10053,6 +10064,151 @@ function renderInvoicesTable(invs) {
   if (window.SetuTableManager) SetuTableManager.syncTable('invoicesTable');
   if (window.lucide) lucide.createIcons();
 }
+
+async function payPendingInvoice(invoiceId) {
+  const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+  if (!token) {
+    showToast('Please log in to complete invoice payment.', 'error');
+    return;
+  }
+
+  showToast('Connecting to Razorpay...', 'info');
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ invoice_id: invoiceId })
+    });
+
+    const rzpData = await res.json();
+    if (!res.ok) throw new Error(rzpData.detail || 'Could not initiate invoice payment.');
+
+    const options = {
+      key: rzpData.key_id,
+      amount: rzpData.amount_minor_units,
+      currency: rzpData.currency || 'INR',
+      name: 'Setu Sericulture',
+      description: `Invoice Payment - ${rzpData.invoice_number || invoiceId}`,
+      image: 'https://setu-adminweb.vercel.app/favicon.ico',
+      order_id: rzpData.razorpay_order_id,
+      prefill: {
+        name: rzpData.customer_name || '',
+        contact: rzpData.customer_phone || ''
+      },
+      theme: { color: '#059669' },
+      handler: async function (resp) {
+        showToast('Verifying payment receipt...', 'info');
+        try {
+          const vRes = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              invoice_id: invoiceId,
+              order_id: rzpData.order_id,
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              method: 'ONLINE'
+            })
+          });
+          const vData = await vRes.json();
+          if (!vRes.ok) throw new Error(vData.detail || 'Payment verification failed.');
+
+          showToast(`Invoice ${rzpData.invoice_number || invoiceId} marked PAID successfully!`, 'success');
+          if (typeof loadBillingAndSubscriptions === 'function') loadBillingAndSubscriptions();
+        } catch (verr) {
+          showToast(verr.message || 'Payment signature verification error.', 'error');
+        }
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  } catch (err) {
+    showToast(err.message || 'Payment initiation failed.', 'error');
+  }
+}
+
+async function retryOrderRazorpayPayment(orderId) {
+  const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+  if (!token) {
+    showToast('Please log in to complete order payment.', 'error');
+    return;
+  }
+
+  showToast('Connecting to Razorpay...', 'info');
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ order_id: orderId })
+    });
+
+    const rzpData = await res.json();
+    if (!res.ok) throw new Error(rzpData.detail || 'Could not initiate Razorpay order.');
+
+    const options = {
+      key: rzpData.key_id,
+      amount: rzpData.amount_minor_units,
+      currency: rzpData.currency || 'INR',
+      name: 'Setu Sericulture',
+      description: `Hardware Order - ${rzpData.order_number || orderId}`,
+      image: 'https://setu-adminweb.vercel.app/favicon.ico',
+      order_id: rzpData.razorpay_order_id,
+      prefill: {
+        name: rzpData.customer_name || '',
+        contact: rzpData.customer_phone || ''
+      },
+      theme: { color: '#059669' },
+      handler: async function (resp) {
+        showToast('Verifying payment receipt...', 'info');
+        try {
+          const vRes = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              order_id: orderId,
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              method: 'UPI'
+            })
+          });
+          const vData = await vRes.json();
+          if (!vRes.ok) throw new Error(vData.detail || 'Payment verification failed.');
+
+          showToast(`Order ${rzpData.order_number || orderId} confirmed via Razorpay!`, 'success');
+          closeAppModal();
+          if (typeof loadOrders === 'function') loadOrders();
+        } catch (verr) {
+          showToast(verr.message || 'Payment signature verification error.', 'error');
+        }
+      }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  } catch (err) {
+    showToast(err.message || 'Payment initiation failed.', 'error');
+  }
+}
+
+window.payPendingInvoice = payPendingInvoice;
+window.retryOrderRazorpayPayment = retryOrderRazorpayPayment;
 
 // ------------------------------------------------------------------------------
 // 4. SUPPORT TICKETS, SENSORS, ALERTS, INSTALLATIONS & OTHER SECTIONS
