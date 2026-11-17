@@ -809,14 +809,39 @@ def get_installations(
     user: dict = Depends(get_current_user_payload)
 ):
     role = user.get("role", "farmer")
-    if role == "technician":
-        uid = user.get("user_id") or user.get("sub")
-        return list_installation_jobs(status=status, technician_id=uid)
-    if role == "farmer":
-        farmer_uid = user.get("user_id") or user.get("sub")
-        jobs = list_installation_jobs(status=status)
-        return [j for j in jobs if j.get("farmer_id") == farmer_uid]
-    return list_installation_jobs(status=status, technician_id=technician_id)
+    jobs = []
+    try:
+        if role == "technician":
+            uid = user.get("user_id") or user.get("sub")
+            jobs = list_installation_jobs(status=status, technician_id=uid)
+        elif role == "farmer":
+            farmer_uid = user.get("user_id") or user.get("sub")
+            all_j = list_installation_jobs(status=status)
+            jobs = [j for j in all_j if j.get("farmer_id") == farmer_uid]
+        else:
+            jobs = list_installation_jobs(status=status, technician_id=technician_id)
+    except Exception as e:
+        logger.debug("list_installation_jobs db error: %s", e)
+
+    # Primary or fallback to Cloud Firestore
+    if not jobs:
+        try:
+            from app.services.firestore_service import firestore_service
+            if firestore_service.is_available:
+                fs_jobs = firestore_service.get_all_installations()
+                if fs_jobs:
+                    if status:
+                        fs_jobs = [j for j in fs_jobs if j.get("status") == status]
+                    if technician_id:
+                        fs_jobs = [j for j in fs_jobs if j.get("technician_id") == technician_id]
+                    if role == "farmer":
+                        farmer_uid = user.get("user_id") or user.get("sub")
+                        fs_jobs = [j for j in fs_jobs if j.get("farmer_id") == farmer_uid]
+                    jobs = fs_jobs
+        except Exception as fe:
+            logger.debug("Firestore get_all_installations fallback error: %s", fe)
+
+    return jobs
 
 
 @router.post("/installations")
@@ -826,7 +851,31 @@ def schedule_installation(
 ):
     actor = user.get("sub", "admin")
     job = create_installation_job(payload.model_dump(), creator_id=actor)
-    log_audit(actor, "INSTALLATION_SCHEDULE", f"Scheduled installation job {job['job_number']}")
+
+    # Sync to Cloud Firestore for cross-region and serverless resilience
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available and job:
+            sched_str = None
+            if job.get("scheduled_date"):
+                sched_val = job.get("scheduled_date")
+                sched_str = sched_val.isoformat() if hasattr(sched_val, "isoformat") else str(sched_val)
+
+            firestore_service.save_installation({
+                **job,
+                "id": job.get("id"),
+                "job_number": job.get("job_number"),
+                "shed_id": job.get("shed_id") or payload.shed_id,
+                "farmer_id": job.get("farmer_id") or payload.farmer_id,
+                "technician_id": job.get("technician_id") or payload.technician_id,
+                "scheduled_date": sched_str,
+                "technician_notes": job.get("technician_notes") or payload.technician_notes or "",
+                "status": job.get("status") or "ASSIGNED"
+            })
+    except Exception as fe:
+        logger.debug("Firestore installation sync notice: %s", fe)
+
+    log_audit(actor, "INSTALLATION_SCHEDULE", f"Scheduled installation job {job.get('job_number', 'JOB')}")
     return job
 
 

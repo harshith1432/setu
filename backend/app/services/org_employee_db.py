@@ -13,6 +13,7 @@ import sys
 import json
 import secrets
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from app.services.db_service import get_db_cursor, invalidate_user_cache
@@ -1161,7 +1162,7 @@ _fallback_departments_loaded = False
 _fallback_departments_lock = threading.Lock()
 
 def _get_departments_file_path() -> str:
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
     os.makedirs(data_dir, exist_ok=True)
     return os.path.join(data_dir, "departments_store.json")
 
