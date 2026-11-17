@@ -7903,17 +7903,36 @@ async function loadProducts(statusFilter = 'ALL') {
     if (!res || !res.ok) {
       res = await fetch(`${API_BASE_URL}/public/products`);
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to load products`);
-    allProductsList = await res.json();
+    if (res && res.ok) {
+      allProductsList = await res.json();
+    } else {
+      throw new Error(`HTTP ${res?.status || 500}: Failed to load products`);
+    }
     filterStoreProducts();
   } catch (err) {
-    if (grid) {
-      grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--rose); padding: 48px 16px;">Failed to load equipment store: ${escapeHtml(err.message)}</div>`;
+    console.warn('API loadProducts failed, attempting Firestore fallback...', err);
+    let firestoreLoaded = false;
+    if (window.SetuFirebase && SetuFirebase.isAvailable && SetuFirebase.db) {
+      try {
+        const snap = await SetuFirebase.db.collection('products').get();
+        if (!snap.empty) {
+          allProductsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          firestoreLoaded = true;
+          filterStoreProducts();
+        }
+      } catch (fe) {
+        console.warn('Firestore loadProducts error:', fe);
+      }
     }
-    if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Failed to load products: ${escapeHtml(err.message)}</td></tr>`;
+    if (!firestoreLoaded) {
+      if (grid) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--rose); padding: 48px 16px;">Failed to load equipment store: ${escapeHtml(err.message)}</div>`;
+      }
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--rose); padding: 24px;">Failed to load products: ${escapeHtml(err.message)}</td></tr>`;
+      }
+      if (window.SetuTableManager) SetuTableManager.syncTable('productsTable');
     }
-    if (window.SetuTableManager) SetuTableManager.syncTable('productsTable');
   }
 }
 
@@ -8755,6 +8774,7 @@ window.handleUpdateProductPhotoSubmit = async function(e, productId) {
 
 function renderProductModalForm(product = null) {
   const isEdit = Boolean(product && product.id);
+  const defaultSku = isEdit ? (product.sku || '') : `SKU-SERI-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
   const specs = (product && product.specifications && typeof product.specifications === 'object') ? product.specifications : {};
   
   const unitPrice = product ? (product.price_minor_units || 0) / 100 : '';
@@ -8780,7 +8800,7 @@ function renderProductModalForm(product = null) {
         <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-bottom: 12px;">
           <div>
             <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">SKU Code *</label>
-            <input type="text" id="prodSkuInput" class="form-control" required placeholder="e.g. SKU-HEAT-2000" value="${escapeHtml(product?.sku || '')}" style="font-family: var(--font-mono); width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
+            <input type="text" id="prodSkuInput" class="form-control" required placeholder="e.g. SKU-HEAT-2000" value="${escapeHtml(defaultSku)}" style="font-family: var(--font-mono); width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: var(--bg-surface);">
           </div>
           <div>
             <label class="form-label" style="font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; display: block;">Product Name *</label>
@@ -8972,9 +8992,10 @@ async function handleSaveProductSubmit(e, productId = null) {
       try {
         const formData = new FormData();
         formData.append('file', file);
+        const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
         const upRes = await fetch(`${API_BASE_URL}/products/upload-image`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${adminToken}` },
+          headers: { 'Authorization': `Bearer ${token}` },
           body: formData
         });
         if (upRes.ok) {
@@ -9006,8 +9027,8 @@ async function handleSaveProductSubmit(e, productId = null) {
       }
     }
 
-    const priceRupees = parseFloat(document.getElementById('prodPriceInput').value) || 0;
-    const mrpRupees = parseFloat(document.getElementById('prodMrpInput').value) || undefined;
+    const priceRupees = parseFloat(document.getElementById('prodPriceInput')?.value) || 0;
+    const mrpRupees = parseFloat(document.getElementById('prodMrpInput')?.value) || undefined;
     const brandVal = document.getElementById('prodBrandInput')?.value?.trim() || undefined;
     const modelVal = document.getElementById('prodModelInput')?.value?.trim() || undefined;
     const powerVal = document.getElementById('prodPowerInput')?.value?.trim() || undefined;
@@ -9026,40 +9047,117 @@ async function handleSaveProductSubmit(e, productId = null) {
     };
     Object.keys(specifications).forEach(k => specifications[k] === undefined && delete specifications[k]);
 
-    const payload = {
-      sku: document.getElementById('prodSkuInput').value.trim(),
-      name: document.getElementById('prodNameInput').value.trim(),
-      category: document.getElementById('prodCategoryInput').value.trim(),
+    const nameVal = document.getElementById('prodNameInput')?.value?.trim() || '';
+    if (!nameVal) {
+      showToast('Product name is required', 'warning');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="${isEdit ? 'save' : 'plus'}"></i> <span>${isEdit ? 'Save Changes' : 'Create Product SKU'}</span>`;
+        if (window.lucide) lucide.createIcons();
+      }
+      return;
+    }
+
+    const skuVal = document.getElementById('prodSkuInput')?.value?.trim() || `SKU-SERI-${Date.now().toString(36).toUpperCase()}`;
+    const catVal = document.getElementById('prodCategoryInput')?.value?.trim() || 'General';
+    const prodId = productId || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const nowIso = new Date().toISOString();
+
+    const productRecord = {
+      id: prodId,
+      sku: skuVal,
+      name: nameVal,
+      category: catVal,
       price_minor_units: Math.round(priceRupees * 100),
-      stock_quantity: parseInt(document.getElementById('prodStockInput').value, 10) || 0,
-      short_description: document.getElementById('prodShortDescInput').value.trim(),
-      description: document.getElementById('prodDescInput').value.trim(),
-      compatibility: document.getElementById('prodCompatInput').value.trim(),
+      stock_quantity: parseInt(document.getElementById('prodStockInput')?.value, 10) || 0,
+      short_description: document.getElementById('prodShortDescInput')?.value?.trim() || '',
+      description: document.getElementById('prodDescInput')?.value?.trim() || '',
+      compatibility: document.getElementById('prodCompatInput')?.value?.trim() || '',
+      specifications: specifications,
+      images: imageUrls,
+      unit: 'unit',
+      currency: 'INR',
+      is_active: true,
+      availability_status: 'AVAILABLE',
+      publication_status: 'PUBLISHED',
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    // 2. Direct Firestore client-side sync
+    let firestoreSaved = false;
+    if (window.SetuFirebase && SetuFirebase.isAvailable && SetuFirebase.db) {
+      try {
+        await SetuFirebase.db.collection('products').doc(prodId).set(productRecord, { merge: true });
+        firestoreSaved = true;
+      } catch (fsErr) {
+        console.warn('Firestore product dual-write notice:', fsErr);
+      }
+    }
+
+    // 3. Backend API sync
+    const payload = {
+      sku: skuVal,
+      name: nameVal,
+      category: catVal,
+      price_minor_units: Math.round(priceRupees * 100),
+      stock_quantity: parseInt(document.getElementById('prodStockInput')?.value, 10) || 0,
+      short_description: document.getElementById('prodShortDescInput')?.value?.trim() || '',
+      description: document.getElementById('prodDescInput')?.value?.trim() || '',
+      compatibility: document.getElementById('prodCompatInput')?.value?.trim() || '',
       specifications: specifications,
       images: imageUrls,
       unit: 'unit',
       currency: 'INR'
     };
 
-    const endpoint = isEdit ? `${API_BASE_URL}/products/${productId}` : `${API_BASE_URL}/products`;
-    const method = isEdit ? 'PUT' : 'POST';
+    let apiSaved = false;
+    let apiErrorDetail = null;
+    try {
+      const endpoint = isEdit ? `${API_BASE_URL}/products/${productId}` : `${API_BASE_URL}/products`;
+      const method = isEdit ? 'PUT' : 'POST';
+      const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
 
-    const res = await fetch(endpoint, {
-      method: method,
-      headers: {
-        'Authorization': `Bearer ${adminToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    });
+      const res = await fetch(endpoint, {
+        method: method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `Failed to ${isEdit ? 'update' : 'create'} product`);
+      if (res.ok) {
+        apiSaved = true;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        apiErrorDetail = errJson.detail || `HTTP ${res.status}`;
+        console.warn('Backend API product save returned status:', res.status, apiErrorDetail);
+      }
+    } catch (apiErr) {
+      console.warn('Backend API product save network error:', apiErr);
+      apiErrorDetail = apiErr.message;
     }
 
-    showToast(`Product SKU ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
+    if (!apiSaved && !firestoreSaved) {
+      throw new Error(apiErrorDetail || `Failed to ${isEdit ? 'update' : 'create'} product SKU`);
+    }
+
+    // Update in-memory catalogue list immediately
+    if (typeof allProductsList !== 'undefined') {
+      const existingIdx = allProductsList.findIndex(p => p.id === prodId || p.sku === skuVal);
+      if (existingIdx >= 0) {
+        allProductsList[existingIdx] = { ...allProductsList[existingIdx], ...productRecord };
+      } else {
+        allProductsList.unshift(productRecord);
+      }
+    }
+
+    showToast(`Product SKU ${skuVal} ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
     closeAppModal();
+    if (typeof filterStoreProducts === 'function') {
+      filterStoreProducts();
+    }
     loadProducts();
   } catch (err) {
     showToast(err.message, 'error');

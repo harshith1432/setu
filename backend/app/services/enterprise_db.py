@@ -1751,10 +1751,13 @@ def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> D
     from app.services.firestore_service import firestore_service
     now_dt = datetime.now(timezone.utc)
     now_iso = now_dt.isoformat()
-    prod_id = product_data.get("id") or f"prod_{uuid.uuid4().hex[:12]}"
-    slug = product_data.get("slug") or product_data["name"].lower().replace(" ", "-").replace("/", "-")
-    pub_status = product_data.get("publication_status", "PUBLISHED").upper()
-    avail_status = product_data.get("availability_status", "AVAILABLE").upper()
+    prod_id = str(product_data.get("id") or f"prod_{uuid.uuid4().hex[:12]}").strip()
+    raw_name = str(product_data.get("name") or "Hardware Product").strip()
+    sku = str(product_data.get("sku") or f"SKU-SERI-{uuid.uuid4().hex[:8].upper()}").strip()
+    slug = str(product_data.get("slug") or raw_name.lower().replace(" ", "-").replace("/", "-")).strip()
+    pub_status = str(product_data.get("publication_status") or "PUBLISHED").strip().upper()
+    avail_status = str(product_data.get("availability_status") or "AVAILABLE").strip().upper()
+    category = str(product_data.get("category") or "General").strip()
     specs = product_data.get("specifications", {})
     if isinstance(specs, str):
         try:
@@ -1771,27 +1774,35 @@ def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> D
             images = [images] if images.strip() else []
     elif not isinstance(images, list):
         images = []
-    price_minor = int(product_data.get("price_minor_units", 0))
-    stock_qty = int(product_data.get("stock_quantity", 0))
-    unit_str = product_data.get("unit", "unit")
-    curr_str = product_data.get("currency", "INR")
+    
+    try:
+        price_minor = int(product_data.get("price_minor_units") or 0)
+    except (ValueError, TypeError):
+        price_minor = 0
+    try:
+        stock_qty = int(product_data.get("stock_quantity") or 0)
+    except (ValueError, TypeError):
+        stock_qty = 0
+
+    unit_str = str(product_data.get("unit") or "unit").strip()
+    curr_str = str(product_data.get("currency") or "INR").strip()
     is_active = (pub_status != "ARCHIVED")
 
     prod = {
         "id": prod_id,
-        "sku": product_data["sku"],
-        "name": product_data["name"],
+        "sku": sku,
+        "name": raw_name,
         "slug": slug,
-        "category": product_data.get("category", "General"),
-        "short_description": product_data.get("short_description", product_data.get("description", "")),
-        "description": product_data.get("description", ""),
+        "category": category,
+        "short_description": str(product_data.get("short_description") or product_data.get("description") or "").strip(),
+        "description": str(product_data.get("description") or "").strip(),
         "price_minor_units": price_minor,
         "currency": curr_str,
         "stock_quantity": stock_qty,
         "unit": unit_str,
         "availability_status": avail_status,
         "publication_status": pub_status,
-        "compatibility": product_data.get("compatibility", ""),
+        "compatibility": str(product_data.get("compatibility") or "").strip(),
         "specifications": specs,
         "images": images,
         "is_active": is_active,
@@ -1813,27 +1824,39 @@ def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> D
                     is_active, created_at, updated_at, published_at
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET
-                    sku = EXCLUDED.sku,
+                ON CONFLICT (sku) DO UPDATE SET
                     name = EXCLUDED.name,
+                    slug = EXCLUDED.slug,
+                    category = EXCLUDED.category,
+                    short_description = EXCLUDED.short_description,
+                    description = EXCLUDED.description,
+                    price_minor_units = EXCLUDED.price_minor_units,
+                    currency = EXCLUDED.currency,
                     stock_quantity = EXCLUDED.stock_quantity,
+                    unit = EXCLUDED.unit,
+                    availability_status = EXCLUDED.availability_status,
+                    publication_status = EXCLUDED.publication_status,
+                    compatibility = EXCLUDED.compatibility,
+                    specifications = EXCLUDED.specifications,
+                    images = EXCLUDED.images,
+                    is_active = EXCLUDED.is_active,
                     updated_at = EXCLUDED.updated_at
                 RETURNING *;
                 """, (
                     prod_id,
-                    product_data["sku"],
-                    product_data["name"],
+                    sku,
+                    raw_name,
                     slug,
-                    product_data.get("category", "General"),
-                    product_data.get("short_description", product_data.get("description", "")),
-                    product_data.get("description", ""),
+                    category,
+                    prod["short_description"],
+                    prod["description"],
                     price_minor,
                     curr_str,
                     stock_qty,
                     unit_str,
                     avail_status,
                     pub_status,
-                    product_data.get("compatibility", ""),
+                    prod["compatibility"],
                     json.dumps(specs),
                     json.dumps(images),
                     is_active,
@@ -1843,7 +1866,12 @@ def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> D
                 ))
                 row = cursor.fetchone()
                 if row and not isinstance(row, _DummyRow) and row.get("id"):
-                    prod = dict(row)
+                    row_dict = dict(row)
+                    for k, v in list(row_dict.items()):
+                        if isinstance(v, datetime):
+                            row_dict[k] = v.isoformat()
+                    prod = row_dict
+                    prod_id = prod.get("id", prod_id)
 
                 if prod.get("stock_quantity", 0) > 0:
                     cursor.execute("""

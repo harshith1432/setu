@@ -344,14 +344,14 @@ def get_analytics_trend_data(
 # ==============================================================================
 
 class ProductCreatePayload(BaseModel):
-    sku: str = Field(..., json_schema_extra={"example": "SKU-GW-ESP32-E"})
+    sku: Optional[str] = Field(None, json_schema_extra={"example": "SKU-GW-ESP32-E"})
     name: str = Field(..., json_schema_extra={"example": "Setu Industrial IoT Gateway"})
-    category: str = Field(..., json_schema_extra={"example": "Gateways"})
+    category: str = Field("General", json_schema_extra={"example": "Gateways"})
     description: Optional[str] = ""
     short_description: Optional[str] = ""
     compatibility: Optional[str] = ""
     specifications: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    price_minor_units: int = Field(..., json_schema_extra={"example": 649900})  # in paise
+    price_minor_units: int = Field(0, json_schema_extra={"example": 649900})  # in paise
     currency: str = "INR"
     stock_quantity: int = Field(0, ge=0)
     unit: str = "unit"
