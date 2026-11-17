@@ -217,25 +217,30 @@ class FirestoreService:
     # 2. PRODUCTS & HARDWARE CATALOGUE
     # =========================================================================
 
-    def get_products(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Retrieve hardware products from Firestore."""
+    def get_products(self, category: Optional[str] = None, published_only: bool = False) -> List[Dict[str, Any]]:
+        """Retrieve hardware products from Firestore with optional category and publication filtering."""
         if not self.is_available:
             return []
 
         try:
             col = self._db.collection("products")
-            q = col.where("publication_status", "==", "PUBLISHED") if hasattr(col, 'where') else col
-            if category and category.upper() != "ALL":
-                q = q.where("category", "==", category)
-            
-            docs = q.get()
-            return [{"id": d.id, **d.to_dict()} for d in docs]
+            docs = col.get() if hasattr(col, "get") else []
+            res = []
+            for d in docs:
+                p = {"id": d.id, **d.to_dict()}
+                if published_only and p.get("publication_status") != "PUBLISHED":
+                    continue
+                if category and category.strip().upper() not in ("ALL", "ALL PRODUCTS"):
+                    if str(p.get("category", "")).strip().lower() != category.strip().lower():
+                        continue
+                res.append(p)
+            return res
         except Exception as e:
             logger.debug("Firestore get_products failed: %s", e)
             return []
 
     def get_product(self, product_id_or_sku: str) -> Optional[Dict[str, Any]]:
-        """Get product by ID or SKU."""
+        """Get product by ID, SKU, or slug."""
         if not self.is_available:
             return None
 
@@ -244,10 +249,14 @@ class FirestoreService:
             if doc.exists:
                 return {"id": doc.id, **doc.to_dict()}
             
-            # Try by SKU
-            docs = self._db.collection("products").where("sku", "==", product_id_or_sku).limit(1).get()
-            for d in docs:
-                return {"id": d.id, **d.to_dict()}
+            # Try by SKU or slug
+            for field in ("sku", "slug"):
+                try:
+                    docs = self._db.collection("products").where(field, "==", product_id_or_sku).limit(1).get()
+                    for d in docs:
+                        return {"id": d.id, **d.to_dict()}
+                except Exception:
+                    pass
         except Exception as e:
             logger.debug("Firestore get_product failed: %s", e)
         return None
@@ -715,6 +724,9 @@ class FirestoreService:
             data = dict(product_data)
             data["id"] = p_id
             now_iso = datetime.now(timezone.utc).isoformat()
+            for k, v in list(data.items()):
+                if isinstance(v, datetime):
+                    data[k] = v.isoformat()
             data["created_at"] = data.get("created_at") or now_iso
             data["updated_at"] = now_iso
             self._db.collection("products").document(p_id).set(data, merge=True)
