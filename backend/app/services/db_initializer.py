@@ -79,120 +79,15 @@ def get_existing_postgres_tables(cursor) -> Set[str]:
 
 def check_and_create_postgres_tables(max_retries: int = 5, retry_interval: float = 2.0) -> Dict[str, Any]:
     """
-    Connects to PostgreSQL, checks if tables exist, and creates them if missing.
-    Includes retry logic to handle cloud database container cold starts during deployment.
+    PostgreSQL is retired. Returns pure Firebase Cloud Firestore status immediately with zero network delays.
     """
-    from app.core.config import settings
-    from app.services.db_service import get_pool, init_db, _postgres_available
-    from app.services.enterprise_db import init_enterprise_tables
-    from app.services.org_employee_db import init_org_employee_tables
-
-    dsn = settings.DATABASE_URL
-    if not dsn or os.getenv("USE_FIREBASE_ONLY", "false").lower() in ("true", "1"):
-        logger.info("[DB-CHECK] PostgreSQL disabled or USE_FIREBASE_ONLY=true. Operating in Cloud Firestore mode.")
-        return {
-            "status": "skipped",
-            "reason": "USE_FIREBASE_ONLY or no DATABASE_URL configured",
-            "tables_found": 0,
-            "created": False
-        }
-
-    pool = None
-    last_err = None
-
-    # Resilient connection retry for cloud deployment cold-starts
-    for attempt in range(1, max_retries + 1):
-        try:
-            pool = get_pool()
-            if pool:
-                break
-        except Exception as e:
-            last_err = e
-            logger.warning("[DB-CHECK] Database connection attempt %d/%d failed: %s", attempt, max_retries, e)
-        time.sleep(retry_interval)
-
-    if not pool:
-        logger.warning("[DB-CHECK] Could not connect to PostgreSQL after %d attempts (%s). Software will run in Firebase fallback mode.", max_retries, last_err)
-        return {
-            "status": "fallback",
-            "reason": str(last_err),
-            "tables_found": 0,
-            "created": False
-        }
-
-    # Inspect database tables
-    conn = pool.getconn()
-    try:
-        cursor = conn.cursor()
-        existing_tables = get_existing_postgres_tables(cursor)
-        missing_tables = [t for t in REQUIRED_TABLES if t not in existing_tables]
-
-        if not missing_tables:
-            logger.info("============================================================")
-            logger.info("[DB-CHECK] SUCCESS: All required database tables exist (%d tables present).", len(existing_tables))
-            logger.info("[DB-CHECK] Database schema verified. Proceeding to run software.")
-            logger.info("============================================================")
-            cursor.close()
-            pool.putconn(conn)
-            return {
-                "status": "verified",
-                "tables_found": len(existing_tables),
-                "missing": [],
-                "created": False
-            }
-
-        # Tables are missing: automatically create tables first
-        logger.info("============================================================")
-        logger.info("[DB-CHECK] Found %d existing tables. Missing %d required tables: %s", 
-                    len(existing_tables), len(missing_tables), missing_tables)
-        logger.info("[DB-CHECK] Creating missing tables and initializing database schema first...")
-        logger.info("============================================================")
-        cursor.close()
-        pool.putconn(conn)
-
-        # Run creation modules
-        init_db()
-        init_enterprise_tables()
-        init_org_employee_tables()
-
-        # Re-verify table creation
-        conn2 = pool.getconn()
-        try:
-            cursor2 = conn2.cursor()
-            updated_tables = get_existing_postgres_tables(cursor2)
-            still_missing = [t for t in REQUIRED_TABLES if t not in updated_tables]
-            cursor2.close()
-            pool.putconn(conn2)
-
-            if still_missing:
-                logger.error("[DB-CHECK] WARNING: Some tables could not be created: %s", still_missing)
-            else:
-                logger.info("============================================================")
-                logger.info("[DB-CHECK] SUCCESS: All tables created and verified (%d tables total).", len(updated_tables))
-                logger.info("[DB-CHECK] Database is fully ready. Proceeding to run software.")
-                logger.info("============================================================")
-
-            return {
-                "status": "created",
-                "tables_found": len(updated_tables),
-                "missing_after_init": still_missing,
-                "created": True
-            }
-        except Exception as e:
-            pool.putconn(conn2)
-            raise e
-
-    except Exception as e:
-        try:
-            pool.putconn(conn)
-        except Exception:
-            pass
-        logger.error("[DB-CHECK] Error during database table verification: %s", e)
-        return {
-            "status": "error",
-            "error": str(e),
-            "created": False
-        }
+    logger.info("[DB-CHECK] Pure Firebase Cloud Firestore mode active (PostgreSQL retired).")
+    return {
+        "status": "disabled_migrated_to_pure_firebase",
+        "reason": "PostgreSQL completely retired in favor of Firebase Cloud Firestore (setu-a767c)",
+        "tables_found": 0,
+        "created": False
+    }
 
 
 def verify_and_ensure_database_ready() -> Dict[str, Any]:

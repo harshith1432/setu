@@ -2,44 +2,35 @@ import os
 import sys
 import time
 
+import os
+import sys
+
 def main():
-    db_url = os.getenv("DATABASE_URL", "postgresql://setu_user:setu_password@127.0.0.1:5433/setu")
-    print(f"Connecting to database: {db_url}")
+    print("Initializing Setu Pure Firebase Cloud Firestore & resilient datastores...")
 
-    import psycopg2
-    connected = False
-    for attempt in range(20):
-        try:
-            conn = psycopg2.connect(db_url)
-            conn.close()
-            connected = True
-            print("PostgreSQL connection confirmed!")
-            break
-        except Exception as e:
-            print(f"Waiting for PostgreSQL... (attempt {attempt+1}/20): {e}")
-            time.sleep(1)
-
-    if not connected:
-        print("ERROR: Could not connect to PostgreSQL")
-        sys.exit(1)
-
-    import traceback
     try:
+        from app.services.firestore_service import firestore_service
+        print(f"Cloud Firestore available: {firestore_service.is_available}")
+
         from app.services.db_service import init_db
         from app.services.enterprise_db import init_enterprise_tables
         from app.services.org_employee_db import init_org_employee_tables
 
-        print("Initializing core database...")
+        print("Initializing core baseline collections...")
         init_db()
-        print("Initializing enterprise database...")
+        print("Initializing enterprise platform catalogue...")
         init_enterprise_tables()
-        print("Initializing org employee database...")
+        print("Initializing organizational RBAC & employee directory...")
         init_org_employee_tables()
-        print("All tables successfully initialized and seeded!")
+        print("All Pure Firebase collections and local datastores successfully initialized!")
     except Exception as e:
-        print(f"FAILED during table initialization: {e}")
+        import traceback
+        print(f"FAILED during database initialization: {e}")
         traceback.print_exc()
         sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()

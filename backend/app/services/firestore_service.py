@@ -591,6 +591,20 @@ class FirestoreService:
             logger.warning("Firestore update_user_password error: %s", e)
             return False
 
+    def update_user_active_status(self, user_id: str, is_active: bool) -> bool:
+        """Updates user is_active flag in Firestore."""
+        if not self.is_available or not user_id:
+            return False
+        try:
+            self._db.collection("users").document(user_id).set({
+                "is_active": bool(is_active),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }, merge=True)
+            return True
+        except Exception as e:
+            logger.warning("Firestore update_user_active_status error: %s", e)
+            return False
+
     def create_user_session(self, session_data: Dict[str, Any]) -> bool:
         """Stores active tab session in Firestore."""
         if not self.is_available:
@@ -1144,7 +1158,8 @@ class FirestoreService:
                 "active_alerts": active_alerts,
                 "critical_alerts": critical_alerts,
                 "pending_installations": pending_jobs,
-                "last_updated": now_iso
+                "last_updated": now_iso,
+                "last_synced_at": now_iso
             }
         except Exception as e:
             logger.error("Error computing Firestore overview KPIs: %s", e)
@@ -1153,7 +1168,8 @@ class FirestoreService:
                 "total_sheds": 0, "total_devices": 0, "online_devices": 0, "offline_devices": 0,
                 "active_subscriptions": 0, "mrr_inr": 0.0, "pending_orders": 0, "total_revenue_inr": 0.0,
                 "open_tickets": 0, "critical_tickets": 0, "active_alerts": 0, "critical_alerts": 0,
-                "pending_installations": 0, "last_updated": now_iso
+                "pending_installations": 0, "last_updated": now_iso,
+                "last_synced_at": now_iso
             }
 
     # =========================================================================
@@ -1176,6 +1192,8 @@ class FirestoreService:
         except Exception as e:
             logger.error("Error creating employee in Cloud Firestore: %s", type(e).__name__)
             return None
+
+    save_employee = create_employee
 
     def get_employee(self, employee_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves an employee record by id, employee_id code, or official_email."""

@@ -42,7 +42,7 @@ def _set_cached_latest_reading(shed_id: str, data: Dict[str, Any]) -> None:
         _latest_reading_cache_times[shed_id] = now
 
 
-_postgres_available: Optional[bool] = None
+_postgres_available: bool = False
 
 class _DummyRow(dict):
     """Safe row object supporting both integer index and string key access in fallback mode."""
@@ -59,12 +59,8 @@ class _DummyRow(dict):
 
 
 def is_postgres_available() -> bool:
-    """Returns True if PostgreSQL connection pool is healthy and active."""
-    global _postgres_available
-    if _postgres_available is False:
-        return False
-    p = get_pool()
-    return _postgres_available is True and p is not None
+    """PostgreSQL is retired in favor of Firebase Cloud Firestore."""
+    return False
 
 
 class _DummyCursor:
@@ -91,663 +87,281 @@ class _DummyCursor:
 
 
 def _get_connect_dsn() -> str:
-    """Returns PostgreSQL connection DSN with defensive connection timeout."""
-    return DATABASE_URL or ""
+    return ""
 
 
-def get_pool() -> Optional[pool.ThreadedConnectionPool]:
-    """
-    Returns a singleton ThreadedConnectionPool for PostgreSQL connection reuse.
-    If PostgreSQL is disabled, unreachable, or broken, returns None cleanly.
-    """
-    global _connection_pool, _postgres_available
-    if _postgres_available is False:
-        return None
-
-    dsn = _get_connect_dsn()
-    # If no DSN, or dead Render Postgres host, or USE_FIREBASE_ONLY is set: disable Postgres
-    if not dsn or "dpg-db5luo4s728c73897it0-a" in dsn or os.getenv("USE_FIREBASE_ONLY", "false").lower() in ("true", "1"):
-        _postgres_available = False
-        logger.info("Operating in pure Firebase Cloud Firestore mode (PostgreSQL disabled).")
-        return None
-
-    if _connection_pool is None:
-        with _pool_lock:
-            if _connection_pool is None and _postgres_available is not False:
-                try:
-                    sep = "&" if "?" in dsn else "?"
-                    if "connect_timeout" not in dsn:
-                        dsn = f"{dsn}{sep}connect_timeout=2"
-                    max_conn = int(os.getenv("DB_POOL_MAX", "20"))
-                    _connection_pool = pool.ThreadedConnectionPool(
-                        minconn=1,
-                        maxconn=max_conn,
-                        dsn=dsn
-                    )
-                    _postgres_available = True
-                except Exception as e:
-                    logger.info("PostgreSQL unavailable (%s). Switching cleanly to Firebase Cloud Firestore mode.", e)
-                    _connection_pool = None
-                    _postgres_available = False
-    return _connection_pool
+def get_pool():
+    return None
 
 
 @contextmanager
 def get_db_cursor(commit: bool = False, dict_cursor: bool = False):
     """
-    Context manager that yields a cursor from the connection pool or a safe dummy cursor.
-    Never crashes or delays application execution if PostgreSQL is offline.
+    Context manager that instantly yields a safe dummy cursor in pure Firebase mode.
+    Zero network latency, zero blocking.
     """
-    p = get_pool()
-    if not p or _postgres_available is False:
-        yield _DummyCursor()
-        return
-
-    conn = None
-    from_pool = False
-    try:
-        conn = p.getconn()
-        from_pool = True
-    except Exception:
-        try:
-            conn = psycopg2.connect(_get_connect_dsn())
-            from_pool = False
-        except Exception:
-            yield _DummyCursor()
-            return
-
-    if commit:
-        conn.autocommit = True
-
-    cursor_kwargs = {"cursor_factory": RealDictCursor} if dict_cursor else {}
-    cursor = conn.cursor(**cursor_kwargs)
-    try:
-        try:
-            cursor.execute("SET statement_timeout = '4000ms'; SET lock_timeout = '2000ms';")
-        except Exception:
-            pass
-        yield cursor
-    finally:
-        cursor.close()
-        if from_pool and p:
-            try:
-                p.putconn(conn)
-            except Exception:
-                conn.close()
-        else:
-            conn.close()
+    yield _DummyCursor()
 
 
 def get_connection():
-    if _postgres_available is False:
-        return None
-    return psycopg2.connect(_get_connect_dsn())
-    """Legacy helper: Returns a direct PostgreSQL connection."""
-    return psycopg2.connect(_get_connect_dsn())
+    return None
 
 
-def _ensure_telemetry_partitions(cursor):
-    """
-    Ensures current, historical, and future monthly partition tables exist
-    for the partitioned time-series shed_telemetry_partitioned table.
-    """
+
+FALLBACK_SHEDS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "sheds_store.json"))
+_fallback_sheds_lock = threading.Lock()
+
+def _load_fallback_sheds() -> Dict[str, Dict[str, Any]]:
     try:
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS shed_telemetry_partitioned (
-            id BIGSERIAL,
-            time TIMESTAMPTZ NOT NULL,
-            shed_id VARCHAR(64) NOT NULL,
-            device_id VARCHAR(64) DEFAULT 'node_default',
-            sequence_number BIGINT DEFAULT 0,
-            event_id VARCHAR(64),
-            temperature DOUBLE PRECISION NOT NULL,
-            humidity DOUBLE PRECISION NOT NULL,
-            air_quality DOUBLE PRECISION NOT NULL DEFAULT 88.0,
-            light_lux DOUBLE PRECISION NOT NULL DEFAULT 22.0,
-            outside_temperature DOUBLE PRECISION,
-            outside_humidity DOUBLE PRECISION,
-            cooler BOOLEAN NOT NULL DEFAULT FALSE,
-            heater BOOLEAN NOT NULL DEFAULT FALSE,
-            fan BOOLEAN NOT NULL DEFAULT FALSE,
-            humidifier BOOLEAN NOT NULL DEFAULT FALSE,
-            light BOOLEAN NOT NULL DEFAULT FALSE,
-            light_brightness INT NOT NULL DEFAULT 0,
-            mode VARCHAR(32) NOT NULL DEFAULT 'AUTO',
-            PRIMARY KEY (id, time)
-        ) PARTITION BY RANGE (time);
-        """)
-
-        # Generate partitions for past 2 months, current month, and next 6 months
-        base_now = datetime.now(timezone.utc)
-        for offset in range(-2, 7):
-            # Compute start of target month
-            y = base_now.year
-            m = base_now.month + offset
-            while m > 12:
-                y += 1
-                m -= 12
-            while m < 1:
-                y -= 1
-                m += 12
-            start_date = datetime(y, m, 1, tzinfo=timezone.utc)
-            # Compute end date (start of next month)
-            next_y = y
-            next_m = m + 1
-            if next_m > 12:
-                next_y += 1
-                next_m = 1
-            end_date = datetime(next_y, next_m, 1, tzinfo=timezone.utc)
-
-            part_name = f"shed_telemetry_y{y}m{m:02d}"
-            cursor.execute(f"""
-            CREATE TABLE IF NOT EXISTS {part_name}
-            PARTITION OF shed_telemetry_partitioned
-            FOR VALUES FROM ('{start_date.isoformat()}') TO ('{end_date.isoformat()}');
-            """)
-            cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_{part_name}_shed_time ON {part_name} (shed_id, time DESC);")
+        if os.path.exists(FALLBACK_SHEDS_FILE):
+            with open(FALLBACK_SHEDS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
     except Exception as e:
-        logger.debug("Partition initialization info: %s", e)
+        logger.debug("Could not read fallback sheds file: %s", e)
+    return {}
 
+def _save_fallback_shed(shed_data: Dict[str, Any]) -> None:
+    if not shed_data or not shed_data.get("id"):
+        return
+    with _fallback_sheds_lock:
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_SHEDS_FILE), exist_ok=True)
+            sheds = _load_fallback_sheds()
+            s_id = str(shed_data["id"])
+            sheds[s_id] = dict(shed_data)
+            with open(FALLBACK_SHEDS_FILE, "w", encoding="utf-8") as f:
+                json.dump(sheds, f, indent=2)
+        except Exception as e:
+            logger.debug("Could not write fallback shed: %s", e)
+
+FALLBACK_THRESHOLDS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "stage_thresholds.json"))
+_fallback_thresholds_lock = threading.Lock()
+
+CANONICAL_THRESHOLDS = [
+    {"stage_id": 1, "name": "1st Instar (Chawki)", "days": "Days 1–3", "temp_min": 27.0, "temp_max": 28.0, "hum_min": 80.0, "hum_max": 85.0, "hysteresis_temp": 0.5, "hysteresis_hum": 3.0, "fan_trigger_offset": 1.5, "description": "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation."},
+    {"stage_id": 2, "name": "2nd Instar", "days": "Days 4–5", "temp_min": 26.5, "temp_max": 27.5, "hum_min": 75.0, "hum_max": 80.0, "hysteresis_temp": 0.5, "hysteresis_hum": 3.0, "fan_trigger_offset": 1.5, "description": "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements."},
+    {"stage_id": 3, "name": "3rd Instar", "days": "Days 6–9", "temp_min": 25.0, "temp_max": 26.5, "hum_min": 70.0, "hum_max": 75.0, "hysteresis_temp": 0.5, "hysteresis_hum": 3.0, "fan_trigger_offset": 1.5, "description": "Late chawki / adult transition. Increased voracity requires steady ventilation and balanced thermal envelope."},
+    {"stage_id": 4, "name": "4th Instar", "days": "Days 10–14", "temp_min": 24.0, "temp_max": 25.5, "hum_min": 65.0, "hum_max": 70.0, "hysteresis_temp": 0.5, "hysteresis_hum": 3.0, "fan_trigger_offset": 1.5, "description": "Exponential larval weight gain. High metabolic heat output necessitates active cooling and air exchange."},
+    {"stage_id": 5, "name": "5th Instar", "days": "Days 15–20", "temp_min": 23.0, "temp_max": 24.5, "hum_min": 60.0, "hum_max": 65.0, "hysteresis_temp": 0.5, "hysteresis_hum": 3.0, "fan_trigger_offset": 1.5, "description": "Final feeding instar preceding cocooning/spinning. Requires cooler, drier conditions and continuous fresh airflow."}
+]
+
+def _ensure_fallback_stage_thresholds() -> List[Dict[str, Any]]:
+    with _fallback_thresholds_lock:
+        try:
+            if os.path.exists(FALLBACK_THRESHOLDS_FILE):
+                with open(FALLBACK_THRESHOLDS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data:
+                        return data
+        except Exception:
+            pass
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_THRESHOLDS_FILE), exist_ok=True)
+            with open(FALLBACK_THRESHOLDS_FILE, "w", encoding="utf-8") as f:
+                json.dump(CANONICAL_THRESHOLDS, f, indent=2)
+        except Exception:
+            pass
+        return list(CANONICAL_THRESHOLDS)
 
 def init_db():
     """
-    Initializes PostgreSQL tables:
-    - 'users': Multi-tenant farmer & operator directory
-    - 'devices': Registered IoT hardware identities with credentials
-    - 'device_commands': Safe command lifecycle with state progression
-    - 'audit_logs': Immutable audit trail for all control & admin actions
-    - 'stage_thresholds': Growth stage thresholds and environmental setpoints
-    - 'shed_telemetry': Historical telemetry timeseries storage
-    - 'shed_telemetry_partitioned': High-scale time-partitioned telemetry store
+    Initializes Pure Firebase Cloud Firestore baseline collections:
+    - Verifies Firestore connectivity (project setu-a767c)
+    - Ensures baseline users and stages exist in Firestore and local store
     """
-    with get_db_cursor(commit=True) as cursor:
-        now_dt = datetime.now(timezone.utc)
-        # 1. Farmers & Users Table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id VARCHAR(64) PRIMARY KEY,
-            username VARCHAR(64) UNIQUE NOT NULL,
-            hashed_password VARCHAR(255) NOT NULL,
-            full_name VARCHAR(128) NOT NULL,
-            phone VARCHAR(32) NOT NULL,
-            preferred_language VARCHAR(8) NOT NULL DEFAULT 'kn',
-            role VARCHAR(32) NOT NULL DEFAULT 'farmer',
-            farm_name VARCHAR(128) NOT NULL DEFAULT 'Green Valley Farm',
-            region VARCHAR(128) NOT NULL DEFAULT 'Local Rearing Shed',
-            latitude DOUBLE PRECISION,
-            longitude DOUBLE PRECISION,
-            shed_id VARCHAR(64) DEFAULT 'shed_01',
-            batch_id VARCHAR(64) NOT NULL DEFAULT 'SERI-2026-M04',
-            dfl_capacity VARCHAR(64) NOT NULL DEFAULT '200 DFL',
-            breed VARCHAR(128) NOT NULL DEFAULT 'Double Hybrid (FC1 x FC2)',
-            current_stage INT DEFAULT 3,
-            official_email VARCHAR(255),
-            organization_id VARCHAR(64) DEFAULT 'default_org',
-            is_active BOOLEAN NOT NULL DEFAULT TRUE,
-            created_at TIMESTAMPTZ NOT NULL
-        );
-        """)
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS shed_id VARCHAR(64) DEFAULT 'shed_01'")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(64)")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS whatsapp_verified BOOLEAN NOT NULL DEFAULT FALSE")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_stage INT DEFAULT 3")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_shed_id ON users (shed_id);")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS official_email VARCHAR(255)")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org'")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_official_email ON users (official_email);")
-        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;")
+    logger.info("Initializing Pure Firebase Cloud Firestore baseline collections...")
+    now_iso = datetime.now(timezone.utc).isoformat()
+    is_test_env = bool("pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SEED_DEMO_DATA", "false").lower() in ("true", "1"))
 
-        # 2. IoT Device Registry
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS devices (
-            device_id VARCHAR(64) PRIMARY KEY,
-            shed_id VARCHAR(64) NOT NULL,
-            device_name VARCHAR(128),
-            device_key_hash VARCHAR(255),
-            cert_fingerprint_sha256 VARCHAR(64),
-            auth_mode VARCHAR(32) DEFAULT 'API_KEY',
-            firmware_version VARCHAR(32) DEFAULT '1.0.0',
-            status VARCHAR(32) DEFAULT 'ONLINE',
-            last_sequence_number BIGINT DEFAULT 0,
-            last_seen_at TIMESTAMPTZ,
-            created_at TIMESTAMPTZ NOT NULL
-        );
-        """)
-        cursor.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org';")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_devices_shed ON devices (shed_id);")
+    admin_init_pw = settings.SUPERADMIN_PASSWORD or settings.INITIAL_ADMIN_PASSWORD or "SuperAdmin@Setu2026!"
+    baseline_users = [
+        {
+            "id": "usr_admin",
+            "username": "superadmin",
+            "hashed_password": get_password_hash(admin_init_pw),
+            "full_name": "Setu Super Admin",
+            "phone": "+91 98450 99999",
+            "official_email": "admin@setu.ag",
+            "preferred_language": "en",
+            "role": "superadmin",
+            "farm_name": "Central Sericulture Command",
+            "region": "Central Sericulture Command HQ",
+            "shed_id": "shed_01",
+            "batch_id": "CENTRAL-HQ",
+            "dfl_capacity": "N/A",
+            "breed": "N/A",
+            "is_active": True,
+            "created_at": now_iso
+        },
+        {
+            "id": "usr_001",
+            "username": "ramesh_farmer",
+            "hashed_password": get_password_hash("setu2026"),
+            "full_name": "Ramesh Gowda",
+            "phone": "+91 98112 75512",
+            "official_email": "ramesh@setu.ag",
+            "preferred_language": "kn",
+            "role": "farmer",
+            "farm_name": "Gowda Sericulture Farm",
+            "region": "Karnataka",
+            "shed_id": "shed_01",
+            "batch_id": "SERI-2026",
+            "dfl_capacity": "250 DFL",
+            "breed": "Double Hybrid (FC1 x FC2)",
+            "is_active": True,
+            "created_at": now_iso
+        }
+    ]
 
-        # Dynamic migration for devices columns
-        cursor.execute("""
-        DO $$
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='devices' AND column_name='cert_fingerprint_sha256') THEN
-                ALTER TABLE devices ADD COLUMN cert_fingerprint_sha256 VARCHAR(64);
-            END IF;
-            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='devices' AND column_name='auth_mode') THEN
-                ALTER TABLE devices ADD COLUMN auth_mode VARCHAR(32) DEFAULT 'API_KEY';
-            END IF;
-        END $$;
-        """)
+    if is_test_env:
+        baseline_users.extend([
+            {
+                "id": "usr_test_admin",
+                "username": "admin",
+                "hashed_password": get_password_hash("admin123"),
+                "full_name": "Test System Administrator",
+                "phone": "+91 98450 00000",
+                "official_email": "sysadmin@setu.ag",
+                "preferred_language": "en",
+                "role": "superadmin",
+                "farm_name": "Setu Operations HQ",
+                "region": "Bengaluru Central",
+                "shed_id": "shed_01",
+                "batch_id": "TEST-HQ",
+                "dfl_capacity": "N/A",
+                "breed": "N/A",
+                "is_active": True,
+                "created_at": now_iso
+            },
+            {
+                "id": "usr_ceo",
+                "username": "ceo",
+                "hashed_password": get_password_hash("ceo2026"),
+                "full_name": "Vikramaditya Hegde",
+                "phone": "+91 98450 11001",
+                "official_email": "ceo@setu.ag",
+                "preferred_language": "en",
+                "role": "ceo",
+                "farm_name": "Setu Executive Office",
+                "region": "Bengaluru Central",
+                "shed_id": "shed_01",
+                "is_active": True,
+                "created_at": now_iso
+            },
+            {
+                "id": "usr_ops_01",
+                "username": "ops_manoj",
+                "hashed_password": get_password_hash("ops2026"),
+                "full_name": "Manoj Gowda (Operations Manager)",
+                "phone": "+91 98450 11005",
+                "official_email": "ops@setu.ag",
+                "preferred_language": "en",
+                "role": "operations_manager",
+                "farm_name": "Central Operations Hub",
+                "region": "Karnataka Central",
+                "shed_id": "shed_01",
+                "is_active": True,
+                "created_at": now_iso
+            },
+            {
+                "id": "usr_technician_01",
+                "username": "tech_kiran",
+                "hashed_password": get_password_hash("tech2026"),
+                "full_name": "Kiran Kumar (Field Lead)",
+                "phone": "+91 98450 22002",
+                "official_email": "tech@setu.ag",
+                "preferred_language": "kn",
+                "role": "technician",
+                "farm_name": "Mysuru Field Hub",
+                "region": "Mysuru Region",
+                "shed_id": "shed_01",
+                "is_active": True,
+                "created_at": now_iso
+            },
+            {
+                "id": "usr_support_01",
+                "username": "support_priya",
+                "hashed_password": get_password_hash("support2026"),
+                "full_name": "Priya Sharma (Support Specialist)",
+                "phone": "+91 98450 33003",
+                "official_email": "support@setu.ag",
+                "preferred_language": "en",
+                "role": "support",
+                "farm_name": "Hubballi Support Desk",
+                "region": "Hubballi Cluster",
+                "shed_id": "shed_01",
+                "is_active": True,
+                "created_at": now_iso
+            },
+            {
+                "id": "usr_sales_01",
+                "username": "sales_anand",
+                "hashed_password": get_password_hash("sales2026"),
+                "full_name": "Anand Verma (Billing Lead)",
+                "phone": "+91 98450 44004",
+                "official_email": "billing@setu.ag",
+                "preferred_language": "en",
+                "role": "sales",
+                "farm_name": "Kolar Commercial Desk",
+                "region": "Kolar Sericulture District",
+                "shed_id": "shed_01",
+                "is_active": True,
+                "created_at": now_iso
+            }
+        ])
 
-        is_test_env = bool("pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SEED_DEMO_DATA", "false").lower() in ("true", "1"))
-        # Pre-seed default hardware nodes only in test or demo environments
-        if is_test_env:
-            now_dt = datetime.now(timezone.utc)
-            default_devices = [
-                ("esp32_shed_01", "shed_01", "Shed 01 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-                ("esp32_shed_02", "shed_02", "Shed 02 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-                ("esp32_shed_03", "shed_03", "Shed 03 Primary ESP32 Controller", "1.0.0", "ONLINE", now_dt),
-            ]
-            for dev in default_devices:
-                cursor.execute("""
-                INSERT INTO devices (device_id, shed_id, device_name, firmware_version, status, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                ON CONFLICT (device_id) DO NOTHING;
-                """, dev)
+    for u in baseline_users:
+        _save_fallback_user(u)
+        if firestore_service.is_available:
+            try:
+                existing = firestore_service.get_user_by_username(u["username"])
+                if not existing:
+                    firestore_service.create_user(u)
+            except Exception as e:
+                logger.debug("Firestore baseline user sync notice: %s", e)
 
-        # 3. Device Command Lifecycle Table (Safe bidirectional controls)
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS device_commands (
-            command_id VARCHAR(64) PRIMARY KEY,
-            device_id VARCHAR(64) NOT NULL,
-            shed_id VARCHAR(64) NOT NULL,
-            requested_by VARCHAR(64) NOT NULL,
-            command_type VARCHAR(64) NOT NULL,
-            command_payload JSONB NOT NULL,
-            status VARCHAR(32) NOT NULL DEFAULT 'REQUESTED',
-            created_at TIMESTAMPTZ NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            correlation_id VARCHAR(64),
-            acknowledged_at TIMESTAMPTZ,
-            applied_at TIMESTAMPTZ,
-            error_message TEXT
-        );
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_device_status ON device_commands (device_id, status);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_created ON device_commands (created_at DESC);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_shed ON device_commands (shed_id);")
-        cursor.execute("ALTER TABLE device_commands ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) NOT NULL DEFAULT 'default_org';")
+    # Baseline Sheds
+    sheds = [
+        {"id": "shed_01", "shed_id": "shed_01", "name": "Shed 01 - Main Chawki Hub", "location": "Kolar Rearing Center", "current_stage": 3, "target_temp": 26.0, "target_humidity": 75.0},
+        {"id": "shed_02", "shed_id": "shed_02", "name": "Shed 02 - Late Age Rearing", "location": "Mysuru Facility", "current_stage": 4, "target_temp": 25.0, "target_humidity": 70.0},
+        {"id": "shed_03", "shed_id": "shed_03", "name": "Shed 03 - Commercial Batch", "location": "Bengaluru Rural", "current_stage": 2, "target_temp": 27.0, "target_humidity": 80.0}
+    ]
+    for s in sheds:
+        _save_fallback_shed(s)
+        if firestore_service.is_available:
+            try:
+                firestore_service.create_shed(s)
+            except Exception as e:
+                logger.debug("Firestore baseline shed sync notice: %s", e)
 
-        # 4. Audit Logs Table
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id SERIAL PRIMARY KEY,
-            timestamp TIMESTAMPTZ NOT NULL,
-            actor VARCHAR(64) NOT NULL,
-            action VARCHAR(64) NOT NULL,
-            details TEXT NOT NULL
-        );
-        """)
-
-        # 5. Stage Thresholds
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS stage_thresholds (
-            stage_id INT PRIMARY KEY,
-            name VARCHAR(128) NOT NULL,
-            days VARCHAR(64) NOT NULL,
-            temp_min FLOAT NOT NULL,
-            temp_max FLOAT NOT NULL,
-            hum_min FLOAT NOT NULL,
-            hum_max FLOAT NOT NULL,
-            hysteresis_temp FLOAT NOT NULL DEFAULT 0.5,
-            hysteresis_hum FLOAT NOT NULL DEFAULT 3.0,
-            fan_trigger_offset FLOAT NOT NULL DEFAULT 1.5,
-            description TEXT,
-            updated_at TIMESTAMPTZ NOT NULL
-        );
-        """)
-
-        # 5b. Shed Custom Setpoints & Advanced Mode Settings
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS shed_settings (
-            shed_id VARCHAR(64) PRIMARY KEY,
-            is_advanced_mode BOOLEAN NOT NULL DEFAULT FALSE,
-            is_auto_mode BOOLEAN NOT NULL DEFAULT TRUE,
-            custom_temp_target FLOAT,
-            custom_hum_target FLOAT,
-            custom_air_quality_target FLOAT DEFAULT 80.0,
-            custom_light_lux_target FLOAT DEFAULT 25.0,
-            custom_light_brightness INT DEFAULT 0,
-            updated_at TIMESTAMPTZ NOT NULL,
-            updated_by VARCHAR(64) DEFAULT 'farmer'
-        );
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_shed_settings_shed ON shed_settings (shed_id);")
-
-        # 6. Shed Telemetry Storage (Standard)
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS shed_telemetry (
-            id BIGSERIAL PRIMARY KEY,
-            time TIMESTAMPTZ NOT NULL,
-            shed_id VARCHAR(64) NOT NULL,
-            temperature DOUBLE PRECISION NOT NULL,
-            humidity DOUBLE PRECISION NOT NULL,
-            air_quality DOUBLE PRECISION NOT NULL DEFAULT 88.0,
-            light_lux DOUBLE PRECISION NOT NULL DEFAULT 22.0,
-            outside_temperature DOUBLE PRECISION,
-            outside_humidity DOUBLE PRECISION,
-            cooler BOOLEAN NOT NULL DEFAULT FALSE,
-            heater BOOLEAN NOT NULL DEFAULT FALSE,
-            fan BOOLEAN NOT NULL DEFAULT FALSE,
-            humidifier BOOLEAN NOT NULL DEFAULT FALSE,
-            light BOOLEAN NOT NULL DEFAULT FALSE,
-            light_brightness INT NOT NULL DEFAULT 0,
-            mode VARCHAR(32) NOT NULL DEFAULT 'AUTO'
-        );
-        """)
-        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS air_quality DOUBLE PRECISION DEFAULT 88.0;")
-        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS light_lux DOUBLE PRECISION DEFAULT 22.0;")
-        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS light BOOLEAN NOT NULL DEFAULT FALSE;")
-        cursor.execute("ALTER TABLE shed_telemetry ADD COLUMN IF NOT EXISTS light_brightness INT NOT NULL DEFAULT 0;")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_shed_telemetry_shed_time ON shed_telemetry (shed_id, time DESC);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_shed_telemetry_time ON shed_telemetry (time DESC);")
-
-        # 7. Partitioned Telemetry Storage (Scale-out)
-        _ensure_telemetry_partitions(cursor)
-
-        # 8. Token Revocation / Blacklist Table (ASVS V3.3 & V3.4 / OWASP A07)
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS revoked_tokens (
-            jti VARCHAR(128) PRIMARY KEY,
-            token_hash VARCHAR(64) UNIQUE,
-            revoked_by VARCHAR(64),
-            expires_at TIMESTAMPTZ NOT NULL,
-            revoked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens (expires_at);")
-
-        # 9. Server-Side User Sessions Management (Multi-Account & Per-Tab Isolation)
-        cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_sessions (
-            session_id VARCHAR(64) PRIMARY KEY,
-            user_id VARCHAR(64) NOT NULL,
-            username VARCHAR(64) NOT NULL,
-            role VARCHAR(32) NOT NULL,
-            organization_id VARCHAR(64) DEFAULT 'default_org',
-            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            last_activity TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            expires_at TIMESTAMPTZ NOT NULL,
-            is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
-            revoked_at TIMESTAMPTZ,
-            revocation_reason VARCHAR(128),
-            user_agent TEXT,
-            ip_address VARCHAR(45)
-        );
-
-        -- Password Reset Tokens & Verification Codes
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id VARCHAR(64) PRIMARY KEY,
-            user_id VARCHAR(64) NOT NULL,
-            identifier VARCHAR(255) NOT NULL,
-            reset_code VARCHAR(16) NOT NULL,
-            reset_token VARCHAR(128) NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            used_at TIMESTAMPTZ,
-            ip_address VARCHAR(64),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(reset_token);
-        CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(reset_code);
-        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
-
-        -- Password Reset Tokens & Verification Codes
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id VARCHAR(64) PRIMARY KEY,
-            user_id VARCHAR(64) NOT NULL,
-            identifier VARCHAR(255) NOT NULL,
-            reset_code VARCHAR(16) NOT NULL,
-            reset_token VARCHAR(128) NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            used_at TIMESTAMPTZ,
-            ip_address VARCHAR(64),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(reset_token);
-        CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(reset_code);
-        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
-
-        -- Password Reset Tokens & Verification Codes
-        CREATE TABLE IF NOT EXISTS password_resets (
-            id VARCHAR(64) PRIMARY KEY,
-            user_id VARCHAR(64) NOT NULL,
-            identifier VARCHAR(255) NOT NULL,
-            reset_code VARCHAR(16) NOT NULL,
-            reset_token VARCHAR(128) NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            used_at TIMESTAMPTZ,
-            ip_address VARCHAR(64),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(reset_token);
-        CREATE INDEX IF NOT EXISTS idx_password_resets_code ON password_resets(reset_code);
-        CREATE INDEX IF NOT EXISTS idx_password_resets_user ON password_resets(user_id);
-        CREATE TABLE IF NOT EXISTS sheds (
-            id VARCHAR(64) PRIMARY KEY,
-            name VARCHAR(128) NOT NULL,
-            location VARCHAR(128) DEFAULT 'Local Rearing Shed',
-            current_stage INT DEFAULT 3,
-            target_temp DOUBLE PRECISION DEFAULT 25.5,
-            target_humidity DOUBLE PRECISION DEFAULT 75.0,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions (user_id);
-        CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions (expires_at);
-        CREATE INDEX IF NOT EXISTS idx_user_sessions_is_revoked ON user_sessions (is_revoked);
-        ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS organization_id VARCHAR(64) DEFAULT 'default_org';
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_device_commands_correlation ON device_commands (correlation_id);")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);")
-
-        if is_test_env:
-            cursor.execute("""
-            INSERT INTO sheds (id, name, location, current_stage, target_temp, target_humidity)
-            VALUES 
-                ('shed_01', 'Shed 01 - Main Chawki Hub', 'Kolar Rearing Center', 3, 26.0, 75.0),
-                ('shed_02', 'Shed 02 - Late Age Rearing', 'Mysuru Facility', 4, 25.0, 70.0),
-                ('shed_03', 'Shed 03 - Commercial Batch', 'Bengaluru Rural', 2, 27.0, 80.0)
-            ON CONFLICT (id) DO NOTHING;
-            """)
-
-        # Pre-seed Stage Thresholds if empty
-        cursor.execute("SELECT COUNT(*) FROM stage_thresholds")
-        count_row = cursor.fetchone()
-        if count_row and count_row[0] == 0:
-            for stage in [
-                (1, "1st Instar (Chawki)", "Days 1–3", 27.0, 28.0, 80.0, 85.0, 0.5, 3.0, 1.5, "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation.", now_dt),
-                (2, "2nd Instar", "Days 4–5", 26.5, 27.5, 75.0, 80.0, 0.5, 3.0, 1.5, "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements.", now_dt),
-                (3, "3rd Instar", "Days 6–9", 25.0, 26.5, 70.0, 75.0, 0.5, 3.0, 1.5, "Late chawki / adult transition. Increased voracity requires steady ventilation and balanced thermal envelope.", now_dt),
-                (4, "4th Instar", "Days 10–14", 24.0, 25.5, 65.0, 70.0, 0.5, 3.0, 1.5, "Exponential larval weight gain. High metabolic heat output necessitates active cooling and air exchange.", now_dt),
-                (5, "5th Instar", "Days 15–20", 23.0, 24.5, 60.0, 65.0, 0.5, 3.0, 1.5, "Final feeding instar preceding cocooning/spinning. Requires cooler, drier conditions and continuous fresh airflow.", now_dt)
-            ]:
-                cursor.execute("""
-                INSERT INTO stage_thresholds (stage_id, name, days, temp_min, temp_max, hum_min, hum_max, hysteresis_temp, hysteresis_hum, fan_trigger_offset, description, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, stage)
-
-        admin_init_pw = settings.SUPERADMIN_PASSWORD or settings.INITIAL_ADMIN_PASSWORD
-        admin_pw_to_hash = admin_init_pw or secrets.token_urlsafe(16)
-
-        cursor.execute("SELECT id FROM users WHERE username = 'superadmin'")
-        if not cursor.fetchone():
-            cursor.execute("""
-            INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                "usr_admin",
-                "superadmin",
-                get_password_hash(admin_pw_to_hash),
-                "Setu Super Admin",
-                "+91 98450 99999",
-                "en",
-                "superadmin",
-                "Central Sericulture Command",
-                "Central Sericulture Command HQ",
-                "shed_01",
-                "CENTRAL-HQ",
-                "N/A",
-                "N/A",
-                True,
-                now_dt
-            ))
-
-        # Seed admin test fixture in test environments
-        if is_test_env:
-            cursor.execute("SELECT id FROM users WHERE username = 'admin'")
-            if not cursor.fetchone():
-                cursor.execute("""
-                INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    "usr_admin_default",
-                    "admin",
-                    get_password_hash(admin_pw_to_hash),
-                    "Setu Super Admin",
-                    "+91 98450 99999",
-                    "en",
-                    "superadmin",
-                    "Central Sericulture Command",
-                    "Central Sericulture Command HQ",
-                    "shed_01",
-                    "CENTRAL-HQ",
-                    "N/A",
-                    "N/A",
-                    True,
-                    now_dt
-                ))
-
-        # Pre-seed Demo Farmers if testing
-        sample_farmers = [
-            (
-                "usr_001",
-                "ramesh_farmer",
-                "setu2026",
-                "Ramesh Gowda",
-                "+91 98450 12345",
-                "kn",
-                "farmer",
-                "Green Valley Sericulture Farm",
-                "Mysuru Silk Belt, KA",
-                "shed_01",
-                "SERI-2026-M04",
-                "200 DFL",
-                "Double Hybrid (FC1 x FC2)"
-            ),
-            (
-                "usr_002",
-                "venkatamma_farmer",
-                "setu2026",
-                "Venkatamma Reddy",
-                "+91 94480 54321",
-                "te",
-                "farmer",
-                "Sri Lakshmi Silk Farm",
-                "Kolar Silk Belt, KA",
-                "shed_02",
-                "SERI-2026-M05",
-                "150 DFL",
-                "Cross Breed (PM x CSR2)"
-            ),
-            (
-                "usr_003",
-                "manjunath_kolar",
-                "setu2026",
-                "Manjunath K.",
-                "+91 99001 88776",
-                "kn",
-                "farmer",
-                "Kolar Silk Fields",
-                "Ramanagara Silk Hub, KA",
-                "shed_03",
-                "SERI-2026-M02",
-                "300 DFL",
-                "Bivoltine White (FC1 x FC2)"
-            ),
-            (
-                "usr_004",
-                "suresh_farmer",
-                "setu2026",
-                "Suresh Patil",
-                "+91 98450 77889",
-                "kn",
-                "farmer",
-                "Patil Bivoltine Farm",
-                "Mandya Silk Zone, KA",
-                "shed_03",
-                "SERI-2026-M06",
-                "250 DFL",
-                "Double Hybrid (FC1 x FC2)"
-            ),
-        ]
-
-        seed_demo = os.getenv("SEED_DEMO_FARMERS", "false").lower() in ("true", "1") or "pytest" in sys.modules or bool(os.getenv("PYTEST_CURRENT_TEST"))
-        if seed_demo:
-            for s_id, u_name, u_pwd, f_name, phone, lang, role, farm, reg, s_shed, b_id, dfl, breed in sample_farmers:
-                cursor.execute("SELECT id FROM users WHERE username = %s", (u_name,))
-                if not cursor.fetchone():
-                    cursor.execute("""
-                    INSERT INTO users (id, username, hashed_password, full_name, phone, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (
-                        s_id,
-                        u_name,
-                        get_password_hash(u_pwd),
-                        f_name,
-                        phone,
-                        lang,
-                        role,
-                        farm,
-                        reg,
-                        s_shed,
-                        b_id,
-                        dfl,
-                        breed,
-                        True,
-                        now_dt
-                    ))
-
+    _ensure_fallback_stage_thresholds()
 
 def ensure_unique_farmer_sheds():
     """
-    Ensures every farmer in the database has a distinct, dedicated shed_id.
+    Ensures every farmer has a dedicated shed_id.
     """
     try:
-        with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-            # Canonical seed farmer ramesh_farmer always owns shed_01
-            cursor.execute("UPDATE users SET shed_id = 'shed_01' WHERE username = 'ramesh_farmer';")
-            cursor.execute("""
-                SELECT id, username, shed_id 
-                FROM users 
-                WHERE role = 'farmer' AND username != 'ramesh_farmer'
-                ORDER BY created_at ASC
-            """)
-            rows = cursor.fetchall()
-            seen_sheds = {"shed_01"}
-            for r in rows:
-                u_id = r["id"]
-                current_shed = r.get("shed_id")
+        users = _load_fallback_users()
+        seen_sheds = {"shed_01"}
+        for u_id, u in list(users.items()):
+            if u.get("role") == "farmer" and u.get("username") != "ramesh_farmer":
+                current_shed = u.get("shed_id")
                 if not current_shed or current_shed in seen_sheds:
                     new_shed = f"shed_{u_id}"
-                    cursor.execute("UPDATE users SET shed_id = %s WHERE id = %s", (new_shed, u_id))
+                    u["shed_id"] = new_shed
+                    _update_fallback_user(u_id, {"shed_id": new_shed})
                     seen_sheds.add(new_shed)
                 else:
                     seen_sheds.add(current_shed)
     except Exception as e:
-        logger.debug("ensure_unique_farmer_sheds: %s", e)
+        logger.debug("ensure_unique_farmer_sheds notice: %s", e)
 
-
-# Initialize DB on module import safely
 try:
     init_db()
     ensure_unique_farmer_sheds()
-except Exception:
-    pass
+except Exception as e:
+    logger.debug("Startup init_db notice: %s", e)
 
-
-# --- Persistent Local Fallback Store for Resilient Zero-Data-Loss Operations ---
 FALLBACK_USERS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "users_store.json"))
 _fallback_users_lock = threading.Lock()
 
@@ -2151,86 +1765,56 @@ def purge_audit_logs(older_than_years: int = 7) -> int:
 
 
 def get_all_stage_thresholds() -> List[Dict[str, Any]]:
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM stage_thresholds ORDER BY stage_id ASC")
-        rows = cursor.fetchall()
-        result = []
-        for r in rows:
-            d = dict(r)
-            if isinstance(d.get("updated_at"), datetime):
-                d["updated_at"] = d["updated_at"].isoformat()
-            result.append(d)
-        return result
+    """Returns all silkworm instar growth thresholds from persistent fallback store."""
+    thresholds = _ensure_fallback_stage_thresholds()
+    return list(thresholds)
 
 def get_stage_threshold(stage_id: int) -> Optional[Dict[str, Any]]:
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM stage_thresholds WHERE stage_id = %s", (stage_id,))
-        row = cursor.fetchone()
-        if row:
-            d = dict(row)
-            if isinstance(d.get("updated_at"), datetime):
-                d["updated_at"] = d["updated_at"].isoformat()
-            return d
+    """Returns stage threshold by stage_id."""
+    thresholds = _ensure_fallback_stage_thresholds()
+    for t in thresholds:
+        if t.get("stage_id") == stage_id:
+            return dict(t)
     return None
 
 def update_stage_threshold(stage_id: int, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    fields = []
-    values = []
-    allowed = ["name", "days", "temp_min", "temp_max", "hum_min", "hum_max", "hysteresis_temp", "hysteresis_hum", "fan_trigger_offset", "description"]
-    for k in allowed:
-        if k in updates and updates[k] is not None:
-            fields.append(f"{k} = %s")
-            values.append(updates[k])
-            
-    if not fields:
-        return get_stage_threshold(stage_id)
-
-    fields.append("updated_at = %s")
-    values.append(datetime.now(timezone.utc))
-
-    values.append(stage_id)
-    query = f"UPDATE stage_thresholds SET {', '.join(fields)} WHERE stage_id = %s RETURNING *"
-
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(query, tuple(values))
-        row = cursor.fetchone()
-        if row:
-            d = dict(row)
-            if isinstance(d.get("updated_at"), datetime):
-                d["updated_at"] = d["updated_at"].isoformat()
-            return d
-    return None
+    """Updates stage threshold setpoints and persists to fallback store."""
+    with _fallback_thresholds_lock:
+        thresholds = _ensure_fallback_stage_thresholds()
+        updated_item = None
+        for t in thresholds:
+            if t.get("stage_id") == stage_id:
+                for k in ["name", "days", "temp_min", "temp_max", "hum_min", "hum_max", "hysteresis_temp", "hysteresis_hum", "fan_trigger_offset", "description"]:
+                    if k in updates and updates[k] is not None:
+                        t[k] = updates[k]
+                t["updated_at"] = datetime.now(timezone.utc).isoformat()
+                updated_item = dict(t)
+                break
+        if updated_item:
+            try:
+                os.makedirs(os.path.dirname(FALLBACK_THRESHOLDS_FILE), exist_ok=True)
+                with open(FALLBACK_THRESHOLDS_FILE, "w", encoding="utf-8") as f:
+                    json.dump(thresholds, f, indent=2)
+            except Exception as e:
+                logger.debug("Could not write updated thresholds file: %s", e)
+        return updated_item
 
 def reset_stage_thresholds() -> List[Dict[str, Any]]:
-    defaults = [
-        (1, "1st Instar (Chawki)", "Days 1–3", 27.0, 28.0, 80.0, 85.0, 0.5, 3.0, 1.5, "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation."),
-        (2, "2nd Instar", "Days 4–5", 26.5, 27.5, 75.0, 80.0, 0.5, 3.0, 1.5, "Post-first moult larvae. Transitioning to active feeding with moderate humidity requirements."),
-        (3, "3rd Instar", "Days 6–9", 25.0, 26.5, 70.0, 75.0, 0.5, 3.0, 1.5, "Late chawki / adult transition. Increased voracity requires steady ventilation and balanced thermal envelope."),
-        (4, "4th Instar", "Days 10–14", 24.0, 25.5, 65.0, 70.0, 0.5, 3.0, 1.5, "Exponential larval weight gain. High metabolic heat output necessitates active cooling and air exchange."),
-        (5, "5th Instar", "Days 15–20", 23.0, 24.5, 60.0, 65.0, 0.5, 3.0, 1.5, "Final feeding instar preceding cocooning/spinning. Requires cooler, drier conditions and continuous fresh airflow.")
-    ]
-    
-    now_dt = datetime.now(timezone.utc)
-    with get_db_cursor(commit=True) as cursor:
-        for s in defaults:
-            cursor.execute("""
-            INSERT INTO stage_thresholds (stage_id, name, days, temp_min, temp_max, hum_min, hum_max, hysteresis_temp, hysteresis_hum, fan_trigger_offset, description, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (stage_id) DO UPDATE SET
-                name = EXCLUDED.name,
-                days = EXCLUDED.days,
-                temp_min = EXCLUDED.temp_min,
-                temp_max = EXCLUDED.temp_max,
-                hum_min = EXCLUDED.hum_min,
-                hum_max = EXCLUDED.hum_max,
-                hysteresis_temp = EXCLUDED.hysteresis_temp,
-                hysteresis_hum = EXCLUDED.hysteresis_hum,
-                fan_trigger_offset = EXCLUDED.fan_trigger_offset,
-                description = EXCLUDED.description,
-                updated_at = EXCLUDED.updated_at
-            """, (*s, now_dt))
-        
-    return get_all_stage_thresholds()
+    """Resets stage thresholds to canonical defaults."""
+    with _fallback_thresholds_lock:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        reset_list = []
+        for t in CANONICAL_THRESHOLDS:
+            item = dict(t)
+            item["updated_at"] = now_iso
+            reset_list.append(item)
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_THRESHOLDS_FILE), exist_ok=True)
+            with open(FALLBACK_THRESHOLDS_FILE, "w", encoding="utf-8") as f:
+                json.dump(reset_list, f, indent=2)
+        except Exception as e:
+            logger.debug("Could not reset thresholds file: %s", e)
+        return reset_list
 
 
 # --- Telemetry Persistence Operations ---

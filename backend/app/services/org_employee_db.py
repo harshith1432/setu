@@ -16,7 +16,93 @@ import logging
 import threading
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
-from app.services.db_service import get_db_cursor, invalidate_user_cache
+from app.services.db_service import get_db_cursor, invalidate_user_cache, get_user_by_id, get_user_by_username, update_user_password, _save_fallback_user, _load_fallback_users, _update_fallback_user
+from app.services.firestore_service import firestore_service
+
+FALLBACK_EMPLOYEES_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "employees_store.json"))
+_fallback_employees: Dict[str, Dict[str, Any]] = {}
+_fallback_employees_loaded = False
+_fallback_employees_lock = threading.Lock()
+
+FALLBACK_INVITATIONS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "invitations_store.json"))
+_fallback_invitations: Dict[str, Dict[str, Any]] = {}
+_fallback_invitations_loaded = False
+_fallback_invitations_lock = threading.Lock()
+
+def _ensure_fallback_employees_loaded():
+    global _fallback_employees_loaded
+    if _fallback_employees_loaded:
+        return
+    with _fallback_employees_lock:
+        if _fallback_employees_loaded:
+            return
+        if os.path.exists(FALLBACK_EMPLOYEES_FILE):
+            try:
+                with open(FALLBACK_EMPLOYEES_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        _fallback_employees.update(data)
+                    elif isinstance(data, list):
+                        for item in data:
+                            if item.get("id"):
+                                _fallback_employees[item["id"]] = item
+            except Exception as e:
+                logger.debug("Could not read fallback employees: %s", e)
+        _fallback_employees_loaded = True
+
+def _save_fallback_employee(emp_data: Dict[str, Any]):
+    if not emp_data or not emp_data.get("id"):
+        return
+    _ensure_fallback_employees_loaded()
+    with _fallback_employees_lock:
+        _fallback_employees[emp_data["id"]] = dict(emp_data)
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_EMPLOYEES_FILE), exist_ok=True)
+            with open(FALLBACK_EMPLOYEES_FILE, "w", encoding="utf-8") as f:
+                json.dump(_fallback_employees, f, indent=2, default=str)
+        except Exception as e:
+            logger.debug("Could not save fallback employees: %s", e)
+
+def _save_fallback_employees() -> None:
+    _ensure_fallback_employees_loaded()
+    with _fallback_employees_lock:
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_EMPLOYEES_FILE), exist_ok=True)
+            with open(FALLBACK_EMPLOYEES_FILE, "w", encoding="utf-8") as f:
+                json.dump(_fallback_employees, f, indent=2, default=str)
+        except Exception as e:
+            logger.debug("Could not save fallback employees: %s", e)
+
+def _ensure_fallback_invitations_loaded():
+    global _fallback_invitations_loaded
+    if _fallback_invitations_loaded:
+        return
+    with _fallback_invitations_lock:
+        if _fallback_invitations_loaded:
+            return
+        if os.path.exists(FALLBACK_INVITATIONS_FILE):
+            try:
+                with open(FALLBACK_INVITATIONS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        _fallback_invitations.update(data)
+            except Exception as e:
+                logger.debug("Could not read fallback invitations: %s", e)
+        _fallback_invitations_loaded = True
+
+def _save_fallback_invitation(inv_data: Dict[str, Any]):
+    if not inv_data or not inv_data.get("token"):
+        return
+    _ensure_fallback_invitations_loaded()
+    with _fallback_invitations_lock:
+        _fallback_invitations[inv_data["token"]] = dict(inv_data)
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_INVITATIONS_FILE), exist_ok=True)
+            with open(FALLBACK_INVITATIONS_FILE, "w", encoding="utf-8") as f:
+                json.dump(_fallback_invitations, f, indent=2, default=str)
+        except Exception as e:
+            logger.debug("Could not save fallback invitations: %s", e)
+
 from app.core.security import get_password_hash
 from app.core.config import settings
 
@@ -490,6 +576,29 @@ def init_org_employee_tables():
                 description = EXCLUDED.description;
             """, (*dept, now_dt))
 
+        # Ensure default departments exist in fallback store and Firestore
+        _ensure_fallback_departments_loaded()
+        now_iso = now_dt.isoformat() if isinstance(now_dt, datetime) else str(now_dt)
+        for dept in default_depts:
+            if dept[0] not in _fallback_departments:
+                _fallback_departments[dept[0]] = {
+                    "id": dept[0],
+                    "name": dept[1],
+                    "code": dept[2],
+                    "description": dept[3],
+                    "head_id": None,
+                    "status": "ACTIVE",
+                    "created_at": now_iso,
+                    "updated_at": now_iso
+                }
+            try:
+                from app.services.firestore_service import firestore_service
+                if firestore_service.is_available:
+                    firestore_service.create_department(_fallback_departments[dept[0]])
+            except Exception:
+                pass
+        _save_fallback_departments()
+
         # 13. Ensure Seed Users & Link Employee Records only in test or demo environments
         is_test_env = bool("pytest" in sys.modules or os.getenv("PYTEST_CURRENT_TEST") or os.getenv("SEED_DEMO_DATA", "false").lower() in ("true", "1"))
         if is_test_env:
@@ -596,59 +705,81 @@ def _seed_all_role_employees(cursor, now_dt):
     ]
 
     import json
+    from app.services.db_service import _save_fallback_user
+    from app.services.firestore_service import firestore_service
 
-    # 1st Pass: Ensure user records exist
+    # 1st Pass: Ensure user records exist in Firestore & fallback store
     for acc in accounts:
-        cursor.execute("SELECT id FROM users WHERE username = %s", (acc["uname"],))
-        existing_u = cursor.fetchone()
-        if not existing_u:
-            cursor.execute("""
-            INSERT INTO users (id, username, hashed_password, full_name, phone, official_email, preferred_language, role, farm_name, region, shed_id, batch_id, dfl_capacity, breed, is_active, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, 'en', %s, 'SeriCare Cluster Facility', 'Central Hub', 'shed_01', 'SERI-2026', '250 DFL', 'Double Hybrid (FC1 x FC2)', TRUE, %s)
-            """, (acc["uid"], acc["uname"], get_password_hash(acc["pwd"]), acc["name"], acc["phone"], acc["email"], acc["role"], now_dt))
-        else:
-            # Sync role, password hash and email
-            cursor.execute("""
-            UPDATE users SET official_email = %s, hashed_password = %s, role = %s WHERE username = %s;
-            """, (acc["email"], get_password_hash(acc["pwd"]), acc["role"], acc["uname"]))
+        user_record = {
+            "id": acc["uid"],
+            "username": acc["uname"],
+            "hashed_password": get_password_hash(acc["pwd"]),
+            "full_name": acc["name"],
+            "phone": acc["phone"],
+            "official_email": acc["email"],
+            "preferred_language": "en",
+            "role": acc["role"],
+            "farm_name": "SeriCare Cluster Facility",
+            "region": "Central Hub",
+            "shed_id": "shed_01",
+            "batch_id": "SERI-2026",
+            "dfl_capacity": "250 DFL",
+            "breed": "Double Hybrid (FC1 x FC2)",
+            "is_active": True,
+            "created_at": now_dt.isoformat() if isinstance(now_dt, datetime) else str(now_dt)
+        }
+        _save_fallback_user(user_record)
+        try:
+            if firestore_service.is_available:
+                firestore_service.create_user(user_record)
+        except Exception:
+            pass
 
     # 2nd Pass: Create employee records
+    _ensure_fallback_employees_loaded()
     for acc in accounts:
         emp_db_id = f"emp_{acc['emp_id'].lower().replace('-', '_')}"
         role_id = f"role_{acc['role']}"
-        res_json = json.dumps(acc["resources"])
-        
-        cursor.execute("SELECT id FROM users WHERE username = %s", (acc["uname"],))
-        u_row = cursor.fetchone()
-        actual_uid = u_row[0] if u_row else acc["uid"]
-
-        cursor.execute("SELECT id FROM employees WHERE id = %s OR employee_id = %s", (emp_db_id, acc["emp_id"]))
-        existing_emp = cursor.fetchone()
-        if not existing_emp:
-            cursor.execute("""
-            INSERT INTO employees (
-                id, user_id, employee_id, official_email, organization_id,
-                department_id, designation, reporting_manager_id,
-                role_code, role_id, access_scope, assigned_resources,
-                employment_status, invitation_status, created_at, updated_at
-            )
-            VALUES (%s, %s, %s, %s, 'default_org', %s, %s, NULL, %s, %s, %s, %s::jsonb, 'ACTIVE', 'ACCEPTED', %s, %s)
-            """, (
-                emp_db_id, actual_uid, acc["emp_id"], acc["email"],
-                acc["dept_id"], acc["desig"], acc["role"], role_id,
-                acc["scope"], res_json, now_dt, now_dt
-            ))
+        now_iso = now_dt.isoformat() if isinstance(now_dt, datetime) else str(now_dt)
+        emp_record = {
+            "id": emp_db_id,
+            "user_id": acc["uid"],
+            "employee_id": acc["emp_id"],
+            "official_email": acc["email"],
+            "organization_id": "default_org",
+            "department_id": acc["dept_id"],
+            "designation": acc["desig"],
+            "reporting_manager_id": None,
+            "role_code": acc["role"],
+            "role_id": role_id,
+            "access_scope": acc["scope"],
+            "assigned_resources": acc["resources"],
+            "employment_status": "ACTIVE",
+            "invitation_status": "ACCEPTED",
+            "created_at": now_iso,
+            "updated_at": now_iso
+        }
+        _save_fallback_employee(emp_record)
+        try:
+            if firestore_service.is_available:
+                firestore_service.save_employee(emp_record)
+        except Exception:
+            pass
 
     # 3rd Pass: Link reporting managers
+    user_to_emp = {acc["uid"]: f"emp_{acc['emp_id'].lower().replace('-', '_')}" for acc in accounts}
     for acc in accounts:
-        if acc["manager_uid"]:
-            cursor.execute("SELECT id FROM employees WHERE user_id = %s", (acc["manager_uid"],))
-            mgr_row = cursor.fetchone()
-            if mgr_row:
-                mgr_emp_id = mgr_row[0]
-                cursor.execute("""
-                UPDATE employees SET reporting_manager_id = %s WHERE user_id = %s;
-                """, (mgr_emp_id, acc["uid"]))
+        if acc["manager_uid"] and acc["manager_uid"] in user_to_emp:
+            mgr_emp_id = user_to_emp[acc["manager_uid"]]
+            emp_db_id = user_to_emp[acc["uid"]]
+            if emp_db_id in _fallback_employees:
+                _fallback_employees[emp_db_id]["reporting_manager_id"] = mgr_emp_id
+                _save_fallback_employee(_fallback_employees[emp_db_id])
+                try:
+                    if firestore_service.is_available:
+                        firestore_service.save_employee(_fallback_employees[emp_db_id])
+                except Exception:
+                    pass
 
 
 # ==============================================================================
@@ -669,17 +800,15 @@ def validate_no_circular_reporting(employee_id: str, candidate_manager_id: Optio
     visited = {employee_id}
     curr_mgr = candidate_manager_id
 
-    with get_db_cursor(dict_cursor=True) as cursor:
-        while curr_mgr:
-            if curr_mgr in visited:
-                raise ValueError(
-                    f"Circular reporting structure detected: employee '{employee_id}' "
-                    f"is already an ancestor or superior of candidate manager '{candidate_manager_id}'."
-                )
-            visited.add(curr_mgr)
-            cursor.execute("SELECT reporting_manager_id FROM employees WHERE id = %s", (curr_mgr,))
-            row = cursor.fetchone()
-            curr_mgr = row["reporting_manager_id"] if row else None
+    while curr_mgr:
+        if curr_mgr in visited:
+            raise ValueError(
+                f"Circular reporting structure detected: employee '{employee_id}' "
+                f"is already an ancestor or superior of candidate manager '{candidate_manager_id}'."
+            )
+        visited.add(curr_mgr)
+        emp = get_employee_detail(curr_mgr)
+        curr_mgr = emp.get("reporting_manager_id") if emp else None
 
 
 # ==============================================================================
@@ -691,34 +820,23 @@ def get_user_effective_permissions(user_id: str, role_code: Optional[str] = None
     Fetches all effective permission codes for a user from their assigned role,
     custom role overrides, or platform superadmin status.
     """
-    with get_db_cursor(dict_cursor=True) as cursor:
-        # Check if role_code passed or query from user
-        if not role_code:
-            cursor.execute("SELECT role FROM users WHERE id = %s", (user_id,))
-            urow = cursor.fetchone()
-            role_code = urow["role"] if urow else "farmer"
+    if not role_code:
+        u = get_user_by_id(user_id) or get_user_by_username(user_id)
+        role_code = u.get("role") if u else "farmer"
 
-        # Platform Super Admin has all permissions
-        if role_code in ["superadmin", "admin"]:
-            return list(ALL_PERMISSION_CODES)
+    # Platform Super Admin has all permissions
+    if role_code in ["superadmin", "admin"]:
+        return list(ALL_PERMISSION_CODES)
 
-        # Check employee custom role_id or standard template
-        cursor.execute("SELECT role_id, role_code FROM employees WHERE user_id = %s", (user_id,))
-        erow = cursor.fetchone()
-        
-        target_role_id = erow["role_id"] if erow and erow.get("role_id") else f"role_{role_code}"
-        
-        cursor.execute("""
-        SELECT permission_code FROM role_permissions WHERE role_id = %s
-        """, (target_role_id,))
-        rows = cursor.fetchall()
-        
-        if rows:
-            return [r["permission_code"] for r in rows]
-            
-        # Fallback to role template
-        tmpl = ROLE_TEMPLATES.get(role_code)
-        return list(tmpl["permissions"]) if tmpl else []
+    # Check role template or custom role
+    target_role_id = f"role_{role_code}"
+    role_info = get_role_detail(target_role_id)
+    if role_info and role_info.get("permissions"):
+        return list(role_info["permissions"])
+
+    # Fallback to role template
+    tmpl = ROLE_TEMPLATES.get(role_code)
+    return list(tmpl["permissions"]) if tmpl else []
 
 
 def get_user_access_context(user_id: str) -> Dict[str, Any]:
@@ -1319,6 +1437,13 @@ def create_department(data: Dict[str, Any], actor: str) -> Dict[str, Any]:
             "updated_at": now_dt.isoformat()
         }
 
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.create_department(created_dict)
+    except Exception as fe:
+        logger.debug("Firestore create_department notice: %s", fe)
+
     with _fallback_departments_lock:
         _fallback_departments[dept_id] = created_dict
         _save_fallback_departments()
@@ -1427,13 +1552,19 @@ def delete_department(dept_id: str, actor: str) -> bool:
 
 def list_all_permissions() -> List[Dict[str, Any]]:
     """Returns all system permissions grouped by category."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT code, name, category, description
-        FROM permissions
-        ORDER BY category ASC, code ASC
-        """)
-        return [dict(r) for r in cursor.fetchall()]
+    try:
+        with get_db_cursor(dict_cursor=True) as cursor:
+            cursor.execute("""
+            SELECT code, name, category, description
+            FROM permissions
+            ORDER BY category ASC, code ASC
+            """)
+            rows = [dict(r) for r in cursor.fetchall()]
+            if rows:
+                return rows
+    except Exception:
+        pass
+    return [dict(p) for p in SYSTEM_PERMISSIONS]
 
 
 def get_role_allowed_dashboards(role_code_or_id: str) -> List[str]:
@@ -1650,9 +1781,27 @@ def create_custom_role(
         details=f"Created custom role '{name}' with {len(requested_perms)} permissions and {len(allowed_dashboards)} dashboards",
         target_resource=role_id
     )
-    result = dict(created)
+    result = dict(created) if (created and bool(created)) else {}
+    result.setdefault("id", role_id)
+    result.setdefault("code", code)
+    result.setdefault("name", name)
+    result.setdefault("description", data.get("description", "Custom operational role"))
+    result.setdefault("is_system", False)
+    result.setdefault("status", data.get("status", "ACTIVE").upper())
+    result.setdefault("organization_id", org_id)
+    now_iso = now_dt.isoformat() if isinstance(now_dt, datetime) else str(now_dt)
+    result.setdefault("created_at", now_iso)
+    result.setdefault("updated_at", now_iso)
     result["permissions"] = requested_perms
     result["allowed_dashboards"] = allowed_dashboards
+
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.save_role(result)
+    except Exception:
+        pass
+
     return result
 
 
@@ -1831,28 +1980,29 @@ def get_dashboard_matrix(org_id: Optional[str] = None) -> Dict[str, Any]:
 
 def delete_custom_role(role_id: str, actor: str) -> bool:
     """Deletes custom role if not in use. System roles are protected."""
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM roles WHERE id = %s OR code = %s", (role_id, role_id))
-        role = cursor.fetchone()
-        if not role:
-            return False
-        if role["is_system"]:
-            raise ValueError("System-critical role templates cannot be deleted.")
+    role = get_role_detail(role_id)
+    if not role:
+        return False
+    if role.get("is_system"):
+        raise ValueError("System-critical role templates cannot be deleted.")
 
-        # Check assigned employees
-        cursor.execute("SELECT COUNT(*) as count FROM employees WHERE role_id = %s", (role["id"],))
-        count = cursor.fetchone()["count"]
-        if count > 0:
-            raise ValueError(f"Cannot delete role: it is currently assigned to {count} active employees.")
+    _ensure_fallback_employees_loaded()
+    assigned = [e for e in _fallback_employees.values() if e.get("role_id") == role.get("id") or e.get("role_code") == role.get("code")]
+    if assigned:
+        raise ValueError(f"Cannot delete role: it is currently assigned to {len(assigned)} active employees.")
 
-        cursor.execute("DELETE FROM roles WHERE id = %s", (role["id"],))
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            firestore_service.delete_role(role.get("id", role_id))
+    except Exception:
+        pass
 
     log_security_audit(
         actor=actor,
         action="DELETE_ROLE",
-        details=f"Deleted custom role '{role['name']}' ({role_id})",
+        details=f"Deleted custom role '{role.get('name')}' ({role_id})",
         target_resource=role_id,
-        
     )
     return True
 
@@ -1986,6 +2136,14 @@ def get_employee_detail(employee_id: str) -> Optional[Dict[str, Any]]:
             """, (employee_id, employee_id))
             row = cursor.fetchone()
             if not row:
+                _ensure_fallback_employees_loaded()
+                for e in _fallback_employees.values():
+                    if e.get("id") == employee_id or e.get("employee_id") == employee_id:
+                        e_copy = dict(e)
+                        e_copy.setdefault("direct_reports", [])
+                        e_copy.setdefault("effective_permissions", get_user_effective_permissions(e.get("user_id"), e.get("role_code")))
+                        e_copy.setdefault("active_invitation", None)
+                        return e_copy
                 try:
                     from app.services.firestore_service import firestore_service
                     if firestore_service.is_available:
@@ -2083,6 +2241,26 @@ def create_employee_with_invitation(
 
     import json
     resources_json = json.dumps(resources)
+
+    _ensure_fallback_employees_loaded()
+    for e in _fallback_employees.values():
+        if e.get("official_email") == email or e.get("employee_id") == emp_code:
+            raise ValueError(f"An employee with email '{email}' or ID '{emp_code}' already exists.")
+
+    base_username = email.split("@")[0].replace(".", "_")
+    uname = f"{base_username}_{secrets.token_hex(2)}"
+
+    default_pwd = getattr(settings, "DEFAULT_NEW_USER_PASSWORD", "")
+    raw_password = (data.get("initial_password") or data.get("password") or default_pwd or secrets.token_urlsafe(12)).strip()
+    if len(raw_password) < 6:
+        raw_password = default_pwd if len(default_pwd) >= 6 else secrets.token_urlsafe(12)
+    initial_password_hash = get_password_hash(raw_password)
+    user_id = f"usr_{secrets.token_hex(6)}"
+    role_id = f"role_{role_code}"
+
+    inv_token = secrets.token_urlsafe(32)
+    inv_id = f"inv_{secrets.token_hex(6)}"
+    expires_at = now_dt + timedelta(days=7)
 
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         # Check uniqueness
@@ -2211,6 +2389,10 @@ def create_employee_with_invitation(
         "created_by": actor,
         "created_at": now_dt.isoformat()
     }
+    _save_fallback_user(user_doc)
+    _save_fallback_employee(emp_doc)
+    _save_fallback_invitation(inv_doc)
+
     try:
         from app.services.firestore_service import firestore_service
         if firestore_service.is_available:
@@ -2448,6 +2630,33 @@ def update_employee_status(
 
     is_user_active = (new_status == "ACTIVE")
     now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
+
+    # Instant session invalidation in fallback stores and Firestore
+    _ensure_fallback_employees_loaded()
+    for e_id, e_val in _fallback_employees.items():
+        if e_id == emp["id"] or e_val.get("employee_id") == employee_id:
+            e_val["employment_status"] = new_status
+            e_val["updated_at"] = now_iso
+            emp["employment_status"] = new_status
+            emp["updated_at"] = now_iso
+    _save_fallback_employees()
+
+    if emp.get("user_id"):
+        _update_fallback_user(emp["user_id"], {"is_active": is_user_active})
+    invalidate_user_cache()
+
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            if hasattr(firestore_service, "save_employee"):
+                firestore_service.save_employee(emp)
+            elif hasattr(firestore_service, "create_employee"):
+                firestore_service.create_employee(emp)
+            if emp.get("user_id"):
+                firestore_service.update_user_active_status(emp["user_id"], is_user_active)
+    except Exception as fse:
+        logger.warning("Firestore update employee status notice: %s", fse)
 
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
@@ -2463,12 +2672,12 @@ def update_employee_status(
         WHERE id = %s
         """, (is_user_active, emp["user_id"]))
 
+    emp_display_name = emp.get("full_name") or emp.get("official_email") or emp.get("employee_id", "Staff")
     log_security_audit(
         actor=actor,
         action="EMPLOYEE_STATUS_CHANGE",
-        details=f"Employee {emp['employee_id']} ({emp['full_name']}) status changed to {new_status}. User session active: {is_user_active}",
+        details=f"Employee {emp.get('employee_id', emp['id'])} ({emp_display_name}) status changed to {new_status}. User session active: {is_user_active}",
         target_resource=emp["id"],
-        
     )
     return {
         "status": "success",
@@ -2572,10 +2781,54 @@ def revoke_employee_invitation(employee_id: str, actor: str) -> bool:
 
 def verify_invitation_token(token: str) -> Dict[str, Any]:
     """
-    Validates invitation token authenticity, expiration, and status.
+    Validates invitation token authenticity, expiration, and status from Firestore / fallback.
     Returns non-sensitive metadata for the onboarding form.
     """
     now_dt = datetime.now(timezone.utc)
+    _ensure_fallback_invitations_loaded()
+    inv = None
+    try:
+        from app.services.firestore_service import firestore_service
+        if firestore_service.is_available:
+            inv = firestore_service.get_employee_invitation(token)
+    except Exception as fe:
+        logger.debug("Firestore get_employee_invitation notice: %s", fe)
+
+    if not inv:
+        inv = _fallback_invitations.get(token)
+
+    if inv:
+        if inv.get("status") == "ACCEPTED":
+            raise ValueError("This invitation has already been accepted and the account is active. Please log in.")
+        if inv.get("status") == "REVOKED":
+            raise ValueError("This invitation was revoked by an administrator. Please contact your organization.")
+        exp_val = inv.get("expires_at")
+        if isinstance(exp_val, str):
+            try:
+                exp_dt = datetime.fromisoformat(exp_val)
+            except Exception:
+                exp_dt = now_dt + timedelta(days=7)
+        elif isinstance(exp_val, datetime):
+            exp_dt = exp_val
+        else:
+            exp_dt = now_dt + timedelta(days=7)
+        if exp_dt < now_dt:
+            raise ValueError("This invitation link has expired. Please request a new invitation link from your administrator.")
+
+        u = get_user_by_id(inv.get("user_id")) or {}
+        emp = get_employee_detail(inv.get("employee_id")) or {}
+        return {
+            "valid": True,
+            "email": inv.get("email"),
+            "official_email": inv.get("email"),
+            "full_name": u.get("full_name") or emp.get("full_name") or "Team Member",
+            "username": u.get("username") or emp.get("username") or "",
+            "corporate_employee_id": emp.get("employee_id") or "",
+            "designation": emp.get("designation") or "Staff Member",
+            "role_code": inv.get("role_code") or "technician",
+            "expires_at": exp_dt.isoformat()
+        }
+
     with get_db_cursor(dict_cursor=True) as cursor:
         cursor.execute("""
         SELECT i.id, i.token, i.email, i.role_code, i.expires_at, i.status,
@@ -2629,6 +2882,44 @@ def accept_invitation_and_activate(
         raise ValueError("Password must be at least 8 characters long.")
 
     now_dt = datetime.now(timezone.utc)
+    _ensure_fallback_invitations_loaded()
+    fb_inv = _fallback_invitations.get(token)
+    if not fb_inv:
+        try:
+            from app.services.firestore_service import firestore_service
+            if firestore_service.is_available:
+                fb_inv = firestore_service.get_employee_invitation(token)
+        except Exception:
+            pass
+
+    if fb_inv:
+        if fb_inv.get("status") != "PENDING":
+            raise ValueError(f"Invitation is no longer pending (Current state: {fb_inv.get('status')}).")
+        user_id = fb_inv.get("user_id")
+        emp_id = fb_inv.get("employee_id")
+        hashed_pwd = get_password_hash(new_password)
+        update_user_password(user_id, hashed_pwd, must_change_password=False)
+        update_employee(emp_id, {"employment_status": "ACTIVE", "invitation_status": "ACCEPTED"}, actor="invitation_flow")
+        fb_inv["status"] = "ACCEPTED"
+        fb_inv["accepted_at"] = now_dt.isoformat()
+        _save_fallback_invitation(fb_inv)
+        try:
+            from app.services.firestore_service import firestore_service
+            if firestore_service.is_available:
+                firestore_service.create_employee_invitation(fb_inv)
+        except Exception:
+            pass
+        user = get_user_by_id(user_id) or {}
+        return {
+            "success": True,
+            "username": user.get("username", ""),
+            "full_name": user.get("full_name", ""),
+            "official_email": fb_inv.get("email"),
+            "role_code": fb_inv.get("role_code", "technician"),
+            "mfa_enabled": mfa_enabled,
+            "message": "Account successfully activated! You may now sign in."
+        }
+
     with get_db_cursor(commit=True, dict_cursor=True) as cursor:
         cursor.execute("""
         SELECT i.*, u.username, u.full_name, e.employee_id as corporate_emp_id
