@@ -8896,9 +8896,9 @@ function renderProductModalForm(product = null) {
       </div>
 
       <!-- Action Buttons -->
-      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 14px;">
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; border-top: 1px solid var(--border-color); padding: 12px 0 4px 0; position: sticky; bottom: -20px; background: var(--bg-surface); z-index: 20; box-shadow: 0 -4px 10px rgba(0,0,0,0.03);">
         <button type="button" class="btn btn-skin" onclick="closeAppModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary" id="btnSaveProductModalSubmit" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 8px 20px;">
+        <button type="submit" class="btn btn-primary" id="btnSaveProductModalSubmit" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 10px 24px; box-shadow: var(--shadow-sm);">
           <i data-lucide="${isEdit ? 'save' : 'plus'}"></i> <span>${isEdit ? 'Save Changes' : 'Create Product SKU'}</span>
         </button>
       </div>
@@ -8967,12 +8967,7 @@ async function handleSaveProductSubmit(e, productId = null) {
     const fileInput = document.getElementById('prodModalImgFileInput');
     if (fileInput && fileInput.files && fileInput.files[0]) {
       const file = fileInput.files[0];
-      try {
-        const dataUrl = await readImageAsDataUrl(file);
-        if (dataUrl) imageUrls.push(dataUrl);
-      } catch (err) {
-        console.warn('DataURL compression error:', err);
-      }
+      let uploadedUrl = null;
 
       try {
         const formData = new FormData();
@@ -8984,12 +8979,22 @@ async function handleSaveProductSubmit(e, productId = null) {
         });
         if (upRes.ok) {
           const upData = await upRes.json();
-          if (imageUrls.length === 0 && upData.image_url) {
-            imageUrls.push(upData.image_url);
+          if (upData.image_url) {
+            uploadedUrl = upData.image_url;
+            imageUrls.push(uploadedUrl);
           }
         }
       } catch (uploadErr) {
         console.warn('Backend image upload error:', uploadErr);
+      }
+
+      if (!uploadedUrl) {
+        try {
+          const dataUrl = await readImageAsDataUrl(file);
+          if (dataUrl) imageUrls.push(dataUrl);
+        } catch (err) {
+          console.warn('DataURL compression error:', err);
+        }
       }
     }
 

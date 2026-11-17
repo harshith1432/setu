@@ -20,11 +20,378 @@ import logging
 import threading
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
-from app.services.db_service import get_db_cursor, log_audit, invalidate_user_cache
+from app.services.db_service import get_db_cursor, log_audit, invalidate_user_cache, is_postgres_available, _DummyRow
 from app.core.security import get_password_hash
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# --- Persistent Local Fallback Store for Hardware Products Catalogue ---
+FALLBACK_PRODUCTS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "products_store.json"))
+_fallback_products_lock = threading.Lock()
+
+CANONICAL_PRODUCTS_FALLBACK = [
+    {
+        "id": "prod_gw_01",
+        "sku": "SKU-GW-ESP32-E",
+        "name": "Setu IoT Industrial Gateway Node v2.4",
+        "slug": "setu-iot-industrial-gateway-node",
+        "category": "IoT Gateways and Connectivity",
+        "short_description": "Industrial RS485/Modbus + ESP32-S3 IoT Gateway with dual Wi-Fi/LTE fallback and mTLS hardware crypto element.",
+        "description": "Centralized communications bridge for sericulture rearing sheds. Equipped with dual-band Wi-Fi (802.11 b/g/n), optional 4G/LTE cellular fallback, and an on-board hardware cryptographic element (ATECC608A) for mutual TLS authentication. Connects up to 16 RS-485 Modbus RTU sensor nodes and actuators across a 500-meter daisy chain. Features 72-hour offline flash buffering to prevent telemetry data loss during rural grid outages.",
+        "price_minor_units": 649900,
+        "stock_quantity": 42,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Sensirion SHT31, Winsen MQ-135, BH1750, 4-Channel Relay Boards, Solid-State AC PWM Dimmers",
+        "specifications": {
+            "Processor": "ESP32-S3 Dual-Core Xtensa LX7 @ 240 MHz",
+            "Memory": "512 KB SRAM + 8 MB PSRAM + 16 MB Flash",
+            "Connectivity": "Wi-Fi 802.11 b/g/n (2.4 GHz) + 4G/LTE Cat-1 Fallback",
+            "Industrial Bus": "Isolated RS-485 Modbus RTU (up to 115,200 baud)",
+            "Security": "Hardware Crypto Element (mTLS / X.509 Device Certificates)",
+            "Power Supply": "9V–24V DC / Solar Backup Compatible (12V 7Ah battery input)",
+            "Operating Range": "-10°C to +70°C, 5% to 95% RH non-condensing",
+            "Enclosure": "IP65 Flame-Retardant ABS Enclosure with DIN-Rail Mount"
+        },
+        "images": ["/uploads/products/setu_gateway_v2.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_sns_sht31",
+        "sku": "SKU-SNS-SHT31-IP67",
+        "name": "Sensirion SHT31 High-Precision Dual Probe",
+        "slug": "sensirion-sht31-precision-probe",
+        "category": "IoT Temperature and Humidity Sensors",
+        "short_description": "IP67 weather-shielded temperature (±0.2°C) and relative humidity (±1.5% RH) sensor probe for rearing racks.",
+        "description": "Engineered specifically for harsh rearing environments with high moisture and disinfectant chemical vapors (formalin, chlorine dioxide). Features Sensirion CMOSens digital sensing technology housed inside a sintered porous stainless steel filter cap. Delivers true laboratory precision across all five silkworm developmental instars without drift or condensation fouling.",
+        "price_minor_units": 185000,
+        "stock_quantity": 118,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Setu Gateway v2.4, ESP32, Arduino, standard Modbus RTU masters",
+        "specifications": {
+            "Temperature Accuracy": "±0.2°C (at 20°C to 40°C)",
+            "Humidity Accuracy": "±1.5% RH (at 10% to 90% RH)",
+            "Response Time": "< 4 seconds (tau 63%)",
+            "Interface Protocol": "I2C / RS-485 Modbus RTU via Setu Sensor Node",
+            "Ingress Protection": "IP67 Sintered Stainless Steel Filter Shield",
+            "Operating Voltage": "3.3V to 5.5V DC (ultra-low power 0.8 uA sleep)",
+            "Cable Length": "3.0 meter high-temperature industrial shielded cable",
+            "Calibration": "NIST-Traceable Factory Calibrated with on-chip EEPROM"
+        },
+        "images": ["/uploads/products/sht31_probe.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_sns_mq135",
+        "sku": "SKU-SNS-MQ135-VOC",
+        "name": "SeriAir MQ-135 CO2 & Ammonia Monitor",
+        "slug": "seriair-mq135-co2-ammonia-monitor",
+        "category": "Smart Environment Monitoring",
+        "short_description": "Calibrated air freshness sensor tuned to detect silkworm bed ammonia build-up and larval asphyxiation risk.",
+        "description": "In enclosed rearing sheds, larval respiration and decomposing mulberry excreta produce hazardous spikes of carbon dioxide (>1000 ppm) and free ammonia. The SeriAir monitor uses an SnO2 semiconductor sensor with pre-aged heating cycles to continuously measure gaseous bed contaminants and trigger automated exhaust fans before silkworm feeding slows.",
+        "price_minor_units": 120000,
+        "stock_quantity": 65,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Setu IoT Industrial Gateway Node v2.4, Exhaust Fan Relays",
+        "specifications": {
+            "Target Gases": "Ammonia (NH3), Carbon Dioxide (CO2), Benzene, Alcohol",
+            "Detection Concentration": "10 ppm to 1000 ppm (Ammonia / CO2 eq)",
+            "Preheating Cycle": "24-hour burn-in with active temperature compensation",
+            "Output Signal": "0–3.3V Analog & Digital Alert Pin / Modbus RTU",
+            "Operating Power": "5V DC ± 0.1V @ 150 mA",
+            "Enclosure": "Vented Wall-Mount Housing with Dust Screen",
+            "Service Life": "3+ years continuous operation in sericulture sheds"
+        },
+        "images": ["/uploads/products/mq135_ammonia.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_sns_bh1750",
+        "sku": "SKU-SNS-BH1750-LUX",
+        "name": "Photoperiod Digital Lux Sensor BH1750",
+        "slug": "photoperiod-digital-lux-sensor-bh1750",
+        "category": "Light Monitoring Systems",
+        "short_description": "16-bit ambient illuminance sensor (0–65,535 lx) ensuring optimal 15–30 lx circadian lighting.",
+        "description": "Silkworms require specific photoperiodic schedules (16 hours light at 15–30 Lux, 8 hours dark) to maintain synchronous feeding and high cocoon shell weight. The BH1750 digital sensor measures illuminance with human eye spectral response approximation and guides PWM lighting controllers to prevent circadian disruption.",
+        "price_minor_units": 95000,
+        "stock_quantity": 84,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Setu Gateway, PWM AC Dimmer Controller, SeriCare Automation Rules",
+        "specifications": {
+            "Measurement Range": "0 to 65,535 Lux",
+            "Resolution": "1 Lux resolution with 16-bit ADC",
+            "Spectral Sensitivity": "Human eye visual sensitivity (560 nm peak)",
+            "Light Source Rejection": "Minimal variation between incandescent, LED & fluorescent",
+            "Interface": "I2C Fast Mode (400 kHz)",
+            "Supply Voltage": "3.0V to 5.0V DC"
+        },
+        "images": ["/uploads/products/bh1750_lux.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_act_pwm",
+        "sku": "SKU-ACT-PWM-DIM",
+        "name": "Solid-State Zero-Cross AC PWM Dimmer (1000W)",
+        "slug": "solid-state-zero-cross-ac-pwm-dimmer",
+        "category": "Smart Rearing Shed Control",
+        "short_description": "Microcontroller-driven zero-crossing AC dimmer for flicker-free rearing shed illumination.",
+        "description": "Controls rearing room lighting levels smoothly from 0% to 100% PWM brightness without audible buzz or flicker. Uses optical zero-cross isolation (MOC3021 + BTA16 triac) to protect against electrical surges in rural installations.",
+        "price_minor_units": 245000,
+        "stock_quantity": 37,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Incandescent, Halogen, and Dimmable LED bulbs (E27 / B22)",
+        "specifications": {
+            "Load Capacity": "Up to 1000W (230V AC @ 4.3A)",
+            "Switching Type": "Optical Zero-Cross Phase Detection (50Hz / 60Hz)",
+            "Isolation Voltage": "3750V RMS Optocoupler Isolation",
+            "Control Logic": "3.3V / 5V TTL PWM Input (0–100%)",
+            "Protection": "Built-in RC snubber circuit and thermal heatsink"
+        },
+        "images": ["/uploads/products/pwm_dimmer.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_act_mist",
+        "sku": "SKU-ACT-MIST-4N",
+        "name": "High-Pressure Ultrasonic Cold Mist Fogger",
+        "slug": "high-pressure-ultrasonic-cold-mist-fogger",
+        "category": "Smart Rearing Shed Control",
+        "short_description": "Micro-droplet humidification unit maintaining 85–90% RH for 1st/2nd Instar Chawki worms without wet bed rot.",
+        "description": "Generates ultra-fine 5–10 micron water aerosols that evaporate in ambient air without settling on mulberry leaves. Critical for young age silkworms to prevent dehydration while avoiding leaf rot and fungal flacherie outbreaks.",
+        "price_minor_units": 899900,
+        "stock_quantity": 19,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Setu Gateway Relay Port 1/2, Automated Humidity Rules Engine",
+        "specifications": {
+            "Atomization Rate": "3.5 Litres per hour (4 piezoceramic heads)",
+            "Droplet Particle Size": "5–10 microns (floating aerosol)",
+            "Water Reservoir": "Direct continuous float-valve waterline connection",
+            "Operating Power": "230V AC @ 120W with internal DC driver",
+            "Safety Sensor": "Automatic water-depletion cut-off probe"
+        },
+        "images": ["/uploads/products/ultrasonic_fogger.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_act_fan",
+        "sku": "SKU-ACT-FAN-EX12",
+        "name": "SilkWatt 12-inch Reversible Exhaust Vent",
+        "slug": "silkwatt-12-inch-reversible-exhaust-vent",
+        "category": "Smart Rearing Shed Control",
+        "short_description": "Low-noise brushless exhaust fan with automated louvers for rapid temperature and CO2 extraction.",
+        "description": "High-volume aerodynamic extraction unit designed for 4th and 5th instar sheds where metabolic heat generation is at peak. Automatically evacuates stagnant warm air and ammonia gas when indoor thresholds are breached.",
+        "price_minor_units": 420000,
+        "stock_quantity": 28,
+        "unit": "unit",
+        "availability_status": "IN_STOCK",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Setu Shed Controller, 230V AC Contactor",
+        "specifications": {
+            "Air Delivery Flow": "1,450 CFM (Cubic Feet per Minute)",
+            "Motor": "Heavy-Duty IP55 Sealed Brushless Induction Motor",
+            "Blade Sweep": "300 mm (12 inches) Aerodynamic Aluminum",
+            "Operating Sound": "< 48 dBA quiet operation (does not distress larvae)",
+            "Louver Mechanism": "Gravity-assisted backdraft louvers prevent insect entry"
+        },
+        "images": ["/uploads/products/exhaust_fan.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_sft_sub",
+        "sku": "SKU-SFT-SUB-PRO",
+        "name": "SeriCare Farmer Mobile App & Web Dashboard",
+        "slug": "sericare-farmer-platform-subscription",
+        "category": "Farmer Monitoring Application",
+        "short_description": "Cloud platform license with real-time microclimate dashboards, multi-lingual WhatsApp voice alerts, and automated actuation control.",
+        "description": "Comprehensive software suite providing farmers and agricultural supervisors with mobile (Android/iOS) and web dashboard access. Includes 3-second live telemetry updates, explainable AI insights in English, Kannada, and Telugu, automated WhatsApp voice alert broadcasts when temperature varies, and complete batch lifecycle tracking.",
+        "price_minor_units": 99900,
+        "stock_quantity": 999,
+        "unit": "month",
+        "availability_status": "AVAILABLE",
+        "publication_status": "PUBLISHED",
+        "compatibility": "All Setu Gateways and Monitored Sheds",
+        "specifications": {
+            "Supported Platforms": "Android 8.0+, iOS 14+, Modern Web Browsers",
+            "Real-Time Latency": "< 500 ms via WebSockets and Server-Sent Events",
+            "Languages": "English, Kannada (ಕನ್ನಡ), Telugu (తెలుగు)",
+            "Alert Channels": "WhatsApp Text, WhatsApp Voice Notes, Push Notifications, SMS",
+            "Data Retention": "Unlimited historical telemetry with CSV/Excel export",
+            "Security": "Role-Based Access Control, JWT, Encrypted SSL/TLS"
+        },
+        "images": ["/uploads/products/software_sub.png"],
+        "is_active": True
+    },
+    {
+        "id": "prod_srv_inst",
+        "sku": "SKU-SRV-INST-CAL",
+        "name": "Professional Shed Assessment & Calibration Service",
+        "slug": "professional-shed-assessment-installation-service",
+        "category": "Installation and Maintenance Services",
+        "short_description": "On-site field inspection, sensor rack positioning, electrical interlock safety wiring, and sensor calibration by certified technicians.",
+        "description": "Turnkey engineering service performed by SeriCare certified field technicians. Includes comprehensive thermal survey of the rearing shed, optimal probe placement across rack tiers, electrical contactor wiring with mutual exclusion safety interlocks, gateway antenna alignment, and sensor calibration against NIST reference instruments.",
+        "price_minor_units": 250000,
+        "stock_quantity": 50,
+        "unit": "service",
+        "availability_status": "AVAILABLE",
+        "publication_status": "PUBLISHED",
+        "compatibility": "Standard Sericulture Sheds (up to 300 DFL capacity)",
+        "specifications": {
+            "Service Scope": "Site Survey, Hardware Mounting, Cabling, Electrical Interlock Wiring",
+            "Calibration Check": "3-point thermal & humidity verification against certified meter",
+            "Farmer Training": "Hands-on mobile app setup and emergency manual override walkthrough",
+            "Job Signoff": "Digital checklist verification with GPS stamped completion report",
+            "Warranty Support": "12-month on-site warranty on all installed hardware components"
+        },
+        "images": ["/uploads/products/field_service.png"],
+        "is_active": True
+    }
+]
+
+def _load_fallback_products() -> Dict[str, Dict[str, Any]]:
+    """Loads products from persistent fallback JSON store, ensuring canonical products are always present as baseline."""
+    with _fallback_products_lock:
+        result = {}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        # 1. Base canonical products
+        for p in CANONICAL_PRODUCTS_FALLBACK:
+            p_copy = dict(p)
+            p_copy["created_at"] = p_copy.get("created_at") or now_iso
+            p_copy["updated_at"] = p_copy.get("updated_at") or now_iso
+            p_copy["is_active"] = p_copy.get("is_active", True)
+            result[p_copy["id"]] = p_copy
+
+        # 2. Overlay with custom created/updated products from persistent file
+        try:
+            if os.path.exists(FALLBACK_PRODUCTS_FILE):
+                with open(FALLBACK_PRODUCTS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if v.get("deleted") is True:
+                                result.pop(k, None)
+                            else:
+                                result[k] = v
+        except Exception as e:
+            logger.debug("Could not read fallback products file: %s", e)
+
+        return result
+
+def _save_fallback_product(product_data: Dict[str, Any]) -> None:
+    """Persists product to persistent fallback JSON store."""
+    if not product_data or not product_data.get("id"):
+        return
+    with _fallback_products_lock:
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_PRODUCTS_FILE), exist_ok=True)
+            products = {}
+            if os.path.exists(FALLBACK_PRODUCTS_FILE):
+                try:
+                    with open(FALLBACK_PRODUCTS_FILE, "r", encoding="utf-8") as f:
+                        products = json.load(f)
+                except Exception:
+                    products = {}
+            p_id = str(product_data["id"])
+            clean_rec = dict(product_data)
+            for k, v in list(clean_rec.items()):
+                if isinstance(v, datetime):
+                    clean_rec[k] = v.isoformat()
+            products[p_id] = clean_rec
+            with open(FALLBACK_PRODUCTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(products, f, indent=2)
+        except Exception as e:
+            logger.debug("Could not save fallback product: %s", e)
+
+def _delete_fallback_product(product_id: str) -> bool:
+    """Removes product from persistent fallback JSON store."""
+    if not product_id:
+        return False
+    with _fallback_products_lock:
+        try:
+            products = {}
+            if os.path.exists(FALLBACK_PRODUCTS_FILE):
+                try:
+                    with open(FALLBACK_PRODUCTS_FILE, "r", encoding="utf-8") as f:
+                        products = json.load(f)
+                except Exception:
+                    products = {}
+            clean_pid = str(product_id).strip()
+            removed = False
+            # If deleting a canonical product, mark as deleted
+            for p in CANONICAL_PRODUCTS_FALLBACK:
+                if p["id"] == clean_pid or p["sku"] == clean_pid:
+                    products[p["id"]] = {"deleted": True}
+                    removed = True
+            keys_to_del = [k for k, v in products.items() if k == clean_pid or v.get("sku") == clean_pid]
+            for k in keys_to_del:
+                del products[k]
+                removed = True
+            with open(FALLBACK_PRODUCTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(products, f, indent=2)
+            return removed
+        except Exception as e:
+            logger.debug("Could not delete fallback product: %s", e)
+            return False
+
+def _get_fallback_product(id_or_sku: str) -> Optional[Dict[str, Any]]:
+    """Retrieves product by ID, SKU, or slug from persistent fallback JSON store."""
+    if not id_or_sku:
+        return None
+    products = _load_fallback_products()
+    clean_target = str(id_or_sku).strip()
+    if clean_target in products:
+        return dict(products[clean_target])
+    for p in products.values():
+        if p.get("sku") == clean_target or p.get("slug") == clean_target:
+            return dict(p)
+    return None
+
+FALLBACK_INVENTORY_MOVEMENTS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "inventory_movements_store.json"))
+_fallback_movements_lock = threading.Lock()
+
+def _load_fallback_inventory_movements() -> List[Dict[str, Any]]:
+    with _fallback_movements_lock:
+        try:
+            if os.path.exists(FALLBACK_INVENTORY_MOVEMENTS_FILE):
+                with open(FALLBACK_INVENTORY_MOVEMENTS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        return data
+        except Exception as e:
+            logger.debug("Could not load fallback inventory movements: %s", e)
+        return []
+
+def _record_fallback_inventory_movement(movement_data: Dict[str, Any]) -> None:
+    with _fallback_movements_lock:
+        try:
+            os.makedirs(os.path.dirname(FALLBACK_INVENTORY_MOVEMENTS_FILE), exist_ok=True)
+            movements = []
+            if os.path.exists(FALLBACK_INVENTORY_MOVEMENTS_FILE):
+                try:
+                    with open(FALLBACK_INVENTORY_MOVEMENTS_FILE, "r", encoding="utf-8") as f:
+                        movements = json.load(f)
+                except Exception:
+                    movements = []
+            rec = dict(movement_data)
+            for k, v in list(rec.items()):
+                if isinstance(v, datetime):
+                    rec[k] = v.isoformat()
+            movements.insert(0, rec)
+            with open(FALLBACK_INVENTORY_MOVEMENTS_FILE, "w", encoding="utf-8") as f:
+                json.dump(movements[:500], f, indent=2)
+        except Exception as e:
+            logger.debug("Could not record fallback inventory movement: %s", e)
 
 
 def init_enterprise_tables():
@@ -480,216 +847,7 @@ def _seed_products_catalogue(cursor, now_dt):
     if count_row and count_row[0] > 0:
         return
     import json
-    products = [
-        {
-            "id": "prod_gw_01",
-            "sku": "SKU-GW-ESP32-E",
-            "name": "Setu IoT Industrial Gateway Node v2.4",
-            "slug": "setu-iot-industrial-gateway-node",
-            "category": "IoT Gateways and Connectivity",
-            "short_description": "Industrial RS485/Modbus + ESP32-S3 IoT Gateway with dual Wi-Fi/LTE fallback and mTLS hardware crypto element.",
-            "description": "Centralized communications bridge for sericulture rearing sheds. Equipped with dual-band Wi-Fi (802.11 b/g/n), optional 4G/LTE cellular fallback, and an on-board hardware cryptographic element (ATECC608A) for mutual TLS authentication. Connects up to 16 RS-485 Modbus RTU sensor nodes and actuators across a 500-meter daisy chain. Features 72-hour offline flash buffering to prevent telemetry data loss during rural grid outages.",
-            "price_minor_units": 649900,
-            "stock_quantity": 42,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Sensirion SHT31, Winsen MQ-135, BH1750, 4-Channel Relay Boards, Solid-State AC PWM Dimmers",
-            "specifications": {
-                "Processor": "ESP32-S3 Dual-Core Xtensa LX7 @ 240 MHz",
-                "Memory": "512 KB SRAM + 8 MB PSRAM + 16 MB Flash",
-                "Connectivity": "Wi-Fi 802.11 b/g/n (2.4 GHz) + 4G/LTE Cat-1 Fallback",
-                "Industrial Bus": "Isolated RS-485 Modbus RTU (up to 115,200 baud)",
-                "Security": "Hardware Crypto Element (mTLS / X.509 Device Certificates)",
-                "Power Supply": "9V–24V DC / Solar Backup Compatible (12V 7Ah battery input)",
-                "Operating Range": "-10°C to +70°C, 5% to 95% RH non-condensing",
-                "Enclosure": "IP65 Flame-Retardant ABS Enclosure with DIN-Rail Mount"
-            }
-        },
-        {
-            "id": "prod_sns_sht31",
-            "sku": "SKU-SNS-SHT31-IP67",
-            "name": "Sensirion SHT31 High-Precision Dual Probe",
-            "slug": "sensirion-sht31-precision-probe",
-            "category": "IoT Temperature and Humidity Sensors",
-            "short_description": "IP67 weather-shielded temperature (±0.2°C) and relative humidity (±1.5% RH) sensor probe for rearing racks.",
-            "description": "Engineered specifically for harsh rearing environments with high moisture and disinfectant chemical vapors (formalin, chlorine dioxide). Features Sensirion CMOSens digital sensing technology housed inside a sintered porous stainless steel filter cap. Delivers true laboratory precision across all five silkworm developmental instars without drift or condensation fouling.",
-            "price_minor_units": 185000,
-            "stock_quantity": 118,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Setu Gateway v2.4, ESP32, Arduino, standard Modbus RTU masters",
-            "specifications": {
-                "Temperature Accuracy": "±0.2°C (at 20°C to 40°C)",
-                "Humidity Accuracy": "±1.5% RH (at 10% to 90% RH)",
-                "Response Time": "< 4 seconds (tau 63%)",
-                "Interface Protocol": "I2C / RS-485 Modbus RTU via Setu Sensor Node",
-                "Ingress Protection": "IP67 Sintered Stainless Steel Filter Shield",
-                "Operating Voltage": "3.3V to 5.5V DC (ultra-low power 0.8 uA sleep)",
-                "Cable Length": "3.0 meter high-temperature industrial shielded cable",
-                "Calibration": "NIST-Traceable Factory Calibrated with on-chip EEPROM"
-            }
-        },
-        {
-            "id": "prod_sns_mq135",
-            "sku": "SKU-SNS-MQ135-VOC",
-            "name": "SeriAir MQ-135 CO2 & Ammonia Monitor",
-            "slug": "seriair-mq135-co2-ammonia-monitor",
-            "category": "Smart Environment Monitoring",
-            "short_description": "Calibrated air freshness sensor tuned to detect silkworm bed ammonia build-up and larval asphyxiation risk.",
-            "description": "In enclosed rearing sheds, larval respiration and decomposing mulberry excreta produce hazardous spikes of carbon dioxide (>1000 ppm) and free ammonia. The SeriAir monitor uses an SnO2 semiconductor sensor with pre-aged heating cycles to continuously measure gaseous bed contaminants and trigger automated exhaust fans before silkworm feeding slows.",
-            "price_minor_units": 120000,
-            "stock_quantity": 65,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Setu IoT Industrial Gateway Node v2.4, Exhaust Fan Relays",
-            "specifications": {
-                "Target Gases": "Ammonia (NH3), Carbon Dioxide (CO2), Benzene, Alcohol",
-                "Detection Concentration": "10 ppm to 1000 ppm (Ammonia / CO2 eq)",
-                "Preheating Cycle": "24-hour burn-in with active temperature compensation",
-                "Output Signal": "0–3.3V Analog & Digital Alert Pin / Modbus RTU",
-                "Operating Power": "5V DC ± 0.1V @ 150 mA",
-                "Enclosure": "Vented Wall-Mount Housing with Dust Screen",
-                "Service Life": "3+ years continuous operation in sericulture sheds"
-            }
-        },
-        {
-            "id": "prod_sns_bh1750",
-            "sku": "SKU-SNS-BH1750-LUX",
-            "name": "Photoperiod Digital Lux Sensor BH1750",
-            "slug": "photoperiod-digital-lux-sensor-bh1750",
-            "category": "Light Monitoring Systems",
-            "short_description": "16-bit ambient illuminance sensor (0–65,535 lx) ensuring optimal 15–30 lx circadian lighting.",
-            "description": "Silkworms require specific photoperiodic schedules (16 hours light at 15–30 Lux, 8 hours dark) to maintain synchronous feeding and high cocoon shell weight. The BH1750 digital sensor measures illuminance with human eye spectral response approximation and guides PWM lighting controllers to prevent circadian disruption.",
-            "price_minor_units": 95000,
-            "stock_quantity": 84,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Setu Gateway, PWM AC Dimmer Controller, SeriCare Automation Rules",
-            "specifications": {
-                "Measurement Range": "0 to 65,535 Lux",
-                "Resolution": "1 Lux resolution with 16-bit ADC",
-                "Spectral Sensitivity": "Human eye visual sensitivity (560 nm peak)",
-                "Light Source Rejection": "Minimal variation between incandescent, LED & fluorescent",
-                "Interface": "I2C Fast Mode (400 kHz)",
-                "Supply Voltage": "3.0V to 5.0V DC"
-            }
-        },
-        {
-            "id": "prod_act_pwm",
-            "sku": "SKU-ACT-PWM-DIM",
-            "name": "Solid-State Zero-Cross AC PWM Dimmer (1000W)",
-            "slug": "solid-state-zero-cross-ac-pwm-dimmer",
-            "category": "Smart Rearing Shed Control",
-            "short_description": "Microcontroller-driven zero-crossing AC dimmer for flicker-free rearing shed illumination.",
-            "description": "Controls rearing room lighting levels smoothly from 0% to 100% PWM brightness without audible buzz or flicker. Uses optical zero-cross isolation (MOC3021 + BTA16 triac) to protect against electrical surges in rural installations.",
-            "price_minor_units": 245000,
-            "stock_quantity": 37,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Incandescent, Halogen, and Dimmable LED bulbs (E27 / B22)",
-            "specifications": {
-                "Load Capacity": "Up to 1000W (230V AC @ 4.3A)",
-                "Switching Type": "Optical Zero-Cross Phase Detection (50Hz / 60Hz)",
-                "Isolation Voltage": "3750V RMS Optocoupler Isolation",
-                "Control Logic": "3.3V / 5V TTL PWM Input (0–100%)",
-                "Protection": "Built-in RC snubber circuit and thermal heatsink"
-            }
-        },
-        {
-            "id": "prod_act_mist",
-            "sku": "SKU-ACT-MIST-4N",
-            "name": "High-Pressure Ultrasonic Cold Mist Fogger",
-            "slug": "high-pressure-ultrasonic-cold-mist-fogger",
-            "category": "Smart Rearing Shed Control",
-            "short_description": "Micro-droplet humidification unit maintaining 85–90% RH for 1st/2nd Instar Chawki worms without wet bed rot.",
-            "description": "Generates ultra-fine 5–10 micron water aerosols that evaporate in ambient air without settling on mulberry leaves. Critical for young age silkworms to prevent dehydration while avoiding leaf rot and fungal flacherie outbreaks.",
-            "price_minor_units": 899900,
-            "stock_quantity": 19,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Setu Gateway Relay Port 1/2, Automated Humidity Rules Engine",
-            "specifications": {
-                "Atomization Rate": "3.5 Litres per hour (4 piezoceramic heads)",
-                "Droplet Particle Size": "5–10 microns (floating aerosol)",
-                "Water Reservoir": "Direct continuous float-valve waterline connection",
-                "Operating Power": "230V AC @ 120W with internal DC driver",
-                "Safety Sensor": "Automatic water-depletion cut-off probe"
-            }
-        },
-        {
-            "id": "prod_act_fan",
-            "sku": "SKU-ACT-FAN-EX12",
-            "name": "SilkWatt 12-inch Reversible Exhaust Vent",
-            "slug": "silkwatt-12-inch-reversible-exhaust-vent",
-            "category": "Smart Rearing Shed Control",
-            "short_description": "Low-noise brushless exhaust fan with automated louvers for rapid temperature and CO2 extraction.",
-            "description": "High-volume aerodynamic extraction unit designed for 4th and 5th instar sheds where metabolic heat generation is at peak. Automatically evacuates stagnant warm air and ammonia gas when indoor thresholds are breached.",
-            "price_minor_units": 420000,
-            "stock_quantity": 28,
-            "unit": "unit",
-            "availability_status": "IN_STOCK",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Setu Shed Controller, 230V AC Contactor",
-            "specifications": {
-                "Air Delivery Flow": "1,450 CFM (Cubic Feet per Minute)",
-                "Motor": "Heavy-Duty IP55 Sealed Brushless Induction Motor",
-                "Blade Sweep": "300 mm (12 inches) Aerodynamic Aluminum",
-                "Operating Sound": "< 48 dBA quiet operation (does not distress larvae)",
-                "Louver Mechanism": "Gravity-assisted backdraft louvers prevent insect entry"
-            }
-        },
-        {
-            "id": "prod_sft_sub",
-            "sku": "SKU-SFT-SUB-PRO",
-            "name": "SeriCare Farmer Mobile App & Web Dashboard",
-            "slug": "sericare-farmer-platform-subscription",
-            "category": "Farmer Monitoring Application",
-            "short_description": "Cloud platform license with real-time microclimate dashboards, multi-lingual WhatsApp voice alerts, and automated actuation control.",
-            "description": "Comprehensive software suite providing farmers and agricultural supervisors with mobile (Android/iOS) and web dashboard access. Includes 3-second live telemetry updates, explainable AI insights in English, Kannada, and Telugu, automated WhatsApp voice alert broadcasts when temperature varies, and complete batch lifecycle tracking.",
-            "price_minor_units": 99900,
-            "stock_quantity": 999,
-            "unit": "month",
-            "availability_status": "AVAILABLE",
-            "publication_status": "PUBLISHED",
-            "compatibility": "All Setu Gateways and Monitored Sheds",
-            "specifications": {
-                "Supported Platforms": "Android 8.0+, iOS 14+, Modern Web Browsers",
-                "Real-Time Latency": "< 500 ms via WebSockets and Server-Sent Events",
-                "Languages": "English, Kannada (ಕನ್ನಡ), Telugu (తెలుగు)",
-                "Alert Channels": "WhatsApp Text, WhatsApp Voice Notes, Push Notifications, SMS",
-                "Data Retention": "Unlimited historical telemetry with CSV/Excel export",
-                "Security": "Role-Based Access Control, JWT, Encrypted SSL/TLS"
-            }
-        },
-        {
-            "id": "prod_srv_inst",
-            "sku": "SKU-SRV-INST-CAL",
-            "name": "Professional Shed Assessment & Calibration Service",
-            "slug": "professional-shed-assessment-installation-service",
-            "category": "Installation and Maintenance Services",
-            "short_description": "On-site field inspection, sensor rack positioning, electrical interlock safety wiring, and sensor calibration by certified technicians.",
-            "description": "Turnkey engineering service performed by SeriCare certified field technicians. Includes comprehensive thermal survey of the rearing shed, optimal probe placement across rack tiers, electrical contactor wiring with mutual exclusion safety interlocks, gateway antenna alignment, and sensor calibration against NIST reference instruments.",
-            "price_minor_units": 250000,
-            "stock_quantity": 50,
-            "unit": "service",
-            "availability_status": "AVAILABLE",
-            "publication_status": "PUBLISHED",
-            "compatibility": "Standard Sericulture Sheds (up to 300 DFL capacity)",
-            "specifications": {
-                "Service Scope": "Site Survey, Hardware Mounting, Cabling, Electrical Interlock Wiring",
-                "Calibration Check": "3-point thermal & humidity verification against certified meter",
-                "Farmer Training": "Hands-on mobile app setup and emergency manual override walkthrough",
-                "Job Signoff": "Digital checklist verification with GPS stamped completion report",
-                "Warranty Support": "12-month on-site warranty on all installed hardware components"
-            }
-        }
-    ]
+    products = CANONICAL_PRODUCTS_FALLBACK
 
     for p in products:
         cursor.execute("""
@@ -697,9 +855,10 @@ def _seed_products_catalogue(cursor, now_dt):
             id, sku, name, slug, category, short_description, description,
             price_minor_units, currency, stock_quantity, unit,
             availability_status, publication_status, compatibility, specifications,
+            images,
             is_active, created_at, updated_at, published_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'INR', %s, %s, %s, %s, %s, %s, TRUE, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'INR', %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, TRUE, %s, %s, %s)
         ON CONFLICT (id) DO UPDATE SET
             sku = EXCLUDED.sku,
             name = EXCLUDED.name,
@@ -714,6 +873,7 @@ def _seed_products_catalogue(cursor, now_dt):
             publication_status = EXCLUDED.publication_status,
             compatibility = EXCLUDED.compatibility,
             specifications = EXCLUDED.specifications,
+            images = EXCLUDED.images,
             is_active = TRUE,
             updated_at = EXCLUDED.updated_at,
             published_at = EXCLUDED.published_at;
@@ -721,7 +881,7 @@ def _seed_products_catalogue(cursor, now_dt):
             p["id"], p["sku"], p["name"], p["slug"], p["category"], p["short_description"],
             p["description"], p["price_minor_units"], p["stock_quantity"], p["unit"],
             p["availability_status"], p["publication_status"], p["compatibility"],
-            json.dumps(p["specifications"]), now_dt, now_dt, now_dt
+            json.dumps(p.get("specifications", {})), json.dumps(p.get("images", [])), now_dt, now_dt, now_dt
         ))
 
     # Seed initial authentic order & subscription for active farmers
@@ -1346,118 +1506,252 @@ def get_analytics_trends(days: int = 7) -> Dict[str, Any]:
 
 # --- Products Repository ---
 def list_products(category: Optional[str] = None) -> List[Dict[str, Any]]:
-    with get_db_cursor(dict_cursor=True) as cursor:
-        if category:
-            cursor.execute("SELECT * FROM products WHERE category = %s AND is_active = TRUE ORDER BY created_at DESC", (category,))
-        else:
-            cursor.execute("SELECT * FROM products ORDER BY created_at DESC")
-        return [dict(r) for r in cursor.fetchall()]
+    """Lists products across PostgreSQL, Cloud Firestore, and persistent fallback storage."""
+    from app.services.firestore_service import firestore_service
+    items = []
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                if category and category.strip().upper() not in ("ALL", "ALL PRODUCTS"):
+                    cursor.execute("SELECT * FROM products WHERE category = %s AND is_active = TRUE ORDER BY created_at DESC", (category,))
+                else:
+                    cursor.execute("SELECT * FROM products ORDER BY created_at DESC")
+                rows = cursor.fetchall()
+                if rows:
+                    items = [dict(r) for r in rows if r and not isinstance(r, _DummyRow)]
+        except Exception as e:
+            logger.debug("PostgreSQL list_products error: %s", e)
+
+    if items:
+        return items
+
+    # Fallback & resilient merge across Cloud Firestore and persistent local JSON store
+    merged_products = {}
+    fallback_map = _load_fallback_products()
+    for pid, p in fallback_map.items():
+        merged_products[pid] = dict(p)
+
+    try:
+        if firestore_service.is_available:
+            fs_prods = firestore_service.get_products(category=category, published_only=False)
+            for p in fs_prods:
+                p_id = p.get("id") or p.get("sku")
+                if p_id:
+                    merged_products[p_id] = p
+    except Exception as e:
+        logger.debug("Firestore list_products overlay error: %s", e)
+
+    result = list(merged_products.values())
+    if category and category.strip().upper() not in ("ALL", "ALL PRODUCTS"):
+        result = [p for p in result if str(p.get("category", "")).strip().lower() == category.strip().lower()]
+
+    result.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
+    return result
 
 
 def get_product_by_id(product_id: str) -> Optional[Dict[str, Any]]:
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM products WHERE id = %s", (product_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+    """Gets product by ID, SKU, or slug across PostgreSQL, Cloud Firestore, and persistent fallback storage."""
+    from app.services.firestore_service import firestore_service
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("SELECT * FROM products WHERE id = %s OR sku = %s OR slug = %s", (product_id, product_id, product_id))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    return dict(row)
+        except Exception as e:
+            logger.debug("PostgreSQL get_product_by_id error: %s", e)
+
+    try:
+        if firestore_service.is_available:
+            p = firestore_service.get_product(product_id)
+            if p:
+                return p
+    except Exception as e:
+        logger.debug("Firestore get_product_by_id error: %s", e)
+
+    return _get_fallback_product(product_id)
 
 
 def delete_product(product_id: str, force: bool = True) -> bool:
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT id, name, sku FROM products WHERE id = %s", (product_id,))
-        prod = cursor.fetchone()
-        if not prod:
-            return False
+    """Deletes a product across PostgreSQL, Cloud Firestore, and persistent fallback storage."""
+    from app.services.firestore_service import firestore_service
+    deleted = False
+    if is_postgres_available():
+        try:
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute("SELECT id FROM products WHERE id = %s OR sku = %s", (product_id, product_id))
+                prod = cursor.fetchone()
+                if prod and not isinstance(prod, _DummyRow):
+                    real_id = prod.get("id", product_id)
+                    cursor.execute("UPDATE order_items SET product_id = NULL WHERE product_id = %s", (real_id,))
+                    cursor.execute("DELETE FROM inventory_movements WHERE product_id = %s", (real_id,))
+                    cursor.execute("DELETE FROM products WHERE id = %s", (real_id,))
+                    deleted = True
+        except Exception as e:
+            logger.debug("PostgreSQL delete_product error: %s", e)
 
-        # Release order_items foreign keys while preserving order totals & history
-        cursor.execute("UPDATE order_items SET product_id = NULL WHERE product_id = %s", (product_id,))
-        cursor.execute("DELETE FROM inventory_movements WHERE product_id = %s", (product_id,))
-        cursor.execute("DELETE FROM products WHERE id = %s", (product_id,))
-        return True
+    try:
+        if firestore_service.is_available:
+            fs_del = firestore_service.delete_product(product_id)
+            if fs_del:
+                deleted = True
+    except Exception as e:
+        logger.debug("Firestore delete_product error: %s", e)
+
+    fb_del = _delete_fallback_product(product_id)
+    if fb_del:
+        deleted = True
+
+    return deleted
 
 
 def update_product_details(product_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Updates product attributes with synchronized triple-tier persistence."""
+    from app.services.firestore_service import firestore_service
     now_dt = datetime.now(timezone.utc)
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT * FROM products WHERE id = %s", (product_id,))
-        prod = cursor.fetchone()
-        if not prod:
-            return None
+    now_iso = now_dt.isoformat()
 
-        name = data.get("name", prod["name"])
-        sku = data.get("sku", prod["sku"])
-        category = data.get("category", prod["category"])
-        description = data.get("description", prod.get("description", ""))
-        short_description = data.get("short_description", prod.get("short_description", ""))
-        compatibility = data.get("compatibility", prod.get("compatibility", ""))
-        specs = data.get("specifications", prod.get("specifications") or {})
-        if isinstance(specs, str):
-            try:
-                specs = json.loads(specs)
-            except Exception:
-                specs = {}
-        elif not isinstance(specs, dict):
+    prod = get_product_by_id(product_id)
+    if not prod:
+        return None
+
+    name = data.get("name", prod["name"])
+    sku = data.get("sku", prod["sku"])
+    category = data.get("category", prod["category"])
+    description = data.get("description", prod.get("description", ""))
+    short_description = data.get("short_description", prod.get("short_description", ""))
+    compatibility = data.get("compatibility", prod.get("compatibility", ""))
+    specs = data.get("specifications", prod.get("specifications") or {})
+    if isinstance(specs, str):
+        try:
+            specs = json.loads(specs)
+        except Exception:
             specs = {}
-        price_minor_units = int(data.get("price_minor_units", prod["price_minor_units"]))
-        stock_quantity = int(data.get("stock_quantity", prod["stock_quantity"]))
-        unit = data.get("unit", prod["unit"])
-        is_active = data.get("is_active", prod["is_active"])
-        if isinstance(is_active, str):
-            is_active = (is_active.lower() == "true")
-        pub_status = "PUBLISHED" if is_active else "ARCHIVED"
+    elif not isinstance(specs, dict):
+        specs = {}
+    price_minor_units = int(data.get("price_minor_units", prod["price_minor_units"]))
+    stock_quantity = int(data.get("stock_quantity", prod["stock_quantity"]))
+    unit = data.get("unit", prod["unit"])
+    is_active = data.get("is_active", prod.get("is_active", True))
+    if isinstance(is_active, str):
+        is_active = (is_active.lower() == "true")
+    pub_status = "PUBLISHED" if is_active else "ARCHIVED"
 
-        images = data.get("images", prod.get("images") or [])
-        if isinstance(images, str):
-            try:
-                images = json.loads(images)
-            except Exception:
-                images = [images] if images.strip() else []
-        elif not isinstance(images, list):
-            images = []
+    images = data.get("images", prod.get("images") or [])
+    if isinstance(images, str):
+        try:
+            images = json.loads(images)
+        except Exception:
+            images = [images] if images.strip() else []
+    elif not isinstance(images, list):
+        images = []
 
-        cursor.execute('''
-        UPDATE products
-        SET name = %s,
-            sku = %s,
-            category = %s,
-            description = %s,
-            short_description = %s,
-            compatibility = %s,
-            specifications = %s::jsonb,
-            price_minor_units = %s,
-            stock_quantity = %s,
-            unit = %s,
-            images = %s::jsonb,
-            is_active = %s,
-            publication_status = %s,
-            updated_at = %s
-        WHERE id = %s
-        RETURNING *;
-        ''', (name, sku, category, description, short_description, compatibility, json.dumps(specs), price_minor_units, stock_quantity, unit, json.dumps(images), is_active, pub_status, now_dt, product_id))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+    updated_prod = dict(prod)
+    updated_prod.update({
+        "name": name,
+        "sku": sku,
+        "category": category,
+        "description": description,
+        "short_description": short_description,
+        "compatibility": compatibility,
+        "specifications": specs,
+        "price_minor_units": price_minor_units,
+        "stock_quantity": stock_quantity,
+        "unit": unit,
+        "images": images,
+        "is_active": is_active,
+        "publication_status": pub_status,
+        "updated_at": now_iso
+    })
+
+    if is_postgres_available():
+        try:
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute('''
+                UPDATE products
+                SET name = %s,
+                    sku = %s,
+                    category = %s,
+                    description = %s,
+                    short_description = %s,
+                    compatibility = %s,
+                    specifications = %s::jsonb,
+                    price_minor_units = %s,
+                    stock_quantity = %s,
+                    unit = %s,
+                    images = %s::jsonb,
+                    is_active = %s,
+                    publication_status = %s,
+                    updated_at = %s
+                WHERE id = %s
+                RETURNING *;
+                ''', (name, sku, category, description, short_description, compatibility, json.dumps(specs), price_minor_units, stock_quantity, unit, json.dumps(images), is_active, pub_status, now_dt, product_id))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    updated_prod = dict(row)
+        except Exception as e:
+            logger.debug("PostgreSQL update_product_details error: %s", e)
+
+    try:
+        if firestore_service.is_available:
+            firestore_service.save_product(updated_prod)
+    except Exception as e:
+        logger.debug("Firestore update product error: %s", e)
+    _save_fallback_product(updated_prod)
+
+    return updated_prod
 
 
 def toggle_product_archive(product_id: str, archive: bool) -> Optional[Dict[str, Any]]:
+    """Toggles product publication between PUBLISHED and ARCHIVED across all tiers."""
+    from app.services.firestore_service import firestore_service
     now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
     is_active = not archive
     pub_status = "ARCHIVED" if archive else "PUBLISHED"
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute('''
-        UPDATE products
-        SET is_active = %s,
-            publication_status = %s,
-            updated_at = %s
-        WHERE id = %s
-        RETURNING *;
-        ''', (is_active, pub_status, now_dt, product_id))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+
+    prod = get_product_by_id(product_id)
+    if not prod:
+        return None
+
+    prod["is_active"] = is_active
+    prod["publication_status"] = pub_status
+    prod["updated_at"] = now_iso
+
+    if is_postgres_available():
+        try:
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute('''
+                UPDATE products
+                SET is_active = %s,
+                    publication_status = %s,
+                    updated_at = %s
+                WHERE id = %s
+                RETURNING *;
+                ''', (is_active, pub_status, now_dt, product_id))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    prod = dict(row)
+        except Exception as e:
+            logger.debug("PostgreSQL toggle_product_archive error: %s", e)
+
+    try:
+        if firestore_service.is_available:
+            firestore_service.save_product(prod)
+    except Exception as e:
+        logger.debug("Firestore toggle_product_archive error: %s", e)
+    _save_fallback_product(prod)
+
+    return prod
 
 
 def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> Dict[str, Any]:
-    import json
+    """Creates a new hardware product SKU with automatic resilience across PostgreSQL, Cloud Firestore, and persistent fallback."""
+    from app.services.firestore_service import firestore_service
     now_dt = datetime.now(timezone.utc)
-    prod_id = f"prod_{uuid.uuid4().hex[:12]}"
+    now_iso = now_dt.isoformat()
+    prod_id = product_data.get("id") or f"prod_{uuid.uuid4().hex[:12]}"
     slug = product_data.get("slug") or product_data["name"].lower().replace(" ", "-").replace("/", "-")
     pub_status = product_data.get("publication_status", "PUBLISHED").upper()
     avail_status = product_data.get("availability_status", "AVAILABLE").upper()
@@ -1467,6 +1761,8 @@ def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> D
             specs = json.loads(specs)
         except Exception:
             specs = {}
+    elif not isinstance(specs, dict):
+        specs = {}
     images = product_data.get("images", [])
     if isinstance(images, str):
         try:
@@ -1475,97 +1771,213 @@ def create_product(product_data: Dict[str, Any], creator_id: str = "admin") -> D
             images = [images] if images.strip() else []
     elif not isinstance(images, list):
         images = []
+    price_minor = int(product_data.get("price_minor_units", 0))
+    stock_qty = int(product_data.get("stock_quantity", 0))
+    unit_str = product_data.get("unit", "unit")
+    curr_str = product_data.get("currency", "INR")
+    is_active = (pub_status != "ARCHIVED")
 
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("""
-        INSERT INTO products (
-            id, sku, name, slug, category, short_description, description,
-            price_minor_units, currency, stock_quantity, unit,
-            availability_status, publication_status, compatibility, specifications,
-            images,
-            is_active, created_at, updated_at, published_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, TRUE, %s, %s, %s)
-        RETURNING *;
-        """, (
-            prod_id,
-            product_data["sku"],
-            product_data["name"],
-            slug,
-            product_data.get("category", "General"),
-            product_data.get("short_description", product_data.get("description", "")),
-            product_data.get("description", ""),
-            int(product_data["price_minor_units"]),
-            product_data.get("currency", "INR"),
-            int(product_data.get("stock_quantity", 0)),
-            product_data.get("unit", "unit"),
-            avail_status,
-            pub_status,
-            product_data.get("compatibility", ""),
-            json.dumps(specs),
-            json.dumps(images),
-            now_dt,
-            now_dt,
-            now_dt if pub_status == "PUBLISHED" else None
-        ))
-        prod = dict(cursor.fetchone())
+    prod = {
+        "id": prod_id,
+        "sku": product_data["sku"],
+        "name": product_data["name"],
+        "slug": slug,
+        "category": product_data.get("category", "General"),
+        "short_description": product_data.get("short_description", product_data.get("description", "")),
+        "description": product_data.get("description", ""),
+        "price_minor_units": price_minor,
+        "currency": curr_str,
+        "stock_quantity": stock_qty,
+        "unit": unit_str,
+        "availability_status": avail_status,
+        "publication_status": pub_status,
+        "compatibility": product_data.get("compatibility", ""),
+        "specifications": specs,
+        "images": images,
+        "is_active": is_active,
+        "created_at": now_iso,
+        "updated_at": now_iso,
+        "published_at": now_iso if pub_status == "PUBLISHED" else None
+    }
 
-        # Log initial inventory movement
-        if prod["stock_quantity"] > 0:
-            cursor.execute("""
-            INSERT INTO inventory_movements (id, product_id, movement_type, quantity_change, previous_quantity, new_quantity, reference_id, notes, created_by, created_at)
-            VALUES (%s, %s, 'PURCHASE', %s, 0, %s, 'INITIAL_ENTRY', 'Initial product catalog creation', %s, %s)
-            """, (f"mov_{uuid.uuid4().hex[:12]}", prod_id, prod["stock_quantity"], prod["stock_quantity"], creator_id, now_dt))
+    # 1. PostgreSQL insert if available
+    if is_postgres_available():
+        try:
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute("""
+                INSERT INTO products (
+                    id, sku, name, slug, category, short_description, description,
+                    price_minor_units, currency, stock_quantity, unit,
+                    availability_status, publication_status, compatibility, specifications,
+                    images,
+                    is_active, created_at, updated_at, published_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    sku = EXCLUDED.sku,
+                    name = EXCLUDED.name,
+                    stock_quantity = EXCLUDED.stock_quantity,
+                    updated_at = EXCLUDED.updated_at
+                RETURNING *;
+                """, (
+                    prod_id,
+                    product_data["sku"],
+                    product_data["name"],
+                    slug,
+                    product_data.get("category", "General"),
+                    product_data.get("short_description", product_data.get("description", "")),
+                    product_data.get("description", ""),
+                    price_minor,
+                    curr_str,
+                    stock_qty,
+                    unit_str,
+                    avail_status,
+                    pub_status,
+                    product_data.get("compatibility", ""),
+                    json.dumps(specs),
+                    json.dumps(images),
+                    is_active,
+                    now_dt,
+                    now_dt,
+                    now_dt if pub_status == "PUBLISHED" else None
+                ))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    prod = dict(row)
 
-        return prod
+                if prod.get("stock_quantity", 0) > 0:
+                    cursor.execute("""
+                    INSERT INTO inventory_movements (id, product_id, movement_type, quantity_change, previous_quantity, new_quantity, reference_id, notes, created_by, created_at)
+                    VALUES (%s, %s, 'PURCHASE', %s, 0, %s, 'INITIAL_ENTRY', 'Initial product catalog creation', %s, %s)
+                    """, (f"mov_{uuid.uuid4().hex[:12]}", prod_id, prod["stock_quantity"], prod["stock_quantity"], creator_id, now_dt))
+        except Exception as pg_err:
+            logger.warning("PostgreSQL create_product error: %s. Using Firestore/fallback.", pg_err)
+
+    # Record initial inventory movement in fallback store if stock present
+    if prod.get("stock_quantity", 0) > 0:
+        _record_fallback_inventory_movement({
+            "id": f"mov_{uuid.uuid4().hex[:12]}",
+            "product_id": prod_id,
+            "product_name": prod.get("name", ""),
+            "sku": prod.get("sku", ""),
+            "movement_type": "PURCHASE",
+            "quantity_change": prod["stock_quantity"],
+            "previous_quantity": 0,
+            "new_quantity": prod["stock_quantity"],
+            "reference_id": "INITIAL_ENTRY",
+            "notes": "Initial product catalog creation",
+            "created_by": creator_id,
+            "created_at": now_iso
+        })
+
+    # 2. Cloud Firestore synchronization
+    try:
+        if firestore_service.is_available:
+            firestore_service.save_product(prod)
+    except Exception as fs_err:
+        logger.warning("Firestore save_product error: %s", fs_err)
+
+    # 3. Persistent JSON fallback store synchronization
+    _save_fallback_product(prod)
+
+    return prod
 
 
 def update_product_stock(product_id: str, quantity_delta: int, movement_type: str, reference_id: str, notes: str, user_id: str) -> Optional[Dict[str, Any]]:
+    """Updates product stock quantity with inventory movement ledger and multi-tier synchronization."""
+    from app.services.firestore_service import firestore_service
     now_dt = datetime.now(timezone.utc)
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT stock_quantity FROM products WHERE id = %s FOR UPDATE", (product_id,))
-        row = cursor.fetchone()
-        if not row:
-            return None
-        prev_qty = row["stock_quantity"]
-        new_qty = prev_qty + quantity_delta
-        if new_qty < 0:
-            raise ValueError(f"Insufficient inventory. Current: {prev_qty}, requested adjustment: {quantity_delta}")
+    now_iso = now_dt.isoformat()
 
-        cursor.execute("""
-        UPDATE products 
-        SET stock_quantity = %s, updated_at = %s 
-        WHERE id = %s 
-        RETURNING *;
-        """, (new_qty, now_dt, product_id))
-        updated_prod = dict(cursor.fetchone())
+    prod = get_product_by_id(product_id)
+    if not prod:
+        return None
 
-        cursor.execute("""
-        INSERT INTO inventory_movements (id, product_id, movement_type, quantity_change, previous_quantity, new_quantity, reference_id, notes, created_by, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (f"mov_{uuid.uuid4().hex[:12]}", product_id, movement_type, quantity_delta, prev_qty, new_qty, reference_id, notes, user_id, now_dt))
+    prev_qty = int(prod.get("stock_quantity", 0))
+    new_qty = prev_qty + quantity_delta
+    if new_qty < 0:
+        raise ValueError(f"Insufficient inventory. Current: {prev_qty}, requested adjustment: {quantity_delta}")
 
-        return updated_prod
+    prod["stock_quantity"] = new_qty
+    prod["updated_at"] = now_iso
+
+    if is_postgres_available():
+        try:
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute("""
+                UPDATE products 
+                SET stock_quantity = %s, updated_at = %s 
+                WHERE id = %s 
+                RETURNING *;
+                """, (new_qty, now_dt, product_id))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    prod = dict(row)
+
+                cursor.execute("""
+                INSERT INTO inventory_movements (id, product_id, movement_type, quantity_change, previous_quantity, new_quantity, reference_id, notes, created_by, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (f"mov_{uuid.uuid4().hex[:12]}", product_id, movement_type, quantity_delta, prev_qty, new_qty, reference_id, notes, user_id, now_dt))
+        except Exception as e:
+            logger.debug("PostgreSQL update_product_stock error: %s", e)
+
+    # Record stock adjustment movement in fallback store
+    _record_fallback_inventory_movement({
+        "id": f"mov_{uuid.uuid4().hex[:12]}",
+        "product_id": product_id,
+        "product_name": prod.get("name", ""),
+        "sku": prod.get("sku", ""),
+        "movement_type": movement_type,
+        "quantity_change": quantity_delta,
+        "previous_quantity": prev_qty,
+        "new_quantity": new_qty,
+        "reference_id": reference_id,
+        "notes": notes,
+        "created_by": user_id,
+        "created_at": now_iso
+    })
+
+    try:
+        if firestore_service.is_available:
+            firestore_service.save_product(prod)
+    except Exception as e:
+        logger.debug("Firestore update_product_stock error: %s", e)
+    _save_fallback_product(prod)
+
+    return prod
 
 
 def get_inventory_movements(product_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
-    with get_db_cursor(dict_cursor=True) as cursor:
-        if product_id:
-            cursor.execute("""
-            SELECT m.*, p.name as product_name, p.sku 
-            FROM inventory_movements m 
-            JOIN products p ON m.product_id = p.id 
-            WHERE m.product_id = %s 
-            ORDER BY m.created_at DESC LIMIT %s
-            """, (product_id, limit))
-        else:
-            cursor.execute("""
-            SELECT m.*, p.name as product_name, p.sku 
-            FROM inventory_movements m 
-            JOIN products p ON m.product_id = p.id 
-            ORDER BY m.created_at DESC LIMIT %s
-            """, (limit,))
-        return [dict(r) for r in cursor.fetchall()]
+    """Retrieves chronological inventory movements from PostgreSQL with seamless fallback."""
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                if product_id:
+                    cursor.execute("""
+                    SELECT m.*, p.name as product_name, p.sku 
+                    FROM inventory_movements m 
+                    JOIN products p ON m.product_id = p.id 
+                    WHERE m.product_id = %s 
+                    ORDER BY m.created_at DESC LIMIT %s
+                    """, (product_id, limit))
+                else:
+                    cursor.execute("""
+                    SELECT m.*, p.name as product_name, p.sku 
+                    FROM inventory_movements m 
+                    JOIN products p ON m.product_id = p.id 
+                    ORDER BY m.created_at DESC LIMIT %s
+                    """, (limit,))
+                rows = cursor.fetchall()
+                if rows:
+                    return [dict(r) for r in rows if r and not isinstance(r, _DummyRow)]
+        except Exception as e:
+            logger.debug("PostgreSQL get_inventory_movements error: %s", e)
+
+    # Fallback to local movements store
+    movements = _load_fallback_inventory_movements()
+    if product_id:
+        movements = [m for m in movements if m.get("product_id") == product_id or m.get("sku") == product_id]
+    return movements[:limit]
 
 
 # --- Orders & Billing Repository ---
@@ -2420,70 +2832,157 @@ def test_integration_connection(provider_key: str, credentials: Optional[Dict[st
 # --- Public Product Catalog & Enquiries Repository ---
 
 def list_public_products(category: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Returns only published and active products for the public catalogue."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        query = """
-        SELECT id, sku, name, slug, category, short_description, description,
-               price_minor_units, currency, stock_quantity, unit,
-               availability_status, publication_status, compatibility, specifications,
-               images, created_at, updated_at
-        FROM products 
-        WHERE is_active = TRUE AND publication_status = 'PUBLISHED'
-        """
-        params = []
-        if category and category.lower() not in ['all', 'all products']:
-            query += " AND category = %s"
-            params.append(category)
-        query += " ORDER BY created_at ASC"
-        cursor.execute(query, tuple(params))
-        return [dict(r) for r in cursor.fetchall()]
+    """Returns only published and active products for the public catalogue across all storage tiers."""
+    from app.services.firestore_service import firestore_service
+    items = []
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                query = """
+                SELECT id, sku, name, slug, category, short_description, description,
+                       price_minor_units, currency, stock_quantity, unit,
+                       availability_status, publication_status, compatibility, specifications,
+                       images, created_at, updated_at
+                FROM products 
+                WHERE is_active = TRUE AND publication_status = 'PUBLISHED'
+                """
+                params = []
+                if category and category.strip().lower() not in ['all', 'all products']:
+                    query += " AND category = %s"
+                    params.append(category.strip())
+                query += " ORDER BY created_at ASC"
+                cursor.execute(query, tuple(params))
+                rows = cursor.fetchall()
+                if rows:
+                    items = [dict(r) for r in rows if r and not isinstance(r, _DummyRow)]
+        except Exception as e:
+            logger.debug("PostgreSQL list_public_products error: %s", e)
+
+    if items:
+        return items
+
+    # Fallback to Firestore & persistent JSON store
+    merged_products = {}
+    fallback_map = _load_fallback_products()
+    for pid, p in fallback_map.items():
+        if p.get("is_active", True) and p.get("publication_status", "PUBLISHED") == "PUBLISHED":
+            merged_products[pid] = dict(p)
+
+    try:
+        if firestore_service.is_available:
+            fs_prods = firestore_service.get_products(category=category, published_only=True)
+            for p in fs_prods:
+                p_id = p.get("id") or p.get("sku")
+                if p_id and p.get("is_active", True) and p.get("publication_status", "PUBLISHED") == "PUBLISHED":
+                    merged_products[p_id] = p
+    except Exception as e:
+        logger.debug("Firestore list_public_products overlay error: %s", e)
+
+    result = list(merged_products.values())
+    if category and category.strip().lower() not in ['all', 'all products']:
+        result = [p for p in result if str(p.get("category", "")).strip().lower() == category.strip().lower()]
+
+    result.sort(key=lambda x: str(x.get("created_at", "")))
+    return result
 
 
 def get_public_product_by_id_or_slug(id_or_slug: str) -> Optional[Dict[str, Any]]:
-    """Returns public product details if published and active."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT id, sku, name, slug, category, short_description, description,
-               price_minor_units, currency, stock_quantity, unit,
-               availability_status, publication_status, compatibility, specifications,
-               images, created_at, updated_at
-        FROM products 
-        WHERE (id = %s OR slug = %s) 
-          AND is_active = TRUE 
-          AND publication_status = 'PUBLISHED'
-        """, (id_or_slug, id_or_slug))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+    """Returns public product details if published and active across storage tiers."""
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT id, sku, name, slug, category, short_description, description,
+                       price_minor_units, currency, stock_quantity, unit,
+                       availability_status, publication_status, compatibility, specifications,
+                       images, created_at, updated_at
+                FROM products 
+                WHERE (id = %s OR slug = %s OR sku = %s) 
+                  AND is_active = TRUE 
+                  AND publication_status = 'PUBLISHED'
+                """, (id_or_slug, id_or_slug, id_or_slug))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    return dict(row)
+        except Exception as e:
+            logger.debug("PostgreSQL get_public_product_by_id_or_slug error: %s", e)
+
+    p = get_product_by_id(id_or_slug)
+    if p and p.get("is_active", True) and p.get("publication_status", "PUBLISHED") == "PUBLISHED":
+        return p
+    return None
 
 
 def list_public_categories() -> List[Dict[str, Any]]:
     """Returns all distinct active categories from published products with item counts."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT category, COUNT(*) as count 
-        FROM products 
-        WHERE is_active = TRUE AND publication_status = 'PUBLISHED'
-        GROUP BY category 
-        ORDER BY category ASC
-        """)
-        return [dict(r) for r in cursor.fetchall()]
+    if is_postgres_available():
+        try:
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT category, COUNT(*) as count 
+                FROM products 
+                WHERE is_active = TRUE AND publication_status = 'PUBLISHED'
+                GROUP BY category 
+                ORDER BY count DESC
+                """)
+                rows = cursor.fetchall()
+                if rows:
+                    return [dict(r) for r in rows if r and not isinstance(r, _DummyRow)]
+        except Exception as e:
+            logger.debug("PostgreSQL list_public_categories error: %s", e)
+
+    prods = list_public_products()
+    cat_counts = {}
+    for p in prods:
+        c = p.get("category") or "General"
+        cat_counts[c] = cat_counts.get(c, 0) + 1
+    return [{"category": k, "count": v} for k, v in sorted(cat_counts.items(), key=lambda x: x[1], reverse=True)]
 
 
 def update_product_publication(product_id: str, publication_status: str) -> Optional[Dict[str, Any]]:
-    """Updates product publication status (PUBLISHED, DRAFT, ARCHIVED)."""
+    """Updates product publication status (PUBLISHED, DRAFT, ARCHIVED) across storage tiers."""
+    from app.services.firestore_service import firestore_service
     now_dt = datetime.now(timezone.utc)
+    now_iso = now_dt.isoformat()
     status_upper = publication_status.upper()
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("""
-        UPDATE products
-        SET publication_status = %s,
-            published_at = CASE WHEN %s = 'PUBLISHED' THEN COALESCE(published_at, %s) ELSE published_at END,
-            updated_at = %s
-        WHERE id = %s
-        RETURNING *;
-        """, (status_upper, status_upper, now_dt, now_dt, product_id))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+    is_active = (status_upper != "ARCHIVED")
+
+    prod = get_product_by_id(product_id)
+    if not prod:
+        return None
+
+    prod["publication_status"] = status_upper
+    prod["is_active"] = is_active
+    prod["updated_at"] = now_iso
+    if status_upper == "PUBLISHED" and not prod.get("published_at"):
+        prod["published_at"] = now_iso
+
+    if is_postgres_available():
+        try:
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute("""
+                UPDATE products
+                SET publication_status = %s,
+                    is_active = %s,
+                    published_at = CASE WHEN %s = 'PUBLISHED' THEN COALESCE(published_at, %s) ELSE published_at END,
+                    updated_at = %s
+                WHERE id = %s
+                RETURNING *;
+                """, (status_upper, is_active, status_upper, now_dt, now_dt, product_id))
+                row = cursor.fetchone()
+                if row and not isinstance(row, _DummyRow) and row.get("id"):
+                    prod = dict(row)
+        except Exception as e:
+            logger.debug("PostgreSQL update_product_publication error: %s", e)
+
+    try:
+        if firestore_service.is_available:
+            firestore_service.save_product(prod)
+    except Exception as e:
+        logger.debug("Firestore update_product_publication error: %s", e)
+    _save_fallback_product(prod)
+
+    return prod
 
 
 def create_enquiry(enquiry_data: Dict[str, Any]) -> Dict[str, Any]:

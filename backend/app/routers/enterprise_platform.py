@@ -385,7 +385,7 @@ def get_product(
 @router.post("/products")
 def create_new_product(
     payload: ProductCreatePayload,
-    user: dict = Depends(require_roles(["superadmin", "admin", "sales"]))
+    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "sales"]))
 ):
     try:
         actor = user.get("sub", "admin")
@@ -393,8 +393,8 @@ def create_new_product(
         log_audit(actor, "PRODUCT_CREATE", f"Created product {payload.sku} - {payload.name}")
         return prod
     except Exception as e:
-        logger.error("Failed to create product: %s", e)
-        raise HTTPException(status_code=400, detail="Failed to create product. Please verify parameters.")
+        logger.error("Failed to create product: %s", e, exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Failed to create product: {str(e)}")
 
 
 ALLOWED_PRODUCT_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
@@ -402,7 +402,7 @@ ALLOWED_PRODUCT_IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}
 @router.post("/products/upload-image")
 async def upload_product_photo(
     file: UploadFile = File(...),
-    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "sales"]))
+    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "sales"]))
 ):
     """Securely uploads a product photo and returns the public asset URL."""
     import re
@@ -470,7 +470,7 @@ async def upload_product_photo(
 def adjust_stock(
     product_id: str,
     payload: StockAdjustmentPayload,
-    user: dict = Depends(require_roles(["superadmin", "admin", "sales"]))
+    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "sales"]))
 ):
     actor = user.get("sub", "admin")
     try:
@@ -509,7 +509,7 @@ class ProductUpdatePayload(BaseModel):
 def update_product_endpoint(
     product_id: str,
     payload: ProductUpdatePayload,
-    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "company_admin"]))
+    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "sales"]))
 ):
     actor = user.get("sub", "admin")
     updated = update_product_details(product_id, payload.model_dump(exclude_unset=True))
@@ -522,7 +522,7 @@ def update_product_endpoint(
 @router.post("/products/{product_id}/toggle-archive")
 def toggle_product_archive_endpoint(
     product_id: str,
-    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "company_admin"]))
+    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "sales"]))
 ):
     actor = user.get("sub", "admin")
     prod = get_product_by_id(product_id)
@@ -540,7 +540,7 @@ def toggle_product_archive_endpoint(
 def delete_existing_product(
     product_id: str,
     force: bool = Query(False, description="Force delete associated test data"),
-    user: dict = Depends(require_roles(["superadmin", "admin", "sales", "company_admin"]))
+    user: dict = Depends(require_roles(["superadmin", "admin", "company_admin", "ceo", "operations_manager", "sales"]))
 ):
     actor = user.get("sub", "admin")
     prod = get_product_by_id(product_id)
