@@ -1081,70 +1081,246 @@ def log_security_audit(
 # DEPARTMENTS OPERATIONS
 # ==============================================================================
 
+DEFAULT_DEPARTMENTS: List[Dict[str, Any]] = [
+    {
+        "id": "dept_exec",
+        "name": "Executive & Strategy",
+        "code": "EXEC",
+        "description": "Corporate oversight, strategy, and overall board governance.",
+        "head_id": None,
+        "head_name": None,
+        "status": "ACTIVE",
+        "employee_count": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00"
+    },
+    {
+        "id": "dept_ops",
+        "name": "Operations & Field Services",
+        "code": "OPS",
+        "description": "Shed microclimate supervision, field deployment, and maintenance.",
+        "head_id": None,
+        "head_name": None,
+        "status": "ACTIVE",
+        "employee_count": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00"
+    },
+    {
+        "id": "dept_eng",
+        "name": "IoT Engineering & R&D",
+        "code": "ENG",
+        "description": "Hardware sensor calibration, gateway firmware, and telemetry analytics.",
+        "head_id": None,
+        "head_name": None,
+        "status": "ACTIVE",
+        "employee_count": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00"
+    },
+    {
+        "id": "dept_comm",
+        "name": "Commercial & Sales",
+        "code": "COMM",
+        "description": "Farm supplies distribution, subscriptions, and financial accounting.",
+        "head_id": None,
+        "head_name": None,
+        "status": "ACTIVE",
+        "employee_count": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00"
+    },
+    {
+        "id": "dept_hr",
+        "name": "Human Resources & Onboarding",
+        "code": "HR",
+        "description": "Personnel onboarding, organizational development, and RBAC governance.",
+        "head_id": None,
+        "head_name": None,
+        "status": "ACTIVE",
+        "employee_count": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00"
+    },
+    {
+        "id": "dept_supp",
+        "name": "Customer Helpdesk & Support",
+        "code": "SUPP",
+        "description": "Farmer assistance, emergency incident triage, and field escalations.",
+        "head_id": None,
+        "head_name": None,
+        "status": "ACTIVE",
+        "employee_count": 0,
+        "created_at": "2026-01-01T00:00:00+00:00",
+        "updated_at": "2026-01-01T00:00:00+00:00"
+    }
+]
+
+_fallback_departments: Dict[str, Dict[str, Any]] = {d["id"]: dict(d) for d in DEFAULT_DEPARTMENTS}
+_fallback_departments_loaded = False
+_fallback_departments_lock = threading.Lock()
+
+def _get_departments_file_path() -> str:
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+    os.makedirs(data_dir, exist_ok=True)
+    return os.path.join(data_dir, "departments_store.json")
+
+def _ensure_fallback_departments_loaded() -> None:
+    global _fallback_departments_loaded
+    if _fallback_departments_loaded:
+        return
+    with _fallback_departments_lock:
+        if _fallback_departments_loaded:
+            return
+        fpath = _get_departments_file_path()
+        if os.path.exists(fpath):
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        for item in data:
+                            _fallback_departments[item["id"]] = item
+                    elif isinstance(data, dict):
+                        _fallback_departments.update(data)
+            except Exception as e:
+                logger.warning("Notice loading fallback departments from file: %s", e)
+        _fallback_departments_loaded = True
+
+def _save_fallback_departments() -> None:
+    try:
+        fpath = _get_departments_file_path()
+        with open(fpath, "w", encoding="utf-8") as f:
+            json.dump(list(_fallback_departments.values()), f, indent=2, default=str)
+    except Exception as e:
+        logger.warning("Notice saving fallback departments to file: %s", e)
+
+
 def list_departments(org_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """Lists departments with member counts and head name."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT d.id, d.name, d.code, d.description, d.head_id, d.status,
-               d.created_at, d.updated_at,
-               (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id) as employee_count,
-               (SELECT u.full_name FROM employees he JOIN users u ON u.id = he.user_id WHERE he.id = d.head_id) as head_name
-        FROM departments d
-        ORDER BY d.created_at ASC
-        """)
-        return [dict(r) for r in cursor.fetchall()]
+    db_results = []
+    try:
+        from app.services.db_service import is_postgres_available
+        if is_postgres_available():
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT d.id, d.name, d.code, d.description, d.head_id, d.status,
+                       d.created_at, d.updated_at,
+                       (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id) as employee_count,
+                       (SELECT u.full_name FROM employees he JOIN users u ON u.id = he.user_id WHERE he.id = d.head_id) as head_name
+                FROM departments d
+                ORDER BY d.created_at ASC
+                """)
+                db_results = [dict(r) for r in cursor.fetchall()]
+    except Exception as e:
+        logger.warning("Postgres list_departments notice (%s); using resilient fallback store.", e)
+
+    if db_results:
+        with _fallback_departments_lock:
+            for r in db_results:
+                _fallback_departments[r["id"]] = dict(r)
+        return db_results
+
+    # Fallback to in-memory / persistent departments store (guarantees departments list is never empty)
+    _ensure_fallback_departments_loaded()
+    with _fallback_departments_lock:
+        return list(_fallback_departments.values())
 
 
 def get_department(dept_id: str) -> Optional[Dict[str, Any]]:
     """Retrieves department details along with list of member employees."""
-    with get_db_cursor(dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT d.*, (SELECT u.full_name FROM employees he JOIN users u ON u.id = he.user_id WHERE he.id = d.head_id) as head_name
-        FROM departments d
-        WHERE d.id = %s
-        """, (dept_id,))
-        dept = cursor.fetchone()
-        if not dept:
-            return None
+    try:
+        from app.services.db_service import is_postgres_available
+        if is_postgres_available():
+            with get_db_cursor(dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT d.*, (SELECT u.full_name FROM employees he JOIN users u ON u.id = he.user_id WHERE he.id = d.head_id) as head_name
+                FROM departments d
+                WHERE d.id = %s
+                """, (dept_id,))
+                dept = cursor.fetchone()
+                if dept:
+                    dept_dict = dict(dept)
+                    cursor.execute("""
+                    SELECT e.id, e.employee_id, e.official_email, e.designation, e.role_code,
+                           e.employment_status, u.full_name, u.phone
+                    FROM employees e
+                    JOIN users u ON u.id = e.user_id
+                    WHERE e.department_id = %s
+                    ORDER BY u.full_name ASC
+                    """, (dept_id,))
+                    dept_dict["members"] = [dict(r) for r in cursor.fetchall()]
+                    return dept_dict
+    except Exception as e:
+        logger.debug("Postgres get_department notice: %s", e)
 
-        # Fetch member employees
-        cursor.execute("""
-        SELECT e.id, e.employee_id, e.official_email, e.designation, e.role_code,
-               e.employment_status, u.full_name, u.phone
-        FROM employees e
-        JOIN users u ON u.id = e.user_id
-        WHERE e.department_id = %s
-        ORDER BY u.full_name ASC
-        """, (dept_id,))
-        dept_dict = dict(dept)
-        dept_dict["members"] = [dict(r) for r in cursor.fetchall()]
-        return dept_dict
+    _ensure_fallback_departments_loaded()
+    with _fallback_departments_lock:
+        dept = _fallback_departments.get(dept_id)
+        if dept:
+            d = dict(dept)
+            d.setdefault("members", [])
+            return d
+    return None
 
 
 def create_department(data: Dict[str, Any], actor: str) -> Dict[str, Any]:
-    """Creates a department."""
+    """Creates a department with dual PostgreSQL and persistent fallback support."""
     now_dt = datetime.now(timezone.utc)
     code = data["code"].strip().upper()
     name = data["name"].strip()
     dept_id = data.get("id") or f"dept_{code.lower()}"
 
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("""
-        SELECT id FROM departments WHERE code = %s
-        """, (code,))
-        if cursor.fetchone():
-            raise ValueError(f"Department code '{code}' already exists.")
+    _ensure_fallback_departments_loaded()
+    with _fallback_departments_lock:
+        for d in _fallback_departments.values():
+            if d.get("code") == code:
+                raise ValueError(f"Department code '{code}' already exists.")
 
-        cursor.execute("""
-        INSERT INTO departments (id, name, code, description, head_id, status, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING *
-        """, (
-            dept_id, name, code, data.get("description"),
-            data.get("head_id"), data.get("status", "ACTIVE").upper(),
-            now_dt, now_dt
-        ))
-        created = cursor.fetchone()
+    created_dict = None
+    try:
+        from app.services.db_service import is_postgres_available
+        if is_postgres_available():
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute("""
+                SELECT id FROM departments WHERE code = %s
+                """, (code,))
+                if cursor.fetchone():
+                    raise ValueError(f"Department code '{code}' already exists.")
+
+                cursor.execute("""
+                INSERT INTO departments (id, name, code, description, head_id, status, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING *
+                """, (
+                    dept_id, name, code, data.get("description"),
+                    data.get("head_id"), data.get("status", "ACTIVE").upper(),
+                    now_dt, now_dt
+                ))
+                row = cursor.fetchone()
+                if row:
+                    created_dict = dict(row)
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.warning("Postgres create_department notice (%s); saving to resilient fallback store.", e)
+
+    if not created_dict:
+        created_dict = {
+            "id": dept_id,
+            "name": name,
+            "code": code,
+            "description": data.get("description") or "",
+            "head_id": data.get("head_id"),
+            "head_name": None,
+            "status": data.get("status", "ACTIVE").upper(),
+            "employee_count": 0,
+            "created_at": now_dt.isoformat(),
+            "updated_at": now_dt.isoformat()
+        }
+
+    with _fallback_departments_lock:
+        _fallback_departments[dept_id] = created_dict
+        _save_fallback_departments()
 
     log_security_audit(
         actor=actor,
@@ -1152,67 +1328,94 @@ def create_department(data: Dict[str, Any], actor: str) -> Dict[str, Any]:
         details=f"Created department '{name}' ({code})",
         target_resource=dept_id
     )
-    return dict(created)
+    return created_dict
 
 
 def update_department(dept_id: str, updates: Dict[str, Any], actor: str) -> Optional[Dict[str, Any]]:
     """Updates department name, description, head, or status."""
     now_dt = datetime.now(timezone.utc)
-    set_clauses = ["updated_at = %s"]
-    params = [now_dt]
+    updated_dict = None
 
-    for f in ["name", "description", "head_id", "status"]:
-        if f in updates and updates[f] is not None:
-            set_clauses.append(f"{f} = %s")
-            params.append(updates[f])
+    try:
+        from app.services.db_service import is_postgres_available
+        if is_postgres_available():
+            set_clauses = ["updated_at = %s"]
+            params = [now_dt]
+            for f in ["name", "description", "head_id", "status"]:
+                if f in updates and updates[f] is not None:
+                    set_clauses.append(f"{f} = %s")
+                    params.append(updates[f])
 
-    if len(set_clauses) == 1:
-        return get_department(dept_id)
+            if len(set_clauses) > 1:
+                params.append(dept_id)
+                with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                    cursor.execute(f"""
+                    UPDATE departments
+                    SET {', '.join(set_clauses)}
+                    WHERE id = %s
+                    RETURNING *
+                    """, tuple(params))
+                    row = cursor.fetchone()
+                    if row:
+                        updated_dict = dict(row)
+    except Exception as e:
+        logger.warning("Postgres update_department notice (%s); using resilient fallback store.", e)
 
-    params.append(dept_id)
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute(f"""
-        UPDATE departments
-        SET {', '.join(set_clauses)}
-        WHERE id = %s
-        RETURNING *
-        """, tuple(params))
-        row = cursor.fetchone()
+    _ensure_fallback_departments_loaded()
+    with _fallback_departments_lock:
+        if dept_id in _fallback_departments:
+            dept = _fallback_departments[dept_id]
+            for f in ["name", "description", "head_id", "status"]:
+                if f in updates and updates[f] is not None:
+                    dept[f] = updates[f]
+            dept["updated_at"] = now_dt.isoformat()
+            _save_fallback_departments()
+            if not updated_dict:
+                updated_dict = dict(dept)
 
-    if row:
+    if updated_dict:
         log_security_audit(
             actor=actor,
             action="UPDATE_DEPARTMENT",
             details=f"Updated department {dept_id}: {list(updates.keys())}",
-            target_resource=dept_id,
-            
+            target_resource=dept_id
         )
-        return dict(row)
-    return None
+    return updated_dict
 
 
 def delete_department(dept_id: str, actor: str) -> bool:
     """Safely removes or deactivates a department."""
-    with get_db_cursor(commit=True, dict_cursor=True) as cursor:
-        cursor.execute("SELECT name FROM departments WHERE id = %s", (dept_id,))
-        dept = cursor.fetchone()
-        if not dept:
-            return False
+    dept_name = dept_id
+    try:
+        from app.services.db_service import is_postgres_available
+        if is_postgres_available():
+            with get_db_cursor(commit=True, dict_cursor=True) as cursor:
+                cursor.execute("SELECT name FROM departments WHERE id = %s", (dept_id,))
+                dept = cursor.fetchone()
+                if dept:
+                    dept_name = dept["name"]
+                    cursor.execute("SELECT COUNT(*) as count FROM employees WHERE department_id = %s", (dept_id,))
+                    count = cursor.fetchone()["count"]
+                    if count > 0:
+                        raise ValueError(f"Cannot delete department '{dept['name']}'. It still contains {count} assigned employees. Reassign them first.")
+                    cursor.execute("DELETE FROM departments WHERE id = %s", (dept_id,))
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.warning("Postgres delete_department notice (%s); using resilient fallback store.", e)
 
-        # Check if members exist
-        cursor.execute("SELECT COUNT(*) as count FROM employees WHERE department_id = %s", (dept_id,))
-        count = cursor.fetchone()["count"]
-        if count > 0:
-            raise ValueError(f"Cannot delete department '{dept['name']}'. It still contains {count} assigned employees. Reassign them first.")
+    _ensure_fallback_departments_loaded()
+    with _fallback_departments_lock:
+        if dept_id in _fallback_departments:
+            dept_name = _fallback_departments[dept_id].get("name", dept_id)
+            del _fallback_departments[dept_id]
+            _save_fallback_departments()
 
-        cursor.execute("DELETE FROM departments WHERE id = %s", (dept_id,))
-        
     log_security_audit(
         actor=actor,
         action="DELETE_DEPARTMENT",
-        details=f"Deleted department '{dept['name']}' ({dept_id})",
-        target_resource=dept_id,
-        
+        details=f"Deleted department '{dept_name}' ({dept_id})",
+        target_resource=dept_id
     )
     return True
 
