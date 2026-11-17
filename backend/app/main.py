@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import (
     auth, sheds, telemetry, control, ai, admin, weather, voice,
-    enterprise_platform, departments, roles_permissions, employees
+    enterprise_platform, departments, roles_permissions, employees, payments
 )
 
 from collections import defaultdict
@@ -142,6 +142,7 @@ app.include_router(enterprise_platform.router, prefix=settings.API_V1_STR)
 app.include_router(departments.router, prefix=settings.API_V1_STR)
 app.include_router(roles_permissions.router, prefix=settings.API_V1_STR)
 app.include_router(employees.router, prefix=settings.API_V1_STR)
+app.include_router(payments.router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 def startup_db_init():

@@ -1481,6 +1481,133 @@ async function submitCheckoutOrder() {
   const submitBtn = document.getElementById('checkoutSubmitOrderBtn');
   const submitBtnText = document.getElementById('checkoutSubmitBtnText');
   if (submitBtn) submitBtn.disabled = true;
+
+  const finalShippingAddr = shippingAddress || (user.farm_name ? `Shed: ${user.farm_name}, Region: ${user.region || 'Karnataka'}` : 'Rearing Shed, Karnataka');
+  const finalPayMethod = selectedPaymentMethod || 'UPI';
+  const isOnlinePayment = (finalPayMethod === 'UPI' || finalPayMethod === 'CARD' || finalPayMethod === 'RAZORPAY');
+
+  // Razorpay Gateway Flow for Online Payments (UPI / Cards / NetBanking)
+  if (isOnlinePayment && typeof window.Razorpay !== 'undefined') {
+    if (submitBtnText) submitBtnText.textContent = 'Connecting to Razorpay...';
+
+    try {
+      // 1. Create Razorpay order on backend
+      const rzpRes = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: [{ product_id: activeCheckoutProduct.id, quantity: checkoutQuantity || 1 }],
+          shipping_address: finalShippingAddr,
+          payment_method: finalPayMethod,
+          notes: `Hardware order placed by ${user.full_name || user.username} (${finalPayMethod})`
+        })
+      });
+
+      const rzpData = await rzpRes.json();
+      if (!rzpRes.ok) {
+        throw new Error(rzpData.detail || 'Could not initialize Razorpay checkout session.');
+      }
+
+      // 2. Launch Razorpay Standard Checkout SDK
+      const options = {
+        key: rzpData.key_id,
+        amount: rzpData.amount_minor_units,
+        currency: rzpData.currency || 'INR',
+        name: 'Setu Sericulture',
+        description: `Hardware Order - ${activeCheckoutProduct.name}`,
+        image: 'https://setu-adminweb.vercel.app/favicon.ico',
+        order_id: rzpData.razorpay_order_id,
+        prefill: {
+          name: user.full_name || user.username || '',
+          email: user.email || '',
+          contact: user.phone || user.whatsapp_number || ''
+        },
+        theme: {
+          color: '#059669'
+        },
+        handler: async function (response) {
+          if (submitBtnText) submitBtnText.textContent = 'Verifying payment receipt...';
+          try {
+            const verifyRes = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                order_id: rzpData.order_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                method: finalPayMethod
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.detail || 'Payment verification failed.');
+            }
+
+            // Sync confirmed order in Firestore
+            if (window.SetuFirebase && SetuFirebase.isAvailable && SetuFirebase.db && verifyData.order) {
+              try {
+                await SetuFirebase.db.collection('orders').doc(rzpData.order_id).set(verifyData.order, { merge: true });
+              } catch (_) {}
+            }
+
+            // Clean storage
+            localStorage.removeItem('setu_pending_order');
+            sessionStorage.removeItem('setu_pending_order');
+            localStorage.removeItem('setu_pending_checkout');
+            sessionStorage.removeItem('setu_pending_checkout');
+            sessionStorage.removeItem('setu_checkout_product_id');
+
+            localStorage.setItem('setu_tab_nav', 'orders');
+            sessionStorage.setItem('setu_tab_nav', 'orders');
+            window.location.href = '/admin?tab=orders';
+          } catch (vErr) {
+            if (errBox) {
+              errBox.textContent = vErr.message || 'Payment signature verification error.';
+              errBox.classList.remove('hidden');
+            }
+            if (submitBtn) submitBtn.disabled = false;
+            if (submitBtnText) submitBtnText.textContent = 'Retry Payment';
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            if (submitBtn) submitBtn.disabled = false;
+            updateCheckoutCalculation();
+          }
+        }
+      };
+
+      const rzpInstance = new window.Razorpay(options);
+      rzpInstance.on('payment.failed', function (resp) {
+        if (errBox) {
+          errBox.textContent = (resp.error && resp.error.description) || 'Payment transaction failed or cancelled.';
+          errBox.classList.remove('hidden');
+        }
+        if (submitBtn) submitBtn.disabled = false;
+        updateCheckoutCalculation();
+      });
+      rzpInstance.open();
+      return;
+    } catch (rzpErr) {
+      console.warn('Razorpay checkout initialization error:', rzpErr);
+      if (errBox) {
+        errBox.textContent = rzpErr.message || 'Payment gateway connection error.';
+        errBox.classList.remove('hidden');
+      }
+      if (submitBtn) submitBtn.disabled = false;
+      updateCheckoutCalculation();
+      return;
+    }
+  }
+
+  // Cash on Delivery (COD) Flow
   if (submitBtnText) submitBtnText.textContent = 'Placing verified order...';
 
   const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -1489,9 +1616,6 @@ async function submitCheckoutOrder() {
   const totalMinor = (activeCheckoutProduct.price_minor_units || 0) * (checkoutQuantity || 1);
   const grandTotalMinor = totalMinor + Math.round(totalMinor * 0.18);
   const nowIso = new Date().toISOString();
-
-  const finalShippingAddr = shippingAddress || (user.farm_name ? `Shed: ${user.farm_name}, Region: ${user.region || 'Karnataka'}` : 'Rearing Shed, Karnataka');
-  const finalPayMethod = selectedPaymentMethod || 'Cash on Delivery (Pay at Shed)';
 
   const orderRecord = {
     id: orderId,

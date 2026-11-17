@@ -694,7 +694,7 @@ def get_current_user(payload: dict = Depends(get_current_user_payload)):
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str
+    current_password: Optional[str] = None
     new_password: str
     confirm_password: Optional[str] = None
 
@@ -723,21 +723,53 @@ def change_user_password(
     if not user:
         raise HTTPException(status_code=404, detail="User account not found")
 
-    if not verify_password(payload.current_password, user["hashed_password"]):
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user_hash = (user.get("hashed_password") or "").strip()
+    is_oauth_user = (
+        not user_hash
+        or user_hash.startswith(("oauth_", "google_", "gh_"))
+        or "dummy" in user_hash.lower()
+    )
 
-    if len(payload.new_password.strip()) < 6:
+    if not is_oauth_user:
+        if not payload.current_password or not payload.current_password.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Please enter your current password to verify your account."
+            )
+        try:
+            is_valid = verify_password(payload.current_password, user_hash)
+        except Exception:
+            is_valid = False
+
+        if not is_valid:
+            raise HTTPException(
+                status_code=400,
+                detail="The current password you entered is incorrect. Please check your existing password and try again."
+            )
+    else:
+        # User registered with Google Sign-In or OAuth without a preexisting password.
+        # Since they are actively authenticated via JWT, allow them to set their account password directly.
+        pass
+
+    new_pwd = (payload.new_password or "").strip()
+    if len(new_pwd) < 6:
         raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
 
-    if payload.confirm_password and payload.new_password.strip() != payload.confirm_password.strip():
+    confirm_pwd = (payload.confirm_password or "").strip()
+    if confirm_pwd and new_pwd != confirm_pwd:
         raise HTTPException(status_code=400, detail="New passwords do not match")
 
-    new_hash = get_password_hash(payload.new_password.strip())
+    new_hash = get_password_hash(new_pwd)
     from app.services.db_service import update_user_password
     update_user_password(user["id"], new_hash, must_change_password=False)
 
-    log_audit(user["username"], "PASSWORD_CHANGE", "User successfully changed their account password")
-    return {"status": "success", "message": "Password changed successfully."}
+    log_audit(user["username"], "PASSWORD_CHANGE", "User successfully changed or set their account password")
+    msg = (
+        "Password successfully updated!"
+        if not is_oauth_user
+        else "Password successfully created! You can now sign in using either Google or your email/username and password."
+    )
+    return {"status": "success", "message": msg}
 
 @router.post("/first-login-reset-password")
 def first_login_reset_password(

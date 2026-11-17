@@ -68,11 +68,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
     return _products.where((p) => p['category']?.toString() == _selectedCategory).toList();
   }
 
+  static const List<String> kIndianStates = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa',
+    'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala',
+    'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland',
+    'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+    'Uttar Pradesh', 'Uttarakhand', 'West Bengal', 'Andaman and Nicobar Islands',
+    'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
+    'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
+  ];
+
   void _openOrderSheet(Map<String, dynamic> product) {
     final provider = Provider.of<SetuProvider>(context, listen: false);
-    final addressController = TextEditingController(
-      text: '${provider.farmName.isNotEmpty ? provider.farmName : "My Farm"}, ${provider.region}',
-    );
+    final fullNameController = TextEditingController(text: provider.farmerName.isNotEmpty ? provider.farmerName : '');
+    final mobileController = TextEditingController(text: provider.phone.isNotEmpty ? provider.phone : '');
+    final pincodeController = TextEditingController();
+    final flatController = TextEditingController(text: provider.farmName.isNotEmpty ? 'Shed: ${provider.farmName}' : '');
+    final areaController = TextEditingController();
+    final landmarkController = TextEditingController();
+    final cityController = TextEditingController(text: provider.region.isNotEmpty ? provider.region : '');
+    String selectedState = kIndianStates.contains(provider.region) ? provider.region : 'Karnataka';
+    final instructionsController = TextEditingController();
+    bool makeDefaultAddress = true;
+
     final notesController = TextEditingController();
     int quantity = 1;
     String paymentMethod = 'UPI';
@@ -205,15 +223,183 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Delivery Address
-                    TextField(
-                      controller: addressController,
+                    // Structured Delivery Address Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.location_on, size: 20, color: Color(0xFF2E7D32)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Delivery Address',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Country/Region (India)
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: 'India',
                       decoration: InputDecoration(
-                        labelText: 'Delivery Address / Rearing Shed Location *',
-                        hintText: 'Enter shed address for equipment drop-off',
-                        prefixIcon: const Icon(Icons.location_on_outlined, color: Color(0xFF2E7D32)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        labelText: 'Country/Region',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'India', child: Text('India')),
+                      ],
+                      onChanged: (_) {},
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Full Name
+                    TextField(
+                      controller: fullNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Full name (First and Last name) *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Mobile Number
+                    TextField(
+                      controller: mobileController,
+                      keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      decoration: InputDecoration(
+                        labelText: 'Mobile number *',
+                        helperText: 'May be used to assist delivery',
+                        counterText: '',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Pincode
+                    TextField(
+                      controller: pincodeController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      decoration: InputDecoration(
+                        labelText: 'Pincode *',
+                        hintText: '6 digits [0-9] PIN code',
+                        counterText: '',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Flat, House no., Building, Company, Apartment
+                    TextField(
+                      controller: flatController,
+                      decoration: InputDecoration(
+                        labelText: 'Flat, House no., Building, Company, Apartment *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Area, Street, Sector, Village
+                    TextField(
+                      controller: areaController,
+                      decoration: InputDecoration(
+                        labelText: 'Area, Street, Sector, Village *',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Landmark
+                    TextField(
+                      controller: landmarkController,
+                      decoration: InputDecoration(
+                        labelText: 'Landmark',
+                        hintText: 'E.g. near apollo hospital',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Town/City and State side-by-side
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: cityController,
+                            decoration: InputDecoration(
+                              labelText: 'Town/City *',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            initialValue: selectedState,
+                            decoration: InputDecoration(
+                              labelText: 'State *',
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            items: kIndianStates.map((s) {
+                              return DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis));
+                            }).toList(),
+                            onChanged: (v) {
+                              if (v != null) setSheetState(() => selectedState = v);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Default Address Checkbox
+                    CheckboxListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Make this my default address', style: TextStyle(fontSize: 13)),
+                      value: makeDefaultAddress,
+                      onChanged: (v) => setSheetState(() => makeDefaultAddress = v ?? true),
+                    ),
+
+                    // Delivery instructions (optional) Expansion
+                    Theme(
+                      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        childrenPadding: const EdgeInsets.only(bottom: 10),
+                        title: const Text(
+                          'Delivery instructions (optional)',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: const Text(
+                          'Add preferences, notes, access codes and more',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF0284C7)),
+                        ),
+                        children: [
+                          TextField(
+                            controller: instructionsController,
+                            maxLines: 2,
+                            decoration: InputDecoration(
+                              hintText: 'Add drop-off preferences, shed gate code, directions or dispatch notes...',
+                              hintStyle: const TextStyle(fontSize: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -250,19 +436,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         if (v != null) setSheetState(() => paymentMethod = v);
                       },
                     ),
-                    const SizedBox(height: 12),
-
-                    // Special Notes
-                    TextField(
-                      controller: notesController,
-                      decoration: InputDecoration(
-                        labelText: 'Installation & Dispatch Notes (Optional)',
-                        hintText: 'e.g., Call before delivery, urgent installation needed',
-                        prefixIcon: const Icon(Icons.note_alt_outlined, color: Color(0xFF2E7D32)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      ),
-                    ),
                     const SizedBox(height: 20),
 
                     // Confirm Button
@@ -276,16 +449,54 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       onPressed: isSubmitting
                           ? null
                           : () async {
-                              final address = addressController.text.trim();
-                              if (address.isEmpty) {
+                              final fullName = fullNameController.text.trim();
+                              final mobile = mobileController.text.trim();
+                              final pincode = pincodeController.text.trim();
+                              final flat = flatController.text.trim();
+                              final area = areaController.text.trim();
+                              final landmark = landmarkController.text.trim();
+                              final city = cityController.text.trim();
+                              final instructions = instructionsController.text.trim();
+
+                              void showMsg(String text) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Please enter a delivery address for the shed.'),
-                                    backgroundColor: Color(0xFFC62828),
-                                  ),
+                                  SnackBar(content: Text(text), backgroundColor: const Color(0xFFC62828)),
                                 );
+                              }
+
+                              if (fullName.isEmpty) {
+                                showMsg('Please enter your Full name (First and Last name).');
                                 return;
                               }
+                              if (mobile.length < 10) {
+                                showMsg('Please enter a valid 10-digit mobile number.');
+                                return;
+                              }
+                              if (pincode.length != 6) {
+                                showMsg('Please enter a valid 6-digit PIN code.');
+                                return;
+                              }
+                              if (flat.isEmpty) {
+                                showMsg('Please enter Flat, House no., Building, Company, Apartment.');
+                                return;
+                              }
+                              if (area.isEmpty) {
+                                showMsg('Please enter Area, Street, Sector, Village.');
+                                return;
+                              }
+                              if (city.isEmpty) {
+                                showMsg('Please enter Town/City.');
+                                return;
+                              }
+
+                              final fullAddress = [
+                                '$flat, $area',
+                                if (landmark.isNotEmpty) 'Landmark: $landmark',
+                                '$city, $selectedState - $pincode',
+                                'India',
+                                'Contact: $fullName (Ph: $mobile)',
+                                if (instructions.isNotEmpty) 'Delivery instructions: $instructions',
+                              ].join(', ');
 
                               setSheetState(() => isSubmitting = true);
                               // Dual write: API Service & Cloud Firestore
@@ -296,9 +507,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                     'quantity': quantity,
                                   }
                                 ],
-                                shippingAddress: address,
+                                shippingAddress: fullAddress,
                                 paymentMethod: paymentMethod,
-                                notes: notesController.text.trim(),
+                                notes: notesController.text.trim().isNotEmpty
+                                    ? notesController.text.trim()
+                                    : (instructions.isNotEmpty ? instructions : 'Direct Mobile App Order'),
                               );
 
                               // Ensure recorded in Cloud Firestore
@@ -312,7 +525,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                     'price_minor_units': (product['price_minor_units'] as num?)?.toInt() ?? (((product['price'] as num?) ?? 0) * 100).toInt(),
                                   }
                                 ],
-                                shippingAddress: address,
+                                shippingAddress: fullAddress,
                                 paymentMethod: paymentMethod,
                                 notes: notesController.text.trim(),
                               );

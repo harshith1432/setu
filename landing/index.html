@@ -1353,6 +1353,7 @@
                   <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="pay-method-title">UPI Instant Payment</span>
                     <span class="badge-rec">Recommended</span>
+                    <span style="font-size: 0.72rem; color: #0369a1; background: #e0f2fe; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Razorpay</span>
                   </div>
                   <span class="pay-method-desc">GPay, PhonePe, Paytm, BHIM, or any UPI ID</span>
                 </div>
@@ -1360,7 +1361,10 @@
               <div class="payment-method-card" id="payMethodCard-CARD" onclick="selectPaymentMethod('CARD')">
                 <div class="pay-method-radio-custom"></div>
                 <div class="pay-method-info">
-                  <span class="pay-method-title">Cards / Net Banking</span>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="pay-method-title">Cards / Net Banking</span>
+                    <span style="font-size: 0.72rem; color: #0369a1; background: #e0f2fe; padding: 2px 7px; border-radius: 4px; font-weight: 700;">Razorpay</span>
+                  </div>
                   <span class="pay-method-desc">RuPay, Visa, Mastercard, SBI, Canara, HDFC, ICICI</span>
                 </div>
               </div>
@@ -1487,6 +1491,8 @@
   </div>
 
   <!-- Firebase and Application Controller Scripts -->
+  <!-- Razorpay Standard Checkout SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script src="/firebase-db.js?v=6.0"></script>
   <script src="/landing/app.js?v=3.2" charset="UTF-8"></script>
 </body>

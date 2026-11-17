@@ -1022,17 +1022,120 @@ async function openBuyProductModal(productId) {
   await checkUserAuth();
   renderCheckoutAuthSection();
 
-  // If user is logged in and farm_name or region exists, prefill address if empty
-  const addrInput = document.getElementById('checkoutShippingAddress');
-  if (addrInput && !addrInput.value.trim() && currentAuthenticatedUser) {
-    const parts = [];
-    if (currentAuthenticatedUser.farm_name) parts.push(`Shed: ${currentAuthenticatedUser.farm_name}`);
-    if (currentAuthenticatedUser.region) parts.push(`Region: ${currentAuthenticatedUser.region}`);
-    if (parts.length > 0) addrInput.value = parts.join(', ');
-  }
+  // Pre-fill address fields from saved address or user profile
+  populateCheckoutAddressFields();
 
   modal.classList.add('open');
   if (window.lucide) lucide.createIcons();
+}
+
+function populateCheckoutAddressFields() {
+  let saved = null;
+  try {
+    const raw = localStorage.getItem('setu_saved_shipping_address');
+    if (raw) saved = JSON.parse(raw);
+  } catch (_) {}
+
+  const countryEl = document.getElementById('checkoutCountry');
+  const nameEl = document.getElementById('checkoutFullName');
+  const mobileEl = document.getElementById('checkoutMobile');
+  const pinEl = document.getElementById('checkoutPincode');
+  const flatEl = document.getElementById('checkoutFlat');
+  const areaEl = document.getElementById('checkoutArea');
+  const landmarkEl = document.getElementById('checkoutLandmark');
+  const cityEl = document.getElementById('checkoutCity');
+  const stateEl = document.getElementById('checkoutState');
+  const defaultEl = document.getElementById('checkoutDefaultAddress');
+  const instrEl = document.getElementById('checkoutDeliveryInstructions');
+  const hiddenAddrEl = document.getElementById('checkoutShippingAddress');
+
+  if (countryEl) countryEl.value = (saved && saved.country) || 'India';
+  if (nameEl) nameEl.value = (saved && saved.full_name) || (currentAuthenticatedUser && (currentAuthenticatedUser.full_name || currentAuthenticatedUser.username)) || '';
+  if (mobileEl) mobileEl.value = (saved && saved.mobile) || (currentAuthenticatedUser && (currentAuthenticatedUser.phone || currentAuthenticatedUser.whatsapp_number)) || '';
+  if (pinEl) pinEl.value = (saved && saved.pincode) || '';
+  if (flatEl) flatEl.value = (saved && saved.flat) || (currentAuthenticatedUser && currentAuthenticatedUser.farm_name ? `Shed: ${currentAuthenticatedUser.farm_name}` : '');
+  if (areaEl) areaEl.value = (saved && saved.area) || '';
+  if (landmarkEl) landmarkEl.value = (saved && saved.landmark) || '';
+  if (cityEl) cityEl.value = (saved && saved.city) || (currentAuthenticatedUser && (currentAuthenticatedUser.region || currentAuthenticatedUser.city)) || '';
+  if (stateEl) stateEl.value = (saved && saved.state) || (currentAuthenticatedUser && (currentAuthenticatedUser.state || currentAuthenticatedUser.region || 'Karnataka')) || '';
+  if (defaultEl) defaultEl.checked = saved ? (saved.is_default !== false) : true;
+  if (instrEl) instrEl.value = (saved && saved.delivery_instructions) || '';
+
+  if (saved && saved.formatted_address && hiddenAddrEl) {
+    hiddenAddrEl.value = saved.formatted_address;
+  }
+}
+
+function getValidatedCheckoutAddress() {
+  const country = document.getElementById('checkoutCountry')?.value?.trim() || 'India';
+  const fullName = document.getElementById('checkoutFullName')?.value?.trim();
+  const mobile = document.getElementById('checkoutMobile')?.value?.trim().replace(/\D/g, '');
+  const pincode = document.getElementById('checkoutPincode')?.value?.trim();
+  const flat = document.getElementById('checkoutFlat')?.value?.trim();
+  const area = document.getElementById('checkoutArea')?.value?.trim();
+  const landmark = document.getElementById('checkoutLandmark')?.value?.trim() || '';
+  const city = document.getElementById('checkoutCity')?.value?.trim();
+  const state = document.getElementById('checkoutState')?.value?.trim();
+  const isDefault = document.getElementById('checkoutDefaultAddress')?.checked !== false;
+  const instructions = document.getElementById('checkoutDeliveryInstructions')?.value?.trim() || '';
+
+  if (!fullName) {
+    return { error: 'Please enter your Full name (First and Last name).', field: 'checkoutFullName' };
+  }
+  if (!mobile || mobile.length < 10) {
+    return { error: 'Please enter a valid 10-digit mobile number.', field: 'checkoutMobile' };
+  }
+  if (!pincode || !/^\d{6}$/.test(pincode)) {
+    return { error: 'Please enter a valid 6-digit PIN code.', field: 'checkoutPincode' };
+  }
+  if (!flat) {
+    return { error: 'Please enter Flat, House no., Building, Company, Apartment.', field: 'checkoutFlat' };
+  }
+  if (!area) {
+    return { error: 'Please enter Area, Street, Sector, Village.', field: 'checkoutArea' };
+  }
+  if (!city) {
+    return { error: 'Please enter Town/City.', field: 'checkoutCity' };
+  }
+  if (!state || state === 'Choose a state') {
+    return { error: 'Please choose a state.', field: 'checkoutState' };
+  }
+
+  const addressParts = [
+    `${flat}, ${area}`,
+    landmark ? `Landmark: ${landmark}` : '',
+    `${city}, ${state} - ${pincode}`,
+    country,
+    `Contact: ${fullName} (Ph: ${mobile})`,
+    instructions ? `Delivery instructions: ${instructions}` : ''
+  ].filter(Boolean);
+  const formattedAddress = addressParts.join(', ');
+
+  const addressData = {
+    country,
+    full_name: fullName,
+    mobile,
+    pincode,
+    flat,
+    area,
+    landmark,
+    city,
+    state,
+    is_default: isDefault,
+    delivery_instructions: instructions,
+    formatted_address: formattedAddress
+  };
+
+  if (isDefault) {
+    try {
+      localStorage.setItem('setu_saved_shipping_address', JSON.stringify(addressData));
+    } catch (_) {}
+  }
+
+  const hiddenInput = document.getElementById('checkoutShippingAddress');
+  if (hiddenInput) hiddenInput.value = formattedAddress;
+
+  return { success: true, address: formattedAddress, details: addressData };
 }
 
 function closeCheckoutModal() {
@@ -1323,9 +1426,21 @@ async function submitCheckoutOrder() {
     return;
   }
 
-  // 2. Validate Shipping Address
-  const addrEl = document.getElementById('checkoutShippingAddress');
-  const shippingAddress = addrEl ? addrEl.value.trim() : '';
+  // 2. Validate Structured Shipping Address
+  const addrRes = getValidatedCheckoutAddress();
+  if (!addrRes.success) {
+    if (errBox) {
+      errBox.textContent = addrRes.error;
+      errBox.classList.remove('hidden');
+    }
+    const focusEl = document.getElementById(addrRes.field);
+    if (focusEl) {
+      focusEl.focus();
+      focusEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
+  const shippingAddress = addrRes.address;
 
   // 3. Save pending checkout state so login page can fulfill it
   const pendingOrder = {
@@ -1336,6 +1451,7 @@ async function submitCheckoutOrder() {
     unit_price_minor_units: activeCheckoutProduct.price_minor_units,
     quantity: checkoutQuantity || 1,
     shipping_address: shippingAddress,
+    shipping_address_details: addrRes.details,
     payment_method: selectedPaymentMethod || 'Cash on Delivery (Pay at Shed)',
     images: activeCheckoutProduct.images || [],
     auto_place: true
@@ -1365,6 +1481,133 @@ async function submitCheckoutOrder() {
   const submitBtn = document.getElementById('checkoutSubmitOrderBtn');
   const submitBtnText = document.getElementById('checkoutSubmitBtnText');
   if (submitBtn) submitBtn.disabled = true;
+
+  const finalShippingAddr = shippingAddress || (user.farm_name ? `Shed: ${user.farm_name}, Region: ${user.region || 'Karnataka'}` : 'Rearing Shed, Karnataka');
+  const finalPayMethod = selectedPaymentMethod || 'UPI';
+  const isOnlinePayment = (finalPayMethod === 'UPI' || finalPayMethod === 'CARD' || finalPayMethod === 'RAZORPAY');
+
+  // Razorpay Gateway Flow for Online Payments (UPI / Cards / NetBanking)
+  if (isOnlinePayment && typeof window.Razorpay !== 'undefined') {
+    if (submitBtnText) submitBtnText.textContent = 'Connecting to Razorpay...';
+
+    try {
+      // 1. Create Razorpay order on backend
+      const rzpRes = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: [{ product_id: activeCheckoutProduct.id, quantity: checkoutQuantity || 1 }],
+          shipping_address: finalShippingAddr,
+          payment_method: finalPayMethod,
+          notes: `Hardware order placed by ${user.full_name || user.username} (${finalPayMethod})`
+        })
+      });
+
+      const rzpData = await rzpRes.json();
+      if (!rzpRes.ok) {
+        throw new Error(rzpData.detail || 'Could not initialize Razorpay checkout session.');
+      }
+
+      // 2. Launch Razorpay Standard Checkout SDK
+      const options = {
+        key: rzpData.key_id,
+        amount: rzpData.amount_minor_units,
+        currency: rzpData.currency || 'INR',
+        name: 'Setu Sericulture',
+        description: `Hardware Order - ${activeCheckoutProduct.name}`,
+        image: 'https://setu-adminweb.vercel.app/favicon.ico',
+        order_id: rzpData.razorpay_order_id,
+        prefill: {
+          name: user.full_name || user.username || '',
+          email: user.email || '',
+          contact: user.phone || user.whatsapp_number || ''
+        },
+        theme: {
+          color: '#059669'
+        },
+        handler: async function (response) {
+          if (submitBtnText) submitBtnText.textContent = 'Verifying payment receipt...';
+          try {
+            const verifyRes = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                order_id: rzpData.order_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                method: finalPayMethod
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              throw new Error(verifyData.detail || 'Payment verification failed.');
+            }
+
+            // Sync confirmed order in Firestore
+            if (window.SetuFirebase && SetuFirebase.isAvailable && SetuFirebase.db && verifyData.order) {
+              try {
+                await SetuFirebase.db.collection('orders').doc(rzpData.order_id).set(verifyData.order, { merge: true });
+              } catch (_) {}
+            }
+
+            // Clean storage
+            localStorage.removeItem('setu_pending_order');
+            sessionStorage.removeItem('setu_pending_order');
+            localStorage.removeItem('setu_pending_checkout');
+            sessionStorage.removeItem('setu_pending_checkout');
+            sessionStorage.removeItem('setu_checkout_product_id');
+
+            localStorage.setItem('setu_tab_nav', 'orders');
+            sessionStorage.setItem('setu_tab_nav', 'orders');
+            window.location.href = '/admin?tab=orders';
+          } catch (vErr) {
+            if (errBox) {
+              errBox.textContent = vErr.message || 'Payment signature verification error.';
+              errBox.classList.remove('hidden');
+            }
+            if (submitBtn) submitBtn.disabled = false;
+            if (submitBtnText) submitBtnText.textContent = 'Retry Payment';
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            if (submitBtn) submitBtn.disabled = false;
+            updateCheckoutCalculation();
+          }
+        }
+      };
+
+      const rzpInstance = new window.Razorpay(options);
+      rzpInstance.on('payment.failed', function (resp) {
+        if (errBox) {
+          errBox.textContent = (resp.error && resp.error.description) || 'Payment transaction failed or cancelled.';
+          errBox.classList.remove('hidden');
+        }
+        if (submitBtn) submitBtn.disabled = false;
+        updateCheckoutCalculation();
+      });
+      rzpInstance.open();
+      return;
+    } catch (rzpErr) {
+      console.warn('Razorpay checkout initialization error:', rzpErr);
+      if (errBox) {
+        errBox.textContent = rzpErr.message || 'Payment gateway connection error.';
+        errBox.classList.remove('hidden');
+      }
+      if (submitBtn) submitBtn.disabled = false;
+      updateCheckoutCalculation();
+      return;
+    }
+  }
+
+  // Cash on Delivery (COD) Flow
   if (submitBtnText) submitBtnText.textContent = 'Placing verified order...';
 
   const orderId = `ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -1373,9 +1616,6 @@ async function submitCheckoutOrder() {
   const totalMinor = (activeCheckoutProduct.price_minor_units || 0) * (checkoutQuantity || 1);
   const grandTotalMinor = totalMinor + Math.round(totalMinor * 0.18);
   const nowIso = new Date().toISOString();
-
-  const finalShippingAddr = shippingAddress || (user.farm_name ? `Shed: ${user.farm_name}, Region: ${user.region || 'Karnataka'}` : 'Rearing Shed, Karnataka');
-  const finalPayMethod = selectedPaymentMethod || 'Cash on Delivery (Pay at Shed)';
 
   const orderRecord = {
     id: orderId,

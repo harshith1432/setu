@@ -19,7 +19,16 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security_scheme = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not plain_password or not hashed_password or not isinstance(hashed_password, str):
+        return False
+    # If the stored hash is an OAuth dummy placeholder (e.g. from Google sign-in)
+    if hashed_password.startswith(("oauth_", "google_", "gh_")) or "dummy" in hashed_password.lower():
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        # Safeguard against unhandled passlib ValueError ("hash could not be identified")
+        return False
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)

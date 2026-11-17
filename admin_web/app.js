@@ -3990,6 +3990,11 @@ function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
 
+  let cleanMsg = String(message || '');
+  if (cleanMsg.toLowerCase().includes('hash could not be identified') || cleanMsg.toLowerCase().includes('unknownhasherror')) {
+    cleanMsg = 'Current password could not be verified. If you signed in with Google, you can leave Current Password blank to set your password.';
+  }
+
   // If this is a success notification replacing a loading/transient state, dismiss transient toasts
   if (type === 'success') {
     container.querySelectorAll('.toast-info, .info').forEach(t => {
@@ -8846,10 +8851,151 @@ async function submitFarmerHardwareOrder(productId) {
   const payMethod = document.querySelector('input[name="farmerPaymentMethod"]:checked')?.value || 'UPI';
   const qty = window.farmerCurrentOrderQty || 1;
   const token = window.adminToken || TAB_STORAGE.getItem('setu_tab_token') || localStorage.getItem('setu_token') || '';
+  const farmerUser = currentUser || {};
+  const unitPaise = p.price_minor_units || 0;
+  const total = (unitPaise * qty * 1.18) / 100;
 
   const btn = document.getElementById('btnSubmitFarmerOrder');
   const btnText = document.getElementById('farmerOrderBtnText');
   if (btn) btn.disabled = true;
+
+  // Razorpay Gateway Flow for Online/UPI Purchases
+  if (payMethod === 'UPI' && typeof window.Razorpay !== 'undefined') {
+    if (btnText) btnText.textContent = 'Connecting to Razorpay...';
+
+    try {
+      const rzpRes = await fetch(`${API_BASE_URL}/payments/razorpay/create-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          items: [{ product_id: p.id, quantity: qty }],
+          shipping_address: formattedAddress,
+          payment_method: 'UPI',
+          notes: `Direct purchase from Setu Farmer Hub (${p.name})`
+        })
+      });
+
+      const rzpData = await rzpRes.json();
+      if (!rzpRes.ok) throw new Error(rzpData.detail || 'Failed to initialize Razorpay checkout session.');
+
+      const options = {
+        key: rzpData.key_id,
+        amount: rzpData.amount_minor_units,
+        currency: rzpData.currency || 'INR',
+        name: 'Setu Sericulture',
+        description: `Hardware Order - ${p.name}`,
+        image: 'https://setu-adminweb.vercel.app/favicon.ico',
+        order_id: rzpData.razorpay_order_id,
+        prefill: {
+          name: fullName || (farmerUser.full_name || farmerUser.username || ''),
+          email: farmerUser.email || '',
+          contact: mobile || (farmerUser.phone || farmerUser.whatsapp_number || '')
+        },
+        theme: { color: '#059669' },
+        handler: async function (resp) {
+          if (btnText) btnText.textContent = 'Verifying Payment...';
+          try {
+            const vRes = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                order_id: rzpData.order_id,
+                razorpay_order_id: resp.razorpay_order_id,
+                razorpay_payment_id: resp.razorpay_payment_id,
+                razorpay_signature: resp.razorpay_signature,
+                method: 'UPI'
+              })
+            });
+            const vData = await vRes.json();
+            if (!vRes.ok) throw new Error(vData.detail || 'Payment verification failed.');
+
+            const finalOrderNum = (vData.order && vData.order.order_number) || rzpData.order_number || 'ORD-2026';
+            const finalTotalINR = ((rzpData.amount_minor_units || 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+            openAppModal('Order Confirmed!', `
+              <div style="text-align: center; padding: 16px 10px;">
+                <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(16, 185, 129, 0.12); color: #059669; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto;">
+                  <i data-lucide="check" style="width: 32px; height: 32px;"></i>
+                </div>
+                <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--text-main); margin-bottom: 6px;">Order Confirmed Successfully!</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 440px; margin: 0 auto 18px auto; line-height: 1.5;">
+                  Your hardware order has been verified and registered with Setu Sericulture Fulfilment. An official GST invoice and tracking ID have been generated.
+                </p>
+                
+                <div style="background: var(--bg-surface-alt, #f8fafc); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; max-width: 420px; margin: 0 auto 22px auto; text-align: left; font-size: 0.84rem; display: flex; flex-direction: column; gap: 8px;">
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">Order Number:</span>
+                    <strong class="font-mono">${escapeHtml(finalOrderNum)}</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">Item Ordered:</span>
+                    <strong>${escapeHtml(p.name)} (${qty} ${p.unit || 'unit'})</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">Total Paid:</span>
+                    <strong style="color: var(--brand-primary, #059669); font-size: 0.95rem;">₹${finalTotalINR}</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">Payment Mode:</span>
+                    <span class="badge badge-success">UPI · Razorpay Verified</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">Dispatch Status:</span>
+                    <span class="badge badge-success">CONFIRMED · DISPATCH PREP</span>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: center; gap: 12px;">
+                  <button type="button" class="btn btn-primary" onclick="closeAppModal(); switchNavTab('orders');" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; padding: 8px 22px; border-radius: 6px;">
+                    <i data-lucide="shopping-bag"></i> View in My Orders
+                  </button>
+                  <button type="button" class="btn btn-skin" onclick="closeAppModal();">
+                    Continue Browsing
+                  </button>
+                </div>
+              </div>
+            `, 'md');
+
+            showToast(`Order ${finalOrderNum} confirmed via Razorpay!`, 'success');
+            if (typeof loadOrders === 'function') loadOrders();
+            if (window.lucide) lucide.createIcons();
+          } catch (verr) {
+            showValidationError(verr.message || 'Payment signature verification failed.', 'btnSubmitFarmerOrder');
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = 'Retry Payment';
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = `Place Order (₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})`;
+          }
+        }
+      };
+
+      const rzpInstance = new window.Razorpay(options);
+      rzpInstance.on('payment.failed', function (r) {
+        showValidationError((r.error && r.error.description) || 'Payment transaction failed or was cancelled.', 'btnSubmitFarmerOrder');
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = `Place Order (₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})`;
+      });
+      rzpInstance.open();
+      return;
+    } catch (err) {
+      showValidationError(err.message || 'Failed to initiate Razorpay checkout.', 'btnSubmitFarmerOrder');
+      if (btn) btn.disabled = false;
+      if (btnText) btnText.textContent = `Place Order (₹${total.toLocaleString('en-IN', {minimumFractionDigits: 2})})`;
+      return;
+    }
+  }
+
+  // Cash on Delivery (Pay at Shed) Fallback Flow
   if (btnText) btnText.textContent = 'Placing Order...';
 
   try {
@@ -13110,15 +13256,33 @@ window.openEditProfileModal = openEditProfileModal;
 window.submitEditProfile = submitEditProfile;
 
 function openChangePasswordModal() {
+  const isGoogleUser = Boolean(
+    currentUser && (
+      currentUser.google_id ||
+      currentUser.auth_provider === 'google' ||
+      (currentUser.username && (currentUser.username.includes('@') || currentUser.username.startsWith('google_') || currentUser.username.startsWith('farmer_')))
+    )
+  );
+
   const body = `
     <form id="changePasswordForm" action="javascript:void(0);" onsubmit="submitChangePassword(event); return false;" style="display: flex; flex-direction: column; gap: 14px;">
-      <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0;">
-        Update your account password below. Enter your current password and choose a new secure password.
+      <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0; line-height: 1.45;">
+        ${isGoogleUser 
+          ? 'You signed in with Google. You can create a direct account password below to log in using either Google or your email/username.' 
+          : 'Update your account password below. Enter your current password and choose a new secure password.'}
       </p>
+
+      ${isGoogleUser ? `
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 8px; font-size: 0.80rem; color: #166534;">
+          <i data-lucide="shield-check" style="width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px;"></i>
+          <span><strong>Google Sign-In:</strong> If you registered with Google and do not have an existing password, leave <em>Current Password</em> blank and set your new password directly.</span>
+        </div>
+      ` : ''}
+
       <div class="form-group">
-        <label style="font-size: 0.8rem; font-weight: 700;">Current Password *</label>
+        <label style="font-size: 0.8rem; font-weight: 700;">Current Password ${isGoogleUser ? '<span style="font-weight: 400; color: var(--text-muted);">(Optional for Google sign-in)</span>' : '*'}</label>
         <div style="position: relative;">
-          <input type="password" id="cpCurrentPassword" required placeholder="Enter current password" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+          <input type="password" id="cpCurrentPassword" ${isGoogleUser ? '' : 'required'} placeholder="${isGoogleUser ? 'Leave blank if first time setting password' : 'Enter current password'}" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
           <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cpCurrentPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide">
             <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
           </button>
@@ -13171,11 +13335,11 @@ async function submitChangePassword(e) {
   const confirm_password = document.getElementById('cpConfirmPassword')?.value || '';
 
   if (new_password !== confirm_password) {
-    showToast('New passwords do not match', 'error');
+    showToast('New passwords do not match. Please ensure both passwords match.', 'error');
     return false;
   }
   if (new_password.length < 6) {
-    showToast('New password must be at least 6 characters', 'error');
+    showToast('New password must be at least 6 characters.', 'error');
     return false;
   }
 
@@ -13190,11 +13354,21 @@ async function submitChangePassword(e) {
       body: JSON.stringify({ current_password, new_password, confirm_password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Failed to update password');
-    showToast('Password updated successfully!', 'success');
+    if (!res.ok) {
+      let detailMsg = data.detail || 'Failed to update password';
+      if (typeof detailMsg === 'string' && (detailMsg.toLowerCase().includes('hash could not be identified') || detailMsg.toLowerCase().includes('hash') || detailMsg.toLowerCase().includes('bcrypt'))) {
+        detailMsg = 'Current password is incorrect. If your account was registered with Google, you can leave Current Password blank to set your password.';
+      }
+      throw new Error(detailMsg);
+    }
+    showToast(data.message || 'Password updated successfully!', 'success');
     closeAppModal();
   } catch (err) {
-    showToast(err.message, 'error');
+    let friendly = err.message || 'Failed to update password';
+    if (typeof friendly === 'string' && (friendly.toLowerCase().includes('hash could not be identified') || friendly.toLowerCase().includes('hash'))) {
+      friendly = 'Current password is incorrect. If your account was registered with Google, you can leave Current Password blank to set your password.';
+    }
+    showToast(friendly, 'error');
   }
   return false;
 }
