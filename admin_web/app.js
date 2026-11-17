@@ -13431,19 +13431,20 @@ function openChangePasswordModal() {
       ${isGoogleUser ? `
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 8px; font-size: 0.80rem; color: #166534;">
           <i data-lucide="shield-check" style="width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px;"></i>
-          <span><strong>Google Sign-In:</strong> If you registered with Google and do not have an existing password, leave <em>Current Password</em> blank and set your new password directly.</span>
+          <span><strong>Google Sign-In Verified:</strong> Your identity is verified with Google. Enter your new password below to create or update your password.</span>
         </div>
-      ` : ''}
+      ` : `
+        <div class="form-group">
+          <label style="font-size: 0.8rem; font-weight: 700;">Current Password *</label>
+          <div style="position: relative;">
+            <input type="password" id="cpCurrentPassword" required placeholder="Enter current password" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cpCurrentPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide">
+              <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+            </button>
+          </div>
+        </div>
+      `}
 
-      <div class="form-group">
-        <label style="font-size: 0.8rem; font-weight: 700;">Current Password ${isGoogleUser ? '<span style="font-weight: 400; color: var(--text-muted);">(Optional for Google sign-in)</span>' : '*'}</label>
-        <div style="position: relative;">
-          <input type="password" id="cpCurrentPassword" ${isGoogleUser ? '' : 'required'} placeholder="${isGoogleUser ? 'Leave blank if first time setting password' : 'Enter current password'}" style="width: 100%; padding: 8px 36px 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); font-family: var(--font-mono); font-size: 0.85rem;">
-          <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('cpCurrentPassword', this)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; padding: 2px;" title="Show/Hide">
-            <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
-          </button>
-        </div>
-      </div>
       <div class="form-group">
         <label style="font-size: 0.8rem; font-weight: 700;">New Password *</label>
         <div style="position: relative;">
@@ -13486,6 +13487,14 @@ async function submitChangePassword(e) {
     if (typeof e.preventDefault === 'function') e.preventDefault();
     if (typeof e.stopPropagation === 'function') e.stopPropagation();
   }
+  const isGoogleUser = Boolean(
+    currentUser && (
+      currentUser.google_id ||
+      currentUser.auth_provider === 'google' ||
+      (currentUser.username && (currentUser.username.includes('@') || currentUser.username.startsWith('google_') || currentUser.username.startsWith('farmer_')))
+    )
+  );
+
   const current_password = document.getElementById('cpCurrentPassword')?.value || '';
   const new_password = document.getElementById('cpNewPassword')?.value || '';
   const confirm_password = document.getElementById('cpConfirmPassword')?.value || '';
@@ -13507,13 +13516,13 @@ async function submitChangePassword(e) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ current_password, new_password, confirm_password })
+      body: JSON.stringify({ current_password, new_password, confirm_password, is_google_user: isGoogleUser })
     });
     const data = await res.json();
     if (!res.ok) {
       let detailMsg = data.detail || 'Failed to update password';
       if (typeof detailMsg === 'string' && (detailMsg.toLowerCase().includes('hash could not be identified') || detailMsg.toLowerCase().includes('hash') || detailMsg.toLowerCase().includes('bcrypt'))) {
-        detailMsg = 'Current password is incorrect. If your account was registered with Google, you can leave Current Password blank to set your password.';
+        detailMsg = 'Current password is incorrect. If your account was registered with Google, you can set your new password directly.';
       }
       throw new Error(detailMsg);
     }
@@ -13522,7 +13531,7 @@ async function submitChangePassword(e) {
   } catch (err) {
     let friendly = err.message || 'Failed to update password';
     if (typeof friendly === 'string' && (friendly.toLowerCase().includes('hash could not be identified') || friendly.toLowerCase().includes('hash'))) {
-      friendly = 'Current password is incorrect. If your account was registered with Google, you can leave Current Password blank to set your password.';
+      friendly = 'Current password is incorrect. If your account was registered with Google, you can set your new password directly.';
     }
     showToast(friendly, 'error');
   }

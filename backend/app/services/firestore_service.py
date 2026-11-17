@@ -1277,6 +1277,239 @@ class FirestoreService:
             logger.warning("Error querying employee invitation in Firestore: %s", type(e).__name__)
             return None
 
+    # =========================================================================
+    # 11. DEPARTMENTS & REPORTING STRUCTURES
+    # =========================================================================
+
+    def create_department(self, dept_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Creates or updates a department document in Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            dept_id = dept_data.get("id") or f"dept_{dept_data.get('code', 'new').lower()}"
+            doc_data = dict(dept_data)
+            doc_data["id"] = dept_id
+            if "created_at" not in doc_data:
+                doc_data["created_at"] = datetime.now(timezone.utc).isoformat()
+            doc_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("departments").document(dept_id).set(doc_data, merge=True)
+            return doc_data
+        except Exception as e:
+            logger.warning("Firestore create_department error: %s", type(e).__name__)
+            return None
+
+    def get_department(self, dept_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves department by ID or department code from Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            doc = self._db.collection("departments").document(dept_id).get()
+            if doc.exists:
+                d = doc.to_dict()
+                d["id"] = doc.id
+                return d
+            # Fallback by code
+            docs = list(self._db.collection("departments").where("code", "==", dept_id.upper()).limit(1).stream())
+            if docs:
+                d = docs[0].to_dict()
+                d["id"] = docs[0].id
+                return d
+            return None
+        except Exception as e:
+            logger.warning("Firestore get_department error: %s", type(e).__name__)
+            return None
+
+    def list_departments(self, org_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lists all departments from Cloud Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            coll = self._db.collection("departments")
+            if org_id:
+                docs = coll.where("organization_id", "==", org_id).stream()
+            else:
+                docs = coll.stream()
+            res = []
+            for d in docs:
+                data = d.to_dict()
+                data["id"] = d.id
+                res.append(data)
+            return res
+        except Exception as e:
+            logger.warning("Firestore list_departments error: %s", type(e).__name__)
+            return []
+
+    def update_department(self, dept_id: str, updates: Dict[str, Any]) -> bool:
+        """Updates department fields in Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            existing = self.get_department(dept_id)
+            if not existing:
+                return False
+            actual_id = existing.get("id") or dept_id
+            updates_copy = dict(updates)
+            updates_copy["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("departments").document(actual_id).update(updates_copy)
+            return True
+        except Exception as e:
+            logger.warning("Firestore update_department error: %s", type(e).__name__)
+            return False
+
+    def delete_department(self, dept_id: str) -> bool:
+        """Deletes department document from Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            existing = self.get_department(dept_id)
+            if not existing:
+                return False
+            actual_id = existing.get("id") or dept_id
+            self._db.collection("departments").document(actual_id).delete()
+            return True
+        except Exception as e:
+            logger.warning("Firestore delete_department error: %s", type(e).__name__)
+            return False
+
+    # =========================================================================
+    # 12. ROLES, PERMISSIONS & DASHBOARDS
+    # =========================================================================
+
+    def list_roles(self, org_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lists roles from Cloud Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            coll = self._db.collection("roles")
+            if org_id:
+                docs = coll.where("organization_id", "==", org_id).stream()
+            else:
+                docs = coll.stream()
+            res = []
+            for d in docs:
+                data = d.to_dict()
+                data["id"] = d.id
+                res.append(data)
+            return res
+        except Exception as e:
+            logger.warning("Firestore list_roles error: %s", type(e).__name__)
+            return []
+
+    def get_role(self, role_id_or_code: str) -> Optional[Dict[str, Any]]:
+        """Gets role document by ID or code from Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            doc = self._db.collection("roles").document(role_id_or_code).get()
+            if doc.exists:
+                d = doc.to_dict()
+                d["id"] = doc.id
+                return d
+            docs = list(self._db.collection("roles").where("code", "==", role_id_or_code.lower()).limit(1).stream())
+            if docs:
+                d = docs[0].to_dict()
+                d["id"] = docs[0].id
+                return d
+            return None
+        except Exception as e:
+            logger.warning("Firestore get_role error: %s", type(e).__name__)
+            return None
+
+    def save_role(self, role_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves or updates role in Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            role_id = role_data.get("id") or f"role_{role_data.get('code', 'custom').lower()}"
+            doc_data = dict(role_data)
+            doc_data["id"] = role_id
+            if "created_at" not in doc_data:
+                doc_data["created_at"] = datetime.now(timezone.utc).isoformat()
+            doc_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._db.collection("roles").document(role_id).set(doc_data, merge=True)
+            return doc_data
+        except Exception as e:
+            logger.warning("Firestore save_role error: %s", type(e).__name__)
+            return None
+
+    def delete_role(self, role_id: str) -> bool:
+        """Deletes custom role from Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            existing = self.get_role(role_id)
+            if not existing:
+                return False
+            actual_id = existing.get("id") or role_id
+            self._db.collection("roles").document(actual_id).delete()
+            return True
+        except Exception as e:
+            logger.warning("Firestore delete_role error: %s", type(e).__name__)
+            return False
+
+    def update_role_dashboards(self, role_id_or_code: str, dashboards: List[str]) -> bool:
+        """Updates allowed dashboards list for a role in Cloud Firestore."""
+        if not self.is_available:
+            return False
+        try:
+            role = self.get_role(role_id_or_code)
+            if not role:
+                return False
+            actual_id = role.get("id") or role_id_or_code
+            self._db.collection("roles").document(actual_id).set({
+                "allowed_dashboards": dashboards,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }, merge=True)
+            return True
+        except Exception as e:
+            logger.warning("Firestore update_role_dashboards error: %s", type(e).__name__)
+            return False
+
+    # =========================================================================
+    # 13. ORGANIZATIONS
+    # =========================================================================
+
+    def list_organizations(self) -> List[Dict[str, Any]]:
+        """Lists organizations from Cloud Firestore."""
+        if not self.is_available:
+            return []
+        try:
+            docs = self._db.collection("organizations").stream()
+            return [{"id": d.id, **d.to_dict()} for d in docs]
+        except Exception as e:
+            logger.warning("Firestore list_organizations error: %s", type(e).__name__)
+            return []
+
+    def get_organization(self, org_id: str) -> Optional[Dict[str, Any]]:
+        """Gets organization by ID from Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            doc = self._db.collection("organizations").document(org_id).get()
+            if doc.exists:
+                d = doc.to_dict()
+                d["id"] = doc.id
+                return d
+            return None
+        except Exception as e:
+            logger.warning("Firestore get_organization error: %s", type(e).__name__)
+            return None
+
+    def save_organization(self, org_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Saves or updates organization document in Cloud Firestore."""
+        if not self.is_available:
+            return None
+        try:
+            org_id = org_data.get("id") or f"org_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            data = dict(org_data)
+            data["id"] = org_id
+            self._db.collection("organizations").document(org_id).set(data, merge=True)
+            return data
+        except Exception as e:
+            logger.warning("Firestore save_organization error: %s", type(e).__name__)
+            return None
+
+
 
 # Global singleton instance
 firestore_service = FirestoreService()

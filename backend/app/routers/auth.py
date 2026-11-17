@@ -496,6 +496,9 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
             updates["farm_name"] = req.farm_name.strip()
         if req.region and req.region.strip() and not existing.get("region"):
             updates["region"] = req.region.strip()
+        if google_id and not existing.get("google_id"):
+            updates["google_id"] = google_id
+        updates["auth_provider"] = "google"
         if existing.get("is_active") is None:
             updates["is_active"] = True
             existing["is_active"] = True
@@ -518,7 +521,14 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
         )
 
         access_token = create_access_token(
-            data={"sub": existing["username"], "user_id": existing["id"], "role": "farmer", "session_id": session_id},
+            data={
+                "sub": existing["username"],
+                "user_id": existing["id"],
+                "role": "farmer",
+                "session_id": session_id,
+                "auth_provider": "google",
+                "google_id": google_id or existing.get("google_id")
+            },
             expires_delta=expires_delta
         )
         log_audit(existing["username"], "GOOGLE_LOGIN", f"Google farmer logged in: {existing.get('full_name')} ({existing.get('username')})")
@@ -570,7 +580,14 @@ def google_sync(req: GoogleAuthRequest, request: Request = None):
     )
 
     access_token = create_access_token(
-        data={"sub": new_user_data["username"], "user_id": user_id, "role": "farmer", "session_id": session_id},
+        data={
+            "sub": new_user_data["username"],
+            "user_id": user_id,
+            "role": "farmer",
+            "session_id": session_id,
+            "auth_provider": "google",
+            "google_id": google_id
+        },
         expires_delta=expires_delta
     )
     log_audit(new_user_data["username"], "GOOGLE_ENROLL", f"New Google farmer enrolled: {new_user_data['full_name']} ({username})")
@@ -697,6 +714,7 @@ class ChangePasswordRequest(BaseModel):
     current_password: Optional[str] = None
     new_password: str
     confirm_password: Optional[str] = None
+    is_google_user: Optional[bool] = None
 
 class ForgotPasswordRequest(BaseModel):
     identifier: str
@@ -724,10 +742,21 @@ def change_user_password(
         raise HTTPException(status_code=404, detail="User account not found")
 
     user_hash = (user.get("hashed_password") or "").strip()
+    token_auth_provider = (current_user_payload.get("auth_provider") or "").lower()
+    user_auth_provider = (user.get("auth_provider") or "").lower()
+
+    # Determine if user is authenticated via Google or OAuth
     is_oauth_user = (
-        not user_hash
+        payload.is_google_user is True
+        or token_auth_provider == "google"
+        or user_auth_provider == "google"
+        or bool(current_user_payload.get("google_id"))
+        or bool(user.get("google_id"))
+        or "@" in (user.get("username") or "")
+        or not user_hash
         or user_hash.startswith(("oauth_", "google_", "gh_"))
         or "dummy" in user_hash.lower()
+        or user_hash == "hash"
     )
 
     if not is_oauth_user:
@@ -747,8 +776,8 @@ def change_user_password(
                 detail="The current password you entered is incorrect. Please check your existing password and try again."
             )
     else:
-        # User registered with Google Sign-In or OAuth without a preexisting password.
-        # Since they are actively authenticated via JWT, allow them to set their account password directly.
+        # User registered or logged in with Google Sign-In or OAuth.
+        # Since they are actively authenticated via JWT, allow them to set their direct login password.
         pass
 
     new_pwd = (payload.new_password or "").strip()
