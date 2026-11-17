@@ -368,7 +368,7 @@ def _get_fallback_product(id_or_sku: str) -> Optional[Dict[str, Any]]:
     return None
 
 FALLBACK_INVENTORY_MOVEMENTS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "inventory_movements_store.json"))
-_fallback_movements_lock = threading.Lock()
+_fallback_movements_lock = threading.RLock()
 
 def _load_fallback_inventory_movements() -> List[Dict[str, Any]]:
     with _fallback_movements_lock:
@@ -2299,14 +2299,44 @@ def get_order_detail(order_id: str) -> Optional[Dict[str, Any]]:
         if firestore_service.is_available:
             doc = firestore_service._db.collection("orders").document(order_id).get()
             if doc.exists:
-                return {"id": doc.id, **doc.to_dict()}
+                res = {"id": doc.id, **doc.to_dict()}
+                if res.get("status") == "PAID":
+                    if res.get("invoice") and isinstance(res["invoice"], dict):
+                        res["invoice"]["status"] = "PAID"
+                    if res.get("invoices") and isinstance(res["invoices"], list):
+                        for inv_entry in res["invoices"]:
+                            if isinstance(inv_entry, dict):
+                                inv_entry["status"] = "PAID"
+                if not res.get("payments"):
+                    try:
+                        p_docs = firestore_service._db.collection("payments").where("order_id", "==", order_id).get()
+                        res["payments"] = [{"id": d.id, **d.to_dict()} for d in p_docs]
+                    except Exception:
+                        pass
+                if not res.get("payments"):
+                    fb_pays = [p for p in _load_fallback_payments() if p.get("order_id") == order_id]
+                    if fb_pays:
+                        res["payments"] = fb_pays
+                return res
     except Exception:
         pass
 
     # 3. Check Local fallback
     for o in _load_fallback_orders():
         if o.get("id") == order_id or o.get("order_number") == order_id:
-            return o
+            res = dict(o)
+            if res.get("status") == "PAID":
+                if res.get("invoice") and isinstance(res["invoice"], dict):
+                    res["invoice"]["status"] = "PAID"
+                if res.get("invoices") and isinstance(res["invoices"], list):
+                    for inv_entry in res["invoices"]:
+                        if isinstance(inv_entry, dict):
+                            inv_entry["status"] = "PAID"
+            if not res.get("payments"):
+                fb_pays = [p for p in _load_fallback_payments() if p.get("order_id") == order_id]
+                if fb_pays:
+                    res["payments"] = fb_pays
+            return res
     return None
 
 
@@ -2620,12 +2650,28 @@ def record_razorpay_payment(
     # 2. Update Cloud Firestore
     try:
         if firestore_service.is_available:
-            firestore_service.update_order(real_order_id, {
+            order_patch = {
                 "status": "PAID",
                 "razorpay_payment_id": razorpay_payment_id,
                 "razorpay_order_id": razorpay_order_id,
                 "updated_at": now_iso
-            })
+            }
+            if order.get("invoices"):
+                updated_invs = []
+                for iv in order["invoices"]:
+                    iv_copy = dict(iv)
+                    iv_copy["status"] = "PAID"
+                    iv_copy["paid_at"] = now_iso
+                    updated_invs.append(iv_copy)
+                order_patch["invoices"] = updated_invs
+            if order.get("invoice"):
+                iv_single = dict(order["invoice"])
+                iv_single["status"] = "PAID"
+                iv_single["paid_at"] = now_iso
+                order_patch["invoice"] = iv_single
+            order_patch["payments"] = [payment_record]
+
+            firestore_service.update_order(real_order_id, order_patch)
             firestore_service.record_payment(payment_record)
             if inv_id:
                 firestore_service.update_invoice(inv_id, {"status": "PAID", "paid_at": now_iso})
@@ -4118,7 +4164,7 @@ def update_platform_settings_category(category: str, new_value: dict, actor: str
 # SUPER ADMIN POLICY & MULTI-ADMIN SECURITY CONTROLS
 # ==============================================================================
 
-_policy_lock = threading.Lock()
+_policy_lock = threading.RLock()
 _cached_default_admin_enabled: Optional[bool] = None
 _cached_default_admin_pw_hash: Optional[str] = None
 _cached_default_admin_email: Optional[str] = None

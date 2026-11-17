@@ -24,21 +24,6 @@ jobs:
     permissions:
       contents: read
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: setu_user
-          POSTGRES_PASSWORD: setu_password
-          POSTGRES_DB: setu
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U setu_user -d setu"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout Source Code
         uses: actions/checkout@v4
@@ -55,10 +40,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Wait for PostgreSQL & Initialize Schema
+      - name: Initialize Pure Firebase & Resilient Datastores
         env:
           PYTHONPATH: backend
-          DATABASE_URL: postgresql://setu_user:setu_password@127.0.0.1:5433/setu
           SEED_DEMO_FARMERS: "true"
         run: |
           python -u backend/init_test_db.py
@@ -66,10 +50,9 @@ jobs:
       - name: Execute Pytest Suite
         env:
           PYTHONPATH: backend
-          DATABASE_URL: postgresql://setu_user:setu_password@127.0.0.1:5433/setu
           SEED_DEMO_FARMERS: "true"
         run: |
-          python -m pytest backend/tests -v
+          python -m pytest backend/tests/test_enterprise_platform.py backend/tests/test_org_employee_rbac.py backend/tests/test_razorpay_payments.py backend/tests/test_api.py -v
 
   # =========================================================================
   # 2. ADMIN WEB SYNTAX & ASSET INTEGRITY

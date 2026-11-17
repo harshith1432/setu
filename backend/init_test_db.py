@@ -1,9 +1,5 @@
 import os
 import sys
-import time
-
-import os
-import sys
 
 def main():
     print("Initializing Setu Pure Firebase Cloud Firestore & resilient datastores...")
@@ -28,9 +24,6 @@ def main():
         print(f"FAILED during database initialization: {e}")
         traceback.print_exc()
         sys.exit(1)
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()

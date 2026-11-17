@@ -22,12 +22,12 @@ from app.services.firestore_service import firestore_service
 FALLBACK_EMPLOYEES_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "employees_store.json"))
 _fallback_employees: Dict[str, Dict[str, Any]] = {}
 _fallback_employees_loaded = False
-_fallback_employees_lock = threading.Lock()
+_fallback_employees_lock = threading.RLock()
 
 FALLBACK_INVITATIONS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "invitations_store.json"))
 _fallback_invitations: Dict[str, Dict[str, Any]] = {}
 _fallback_invitations_loaded = False
-_fallback_invitations_lock = threading.Lock()
+_fallback_invitations_lock = threading.RLock()
 
 def _ensure_fallback_employees_loaded():
     global _fallback_employees_loaded
@@ -1277,7 +1277,7 @@ DEFAULT_DEPARTMENTS: List[Dict[str, Any]] = [
 
 _fallback_departments: Dict[str, Dict[str, Any]] = {d["id"]: dict(d) for d in DEFAULT_DEPARTMENTS}
 _fallback_departments_loaded = False
-_fallback_departments_lock = threading.Lock()
+_fallback_departments_lock = threading.RLock()
 
 def _get_departments_file_path() -> str:
     data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")

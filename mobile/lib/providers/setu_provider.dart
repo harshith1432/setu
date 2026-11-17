@@ -148,7 +148,9 @@ class SetuProvider with ChangeNotifier {
   String get userId => _userId;
   String get username => _username;
   String get userName => _userName;
+  String get farmerName => _userName;
   String get userPhone => _userPhone;
+  String get phone => _userPhone;
   String get batchId => _batchId;
   String get dflCapacity => _dflCapacity;
   String get breed => _breed;

@@ -5,9 +5,17 @@ import logging
 import threading
 import time
 import secrets
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor, execute_values
+try:
+    import psycopg2
+    from psycopg2 import pool
+    from psycopg2.extras import RealDictCursor, execute_values
+    _psycopg2_installed = True
+except ImportError:
+    psycopg2 = None
+    pool = None
+    RealDictCursor = None
+    execute_values = None
+    _psycopg2_installed = False
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone, timedelta
 from contextlib import contextmanager
@@ -19,13 +27,13 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = settings.DATABASE_URL
 
-_connection_pool: Optional[pool.ThreadedConnectionPool] = None
-_pool_lock = threading.Lock()
+_connection_pool: Optional[Any] = None
+_pool_lock = threading.RLock()
 
 # L1 In-Memory Ring Buffer / Cache for Telemetry Read-Heavy Dashboards
 _latest_reading_cache: Dict[str, Dict[str, Any]] = {}
 _latest_reading_cache_times: Dict[str, float] = {}
-_cache_lock = threading.Lock()
+_cache_lock = threading.RLock()
 
 def _get_cached_latest_reading(shed_id: str) -> Optional[Dict[str, Any]]:
     now = time.time()
@@ -109,7 +117,7 @@ def get_connection():
 
 
 FALLBACK_SHEDS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "sheds_store.json"))
-_fallback_sheds_lock = threading.Lock()
+_fallback_sheds_lock = threading.RLock()
 
 def _load_fallback_sheds() -> Dict[str, Dict[str, Any]]:
     try:
@@ -135,7 +143,7 @@ def _save_fallback_shed(shed_data: Dict[str, Any]) -> None:
             logger.debug("Could not write fallback shed: %s", e)
 
 FALLBACK_THRESHOLDS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "stage_thresholds.json"))
-_fallback_thresholds_lock = threading.Lock()
+_fallback_thresholds_lock = threading.RLock()
 
 CANONICAL_THRESHOLDS = [
     {"stage_id": 1, "name": "1st Instar (Chawki)", "days": "Days 1–3", "temp_min": 27.0, "temp_max": 28.0, "hum_min": 80.0, "hum_max": 85.0, "hysteresis_temp": 0.5, "hysteresis_hum": 3.0, "fan_trigger_offset": 1.5, "description": "Chawki stage: Delicate larvae requiring high humidity and warm ambient temperatures to prevent desiccation."},
@@ -363,7 +371,7 @@ except Exception as e:
     logger.debug("Startup init_db notice: %s", e)
 
 FALLBACK_USERS_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "users_store.json"))
-_fallback_users_lock = threading.Lock()
+_fallback_users_lock = threading.RLock()
 
 def _load_fallback_users() -> Dict[str, Dict[str, Any]]:
     """Loads fallback users from persistent JSON store."""
@@ -423,7 +431,7 @@ def _update_fallback_user(user_id: str, updates: Dict[str, Any]) -> Optional[Dic
 # --- Database CRUD helpers with L1 In-Memory Caching ---
 _user_cache: Dict[str, tuple[float, Optional[Dict[str, Any]]]] = {}
 _farmers_by_shed_cache: Dict[str, tuple[float, List[Dict[str, Any]]]] = {}
-_user_cache_lock = threading.Lock()
+_user_cache_lock = threading.RLock()
 USER_CACHE_TTL = 30.0  # seconds
 
 def invalidate_user_cache():
@@ -2334,7 +2342,7 @@ def get_device_command_by_id(command_id: str) -> Optional[Dict[str, Any]]:
 # ==============================================================================
 
 _revoked_tokens_cache = set()
-_revoked_tokens_lock = threading.Lock()
+_revoked_tokens_lock = threading.RLock()
 
 def revoke_token(jti: Optional[str], token_hash: Optional[str], expires_at: datetime, revoked_by: Optional[str] = None, user_id: Optional[str] = None, reason: Optional[str] = None) -> bool:
     """
@@ -2393,7 +2401,7 @@ def is_token_revoked(jti: Optional[str], token_hash: Optional[str]) -> bool:
 # ==============================================================================
 
 _revoked_sessions_cache = set()
-_sessions_cache_lock = threading.Lock()
+_sessions_cache_lock = threading.RLock()
 _active_sessions_dict: Dict[str, Dict[str, Any]] = {}
 
 def create_user_session(
@@ -2571,7 +2579,7 @@ def revoke_user_session(session_id: str, reason: str = "User logout") -> bool:
     return True
 
 _active_password_resets: Dict[str, Dict[str, Any]] = {}
-_active_password_resets_lock = threading.Lock()
+_active_password_resets_lock = threading.RLock()
 
 def create_password_reset(identifier: str, ip_address: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
