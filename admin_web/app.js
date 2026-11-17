@@ -3610,7 +3610,45 @@ function openAppModal(title, htmlContent, size = '') {
   if (modalTitle) modalTitle.textContent = title;
   const modalBody = document.getElementById('modalBody');
   if (modalBody) {
-    modalBody.innerHTML = window.DOMPurify.sanitize(htmlContent);
+    // Preserve inline form submit & click handlers from being stripped by DOMPurify
+    const protectedHtml = (htmlContent || '')
+      .replace(/\bonsubmit=(["'])(.*?)\1/gi, 'data-modal-submit="$2"')
+      .replace(/\bonclick=(["'])(.*?)\1/gi, 'data-modal-click="$2"');
+
+    if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+      modalBody.innerHTML = window.DOMPurify.sanitize(protectedHtml, {
+        ADD_ATTR: ['data-modal-submit', 'data-modal-click', 'target']
+      });
+    } else {
+      modalBody.innerHTML = protectedHtml;
+    }
+
+    // Rebind form submit listeners cleanly
+    modalBody.querySelectorAll('[data-modal-submit]').forEach(form => {
+      const handlerStr = form.getAttribute('data-modal-submit');
+      form.removeAttribute('data-modal-submit');
+      form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        try {
+          new Function('event', handlerStr).call(this, event);
+        } catch (err) {
+          console.error('[ModalFormSubmit] execution error:', err);
+        }
+      });
+    });
+
+    // Rebind click listeners cleanly
+    modalBody.querySelectorAll('[data-modal-click]').forEach(el => {
+      const handlerStr = el.getAttribute('data-modal-click');
+      el.removeAttribute('data-modal-click');
+      el.addEventListener('click', function(event) {
+        try {
+          new Function('event', handlerStr).call(this, event);
+        } catch (err) {
+          console.error('[ModalClick] execution error:', err);
+        }
+      });
+    });
   }
   const card = document.querySelector('#appModalBackdrop .modal-card');
   if (card) {
